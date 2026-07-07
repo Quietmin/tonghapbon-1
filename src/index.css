@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  font-family: 'Inter', 'Pretendard', system-ui, sans-serif;
+  background-color: #f9f9ff;
+  color: #181c23;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-mono-data {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+
+@layer components {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+  }
+  .no-lift.glass-card:hover {
+    transform: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  }
+  .input {
+    @apply w-full h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm text-on-surface outline-none transition-colors focus:border-primary focus:bg-surface-container-lowest;
+  }
+  textarea.input {
+    @apply h-auto py-3 leading-relaxed;
+  }
+}
+
+/* thin scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c1c6d7;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.progress-ring__circle {
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+/* 인쇄 / PDF — 사이드바·헤더·네비 등 화면 UI 제거, 보고서 본문만 출력 */
+@media print {
+  aside,
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .glass-card {
+    box-shadow: none !important;
+    border: 1px solid #e0e2ed !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+  .report-page {
+    break-after: page;
+  }
+  .report-page:last-child {
+    break-after: auto;
+  }
+  @page {
+    margin: 12mm;
+    size: A4;
+  }
+}
