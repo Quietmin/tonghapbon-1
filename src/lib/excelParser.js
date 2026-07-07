@@ -9,14 +9,18 @@ const squash = (v) => norm(v).toLowerCase().replace(/\s+/g, '')
 // ---------------------------------------------------------------------------
 // 1. 컬럼 자동 인식 사전 (PRD 6.3) — 모두 공백제거 기준으로 비교
 // ---------------------------------------------------------------------------
+// name 컬럼은 별도 우선순위 처리(아래 NAME_STRONG/NAME_WEAK). '항목'은 번호(색인) 컬럼
+// 헤더로 자주 쓰여 실제 명칭('명칭','품명')보다 후순위로 둔다.
 const COLUMN_PATTERNS = {
-  name: ['명칭', '품명', '공종', '항목', '작업명', '기기명', '설비명', '대상설비', '대상기기', 'description', 'item', 'name'],
   spec: ['규격', 'spec', 'specification', 'range', '사양', '형식'],
   qty: ['수량', 'qty', 'quantity', "q'ty", '물량', '개소'],
   unit: ['단위', 'unit'],
   remark: ['비고', 'remark', 'note', '적요'],
   tag: ['tagno', 'tagno.', 'tagnumber', 'tag', '태그', '태그번호'],
 }
+// 명칭 컬럼 후보 — STRONG(실제 작업명)을 WEAK(색인성 헤더)보다 우선 선택
+const NAME_STRONG = ['명칭', '품명', '작업명', '작업내용', '공종', '기기명', '설비명', '대상설비', '대상기기', 'description', 'name']
+const NAME_WEAK = ['항목', 'item', '공사명', '내용']
 const AMOUNT_KEYWORDS = ['금액', '단가', '재료비', '노무비', '경비', '합계', 'amount', 'price', '구성비', '산식', '적용율']
 
 // ---------------------------------------------------------------------------
@@ -101,6 +105,22 @@ function parseQty(v) {
 
 const isPureNumber = (v) => /^\d+(\.\d+)?$/.test(norm(v))
 
+// 색인(번호) 토큰 판별 — 명칭이 아니라 항목 번호인 셀을 걸러낸다.
+// 예: "1", "1-1", "1.2", "Ⅰ", "Ⅰ-1", "Ⅱ-11", "I-1", "II-3", "①", "가", "(1)"
+const RE_INDEX = [
+  /^\d+([.\-]\d+)*$/, // 1, 1-1, 1.2.3
+  /^[Ⅰ-Ⅻⅰ-ⅻ]+([.\-]\s*\d+)?$/, // 유니코드 로마숫자 (± -숫자)
+  /^[IVXLCDM]{1,5}[-.．]\s*\d*$/i, // ASCII 로마숫자 + 구분자 (I-1, II-3) — 구분자 필수라 'Inlet' 등은 제외
+  /^[①-⑳㉑-㉟➀-➓]+$/, // 원문자
+  /^[가-힣]$/, // 단일 한글 (가, 나, 다)
+  /^\(?\d+\)?$/, // (1)
+]
+function isIndexToken(v) {
+  const s = norm(v)
+  if (!s || s.length > 12) return false
+  return RE_INDEX.some((re) => re.test(s))
+}
+
 function headerScore(row) {
   let score = 0
   for (const cell of row) {
@@ -119,24 +139,43 @@ function mapColumns(headerRow) {
     for (const [field, patterns] of Object.entries(COLUMN_PATTERNS)) {
       if (map[field] != null) continue
       if (patterns.some((p) => t === p || t.includes(p))) {
-        if (field === 'name' && AMOUNT_KEYWORDS.some((a) => t.includes(a))) continue
         map[field] = idx
         break
       }
     }
   })
+  // 명칭 컬럼: STRONG 우선(rank 0..), 없으면 WEAK(rank 100..). 같은 순위면 왼쪽 우선.
+  let nameIdx = null
+  let nameRank = Infinity
+  headerRow.forEach((cell, idx) => {
+    const t = squash(cell)
+    if (!t || AMOUNT_KEYWORDS.some((a) => t.includes(a))) return
+    let rank = Infinity
+    const si = NAME_STRONG.findIndex((p) => t === p || t.includes(p))
+    if (si !== -1) rank = si
+    else {
+      const wi = NAME_WEAK.findIndex((p) => t === p || t.includes(p))
+      if (wi !== -1) rank = 100 + wi
+    }
+    if (rank < nameRank) {
+      nameRank = rank
+      nameIdx = idx
+    }
+  })
+  if (nameIdx != null) map.name = nameIdx
   return map
 }
 
-// 명칭 셀이 번호/공백이면 오른쪽에서 첫 텍스트 셀을 명칭으로 대체 (번호열이 앞에 오는 내역서 대응)
+// 명칭 셀이 번호(색인)/공백이면 오른쪽에서 첫 텍스트 셀을 명칭으로 대체
+// (번호열이 명칭 앞/병합셀에 오는 내역서 대응 — 예: "항목"열에 Ⅰ-1, 실제 명칭은 옆 칸)
 function resolveName(row, colMap) {
   const raw = norm(row[colMap.name])
-  if (raw && !isPureNumber(raw)) return raw
+  if (raw && !isIndexToken(raw)) return raw
   const used = new Set([colMap.qty, colMap.unit, colMap.spec, colMap.tag, colMap.remark])
   for (let i = (colMap.name ?? 0); i < row.length; i++) {
     if (used.has(i)) continue
     const v = norm(row[i])
-    if (v && !isPureNumber(v)) return v
+    if (v && !isIndexToken(v) && !AMOUNT_KEYWORDS.some((a) => squash(v).includes(a))) return v
   }
   return raw
 }
