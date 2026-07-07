@@ -7,12 +7,11 @@ import {
   progressByField,
   progressByEquipment,
   scheduleInfo,
-  taskStatus,
   taskProgress,
-  delayRiskTasks,
   missingEntries,
   fieldColor,
 } from '../lib/progress'
+import { plannedOverall, scheduleDelayTasks } from '../lib/schedule'
 import { exportTasksToExcel } from '../lib/exporter'
 
 const FIELD_LABEL_EN = { 기계: 'Mechanical', 전기: 'Electrical', 제어: 'Control' }
@@ -25,14 +24,15 @@ export default function Dashboard() {
   const m = useMemo(() => {
     const sched = scheduleInfo(project)
     const overall = overallProgress(tasks)
+    const planned = plannedOverall(tasks, project, project.today)
     const byField = progressByField(tasks)
     const equip = progressByEquipment(tasks).sort((a, b) => b.count - a.count)
-    const risk = delayRiskTasks(tasks, sched.expected)
+    const risk = scheduleDelayTasks(tasks, project, project.today)
     const missing = missingEntries(tasks, project.today)
-    return { sched, overall, byField, equip, risk, missing }
+    return { sched, overall, planned, byField, equip, risk, missing }
   }, [tasks, project])
 
-  const onTrack = m.overall >= m.sched.expected - 5
+  const onTrack = m.overall >= m.planned - 5
   const alert = m.missing.length > 0 || m.risk.length > 0
 
   return (
@@ -88,7 +88,7 @@ export default function Dashboard() {
             </h4>
             <p className={`text-xs mt-1 flex items-center gap-1 ${onTrack ? 'text-status-success' : 'text-error'}`}>
               <Icon name={onTrack ? 'trending_up' : 'trending_down'} className="text-sm" />
-              계획 대비 {(m.overall - m.sched.expected).toFixed(1)}%p
+              계획 대비 {(m.overall - m.planned).toFixed(1)}%p
             </p>
           </div>
         </Card>
@@ -160,7 +160,7 @@ export default function Dashboard() {
               </thead>
               <tbody className="divide-y divide-border-subtle">
                 {m.equip.slice(0, 7).map((e) => {
-                  const status = e.progress >= 100 ? '완료' : e.progress >= m.sched.expected - 15 ? '진행중' : '지연'
+                  const status = e.progress >= 100 ? '완료' : e.progress >= m.planned - 15 ? '진행중' : '지연'
                   return (
                     <tr key={e.equipment} className="hover:bg-surface-container-low transition-colors">
                       <td className="py-4 font-mono-data text-on-surface">{e.equipment}</td>

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Icon, StatusChip, FieldChip, Avatar, EmptyState, ProgressBar } from '../components/ui'
 import { useStore } from '../lib/store'
-import { taskProgress, taskStatus, scheduleInfo, delayRiskTasks, overallProgress } from '../lib/progress'
+import { taskProgress, scheduleInfo, overallProgress } from '../lib/progress'
+import { scheduleDelayTasks } from '../lib/schedule'
 import { exportTasksToExcel } from '../lib/exporter'
 
 const PAGE_SIZE = 12
@@ -37,7 +38,7 @@ export default function TaskManagement() {
   const pageRows = filtered.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE)
 
   const sched = scheduleInfo(project)
-  const risk = delayRiskTasks(tasks, sched.expected)
+  const risk = scheduleDelayTasks(tasks, project, project.today)
   const completion = overallProgress(tasks)
   const personnel = new Set(tasks.map((t) => t.assignee).filter(Boolean)).size
 

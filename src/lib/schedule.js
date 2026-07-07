@@ -1,5 +1,5 @@
 // 공정표 자동 생성 (PRD 8장) — 작업명 키워드 → 오버홀 기간 내 계획일정 자동 배치
-import { taskProgress } from './progress'
+import { taskProgress } from './progress.js'
 
 // 로컬 날짜 파싱 (타임존 영향 없이)
 export function toDate(s) {
@@ -48,10 +48,33 @@ export function phaseFor(task) {
   return DEFAULT_PHASE
 }
 
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+
 // 단일 작업의 계획일정 산출
+// 1순위: 엑셀에 입력된 작업 예정일(task.planStart/planEnd)
+// 2순위: 작업명 키워드 기반 자동 배치(PRD 8.3)
 export function taskSchedule(task, project) {
   const start = toDate(project.startDate)
   const total = Math.max(1, diffDays(project.startDate, project.endDate))
+
+  if (task && task.planStart) {
+    const plannedStart = toDate(task.planStart)
+    const plannedEnd = task.planEnd ? toDate(task.planEnd) : plannedStart
+    const startOff = clamp(diffDays(project.startDate, task.planStart), 0, total)
+    const endOff = clamp(diffDays(project.startDate, task.planEnd || task.planStart), startOff, total)
+    return {
+      phase: { key: '지정', label: '지정 일정' },
+      startOff,
+      endOff,
+      total,
+      plannedStart,
+      plannedEnd,
+      plannedStartStr: task.planStart,
+      plannedEndStr: task.planEnd || task.planStart,
+      source: 'excel',
+    }
+  }
+
   const ph = phaseFor(task)
   const startOff = Math.round(ph.span[0] * total)
   const endOff = Math.max(startOff + 1, Math.min(total, Math.round(ph.span[1] * total)))
@@ -66,7 +89,13 @@ export function taskSchedule(task, project) {
     plannedEnd,
     plannedStartStr: ymd(plannedStart),
     plannedEndStr: ymd(plannedEnd),
+    source: 'auto',
   }
+}
+
+// 계획 대비 지연 작업 목록 (일정 기준 — 엑셀 예정일 또는 자동배치)
+export function scheduleDelayTasks(tasks, project, dateStr, threshold = 15) {
+  return tasks.filter((t) => isBehind(t, project, dateStr, threshold))
 }
 
 // 특정 일자 기준 계획 진척률(%) — 계획 구간 내 선형 램프

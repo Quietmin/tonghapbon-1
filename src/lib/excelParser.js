@@ -17,6 +17,8 @@ const COLUMN_PATTERNS = {
   unit: ['단위', 'unit'],
   remark: ['비고', 'remark', 'note', '적요'],
   tag: ['tagno', 'tagno.', 'tagnumber', 'tag', '태그', '태그번호'],
+  // 작업 예정일 (선택) — "2026-07-10~2026-07-15" 같은 기간, 있으면 계획일정으로 사용
+  plandate: ['작업예정일', '예정일', '작업일정', '계획일정', '공정예정', '착수예정', '일정', 'plannedstart', 'plandate', 'schedule'],
 }
 // 명칭 컬럼 후보 — STRONG(실제 작업명)을 WEAK(색인성 헤더)보다 우선 선택
 const NAME_STRONG = ['명칭', '품명', '작업명', '작업내용', '공종', '기기명', '설비명', '대상설비', '대상기기', 'description', 'name']
@@ -92,6 +94,27 @@ function classifyField(equipment, texts) {
     if (FIELD_KEYWORDS[field].some((k) => joined.includes(k))) return field
   }
   return null
+}
+
+// 작업 예정일 파싱 — "2026-07-10~2026-07-15", "2026.7.5", 단일일자, 엑셀 날짜 일련번호 지원
+const pad2 = (n) => String(n).padStart(2, '0')
+const RE_DATE = /(\d{4})\s*[-.\/년]\s*(\d{1,2})\s*[-.\/월]\s*(\d{1,2})/g
+function excelSerialToYMD(n) {
+  const dt = new Date(Date.UTC(1899, 11, 30) + Math.round(n) * 86400000)
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`
+}
+function parsePlanDates(cell) {
+  if (cell == null || cell === '') return null
+  if (typeof cell === 'number') {
+    return cell > 30000 && cell < 80000 ? { start: excelSerialToYMD(cell), end: null } : null
+  }
+  const s = String(cell)
+  const found = []
+  let m
+  RE_DATE.lastIndex = 0
+  while ((m = RE_DATE.exec(s)) !== null) found.push(`${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}`)
+  if (!found.length) return null
+  return { start: found[0], end: found.length > 1 ? found[found.length - 1] : null }
 }
 
 function parseQty(v) {
@@ -228,6 +251,7 @@ function analyzeSheet(sheetName, rows, fileName) {
     const qty = colMap.qty != null ? parseQty(row[colMap.qty]) : null
     const remark = colMap.remark != null ? norm(row[colMap.remark]) : ''
     const tag = colMap.tag != null ? norm(row[colMap.tag]) : ''
+    const plan = colMap.plandate != null ? parsePlanDates(row[colMap.plandate]) : null
     const allText = row.map(squash).join(' ')
 
     const ex = isExcludedRow(name, qty, unit, allText)
@@ -254,6 +278,8 @@ function analyzeSheet(sheetName, rows, fileName) {
       unit: unit || 'EA',
       remark,
       tag,
+      planStart: plan?.start || null,
+      planEnd: plan?.end || null,
       sheetName,
       sourceRow: r + 1,
       issues,
@@ -272,6 +298,12 @@ function dedupe(tasks) {
       // 더 정보가 많은(수량 있는) 항목으로 갱신
       const prev = out[seen.get(key)]
       if (prev.qty === 0 && t.qty > 0) out[seen.get(key)] = t
+      // 예정일은 어느 한 쪽에만 있을 수 있으니 보존
+      const keep = out[seen.get(key)]
+      if (!keep.planStart && t.planStart) {
+        keep.planStart = t.planStart
+        keep.planEnd = t.planEnd
+      }
       continue
     }
     seen.set(key, out.length)
