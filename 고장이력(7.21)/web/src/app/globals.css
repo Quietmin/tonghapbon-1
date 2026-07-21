@@ -1,0 +1,124 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+@theme {
+  /* Colors — ported from Stitch export (plant_ops_manager.html) */
+  --color-on-tertiary-fixed: #0b1c30;
+  --color-primary: #1e3a5f;
+  --color-inverse-primary: #adc8f5;
+  --color-primary-fixed-dim: #adc8f5;
+  --color-secondary: #515f74;
+  --color-inverse-on-surface: #eff1f3;
+  --color-outline: #74777f;
+  --color-table-header: #f1f5f9;
+  --color-secondary-fixed: #d5e3fd;
+  --color-background: #f7f9fb;
+  --color-on-surface-variant: #43474e;
+  --color-on-error: #ffffff;
+  --color-surface-dim: #d8dadc;
+  --color-status-critical: #dc2626;
+  --color-error-container: #ffdad6;
+  --color-border-subtle: #e2e8f0;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-primary-container: #8aa4cf;
+  --color-surface: #f7f9fb;
+  --color-surface-container-highest: #e0e3e5;
+  --color-on-primary-fixed: #001c3b;
+  --color-on-surface: #191c1e;
+  --color-on-secondary-container: #57657b;
+  --color-on-primary-fixed-variant: #2d486d;
+  --color-on-secondary-fixed: #0d1c2f;
+  --color-tertiary-fixed-dim: #b7c8e1;
+  --color-tertiary: #142538;
+  --color-inverse-surface: #2d3133;
+  --color-on-tertiary-fixed-variant: #38485d;
+  --color-secondary-fixed-dim: #b9c7e0;
+  --color-outline-variant: #c4c6cf;
+  --color-surface-container-high: #e6e8ea;
+  --color-on-primary: #ffffff;
+  --color-surface-variant: #e0e3e5;
+  --color-secondary-container: #d5e3fd;
+  --color-error: #ba1a1a;
+  --color-surface-container: #eceef0;
+  --color-primary-container: #1e3a5f;
+  --color-tertiary-container: #2a3a4f;
+  --color-surface-container-low: #f2f4f6;
+  --color-on-background: #191c1e;
+  --color-status-warning: #ea580c;
+  --color-on-tertiary-container: #94a4bd;
+  --color-surface-tint: #455f87;
+  --color-on-tertiary: #ffffff;
+  --color-primary-fixed: #d5e3ff;
+  --color-tertiary-fixed: #d3e4fe;
+  --color-on-secondary-fixed-variant: #3a485c;
+  --color-on-error-container: #93000a;
+  --color-status-success: #16a34a;
+  --color-surface-bright: #f7f9fb;
+  --color-on-secondary: #ffffff;
+
+  /* Border radius scale */
+  --radius: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 0.75rem;
+
+  /* Spacing tokens used as p-container-padding, gap-gutter, ml-sidebar-width, etc. */
+  --spacing-container-padding: 24px;
+  --spacing-stack-lg: 32px;
+  --spacing-stack-sm: 8px;
+  --spacing-gutter: 16px;
+  --spacing-stack-md: 16px;
+  --spacing-sidebar-width: 260px;
+
+  /* Font families */
+  --font-body-sm: "Inter", sans-serif;
+  --font-label-caps: "Inter", sans-serif;
+  --font-headline-md: "Hanken Grotesk", sans-serif;
+  --font-body-md: "Inter", sans-serif;
+  --font-data-mono: "JetBrains Mono", monospace;
+  --font-title-sm: "Inter", sans-serif;
+  --font-display-lg: "Hanken Grotesk", sans-serif;
+
+  /* Font sizes (type scale implied by Stitch design but missing from its exported
+     tailwind config — added here so text-display-lg/headline-md/etc. actually render
+     at distinct sizes instead of silently falling back to the browser default). */
+  --text-label-caps: 0.6875rem;
+  --text-label-caps--line-height: 1rem;
+  --text-label-caps--letter-spacing: 0.04em;
+  --text-body-sm: 0.8125rem;
+  --text-body-sm--line-height: 1.25rem;
+  --text-body-md: 0.9375rem;
+  --text-body-md--line-height: 1.5rem;
+  --text-title-sm: 1rem;
+  --text-title-sm--line-height: 1.5rem;
+  --text-headline-md: 1.5rem;
+  --text-headline-md--line-height: 2rem;
+  --text-display-lg: 2rem;
+  --text-display-lg--line-height: 2.5rem;
+}
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+  vertical-align: middle;
+}
+
+body {
+  background-color: var(--color-background);
+  font-family: "Inter", sans-serif;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}

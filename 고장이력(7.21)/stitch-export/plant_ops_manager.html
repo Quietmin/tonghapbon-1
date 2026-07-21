@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ko" class="">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Plant Ops Manager - 열원설비 관리 시스템</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Hanken+Grotesk:wght@600;700&family=JetBrains+Mono&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#0b1c30",
+                        "primary": "#1e3a5f", // Corrected to match theme primary
+                        "inverse-primary": "#adc8f5",
+                        "primary-fixed-dim": "#adc8f5",
+                        "secondary": "#515f74",
+                        "inverse-on-surface": "#eff1f3",
+                        "outline": "#74777f",
+                        "table-header": "#F1F5F9",
+                        "secondary-fixed": "#d5e3fd",
+                        "background": "#f7f9fb",
+                        "on-surface-variant": "#43474e",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#d8dadc",
+                        "status-critical": "#DC2626",
+                        "error-container": "#ffdad6",
+                        "border-subtle": "#E2E8F0",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-container": "#8aa4cf",
+                        "surface": "#f7f9fb",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-primary-fixed": "#001c3b",
+                        "on-surface": "#191c1e",
+                        "on-secondary-container": "#57657b",
+                        "on-primary-fixed-variant": "#2d486d",
+                        "on-secondary-fixed": "#0d1c2f",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "tertiary": "#142538",
+                        "inverse-surface": "#2d3133",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "secondary-fixed-dim": "#b9c7e0",
+                        "outline-variant": "#c4c6cf",
+                        "surface-container-high": "#e6e8ea",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e0e3e5",
+                        "secondary-container": "#d5e3fd",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eceef0",
+                        "primary-container": "#1e3a5f",
+                        "tertiary-container": "#2a3a4f",
+                        "surface-container-low": "#f2f4f6",
+                        "on-background": "#191c1e",
+                        "status-warning": "#EA580C",
+                        "on-tertiary-container": "#94a4bd",
+                        "surface-tint": "#455f87",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#d5e3ff",
+                        "tertiary-fixed": "#d3e4fe",
+                        "on-secondary-fixed-variant": "#3a485c",
+                        "on-error-container": "#93000a",
+                        "status-success": "#16A34A",
+                        "surface-bright": "#f7f9fb",
+                        "on-secondary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-padding": "24px",
+                        "stack-lg": "32px",
+                        "stack-sm": "8px",
+                        "gutter": "16px",
+                        "stack-md": "16px",
+                        "sidebar-width": "260px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "body-md": ["Inter"],
+                        "data-mono": ["JetBrains Mono"],
+                        "title-sm": ["Inter"],
+                        "display-lg": ["Hanken Grotesk"]
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            background-color: #f7f9fb;
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="font-body-md text-on-surface">
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate, useLocation } = ReactRouterDOM;
+
+        // --- Shared Components ---
+
+        const Sidebar = () => {
+            const location = useLocation();
+            const isActive = (path) => location.pathname === path;
+
+            return (
+                <aside className="fixed left-0 top-0 h-full w-sidebar-width bg-primary flex flex-col p-gutter border-r border-outline-variant z-50">
+                    <div className="text-title-sm font-title-sm font-bold text-on-primary mb-stack-lg flex items-center gap-2">
+                        <span className="material-symbols-outlined" style={{fontVariationSettings: "'FILL' 1"}}>factory</span>
+                        <span>Plant Ops Manager</span>
+                    </div>
+                    <nav className="flex flex-col gap-2 flex-grow">
+                        <Link to="/" className={`flex items-center gap-stack-md rounded-lg px-4 py-3 transition-all ${isActive('/') ? 'bg-primary-container text-on-primary-container scale-[0.98]' : 'text-on-primary/70 hover:text-on-primary hover:bg-primary-container/20'}`}>
+                            <span className="material-symbols-outlined">dashboard</span>
+                            <span className="font-label-caps text-label-caps">대시보드</span>
+                        </Link>
+                        <Link to="/history" className={`flex items-center gap-stack-md rounded-lg px-4 py-3 transition-all ${isActive('/history') || isActive('/detail') || isActive('/register') || isActive('/export-success') ? 'bg-primary-container text-on-primary-container scale-[0.98]' : 'text-on-primary/70 hover:text-on-primary hover:bg-primary-container/20'}`}>
+                            <span className="material-symbols-outlined" style={{fontVariationSettings: "'FILL' 1"}}>history_edu</span>
+                            <span className="font-label-caps text-label-caps">고장이력</span>
+                        </Link>
+                        <Link to="/equipment" className={`flex items-center gap-stack-md rounded-lg px-4 py-3 transition-all ${isActive('/equipment') ? 'bg-primary-container text-on-primary-container scale-[0.98]' : 'text-on-primary/70 hover:text-on-primary hover:bg-primary-container/20'}`}>
+                            <span className="material-symbols-outlined">settings_input_component</span>
+                            <span className="font-label-caps text-label-caps">설비목록</span>
+                        </Link>
+                        <Link to="/migration" className={`flex items-center gap-stack-md rounded-lg px-4 py-3 transition-all ${isActive('/migration') ? 'bg-primary-container text-on-primary-container scale-[0.98]' : 'text-on-primary/70 hover:text-on-primary hover:bg-primary-container/20'}`}>
+                            <span className="material-symbols-outlined">settings_backup_restore</span>
+                            <span className="font-label-caps text-label-caps">이력 마이그레이션</span>
+                        </Link>
+                    </nav>
+                    <div className="mt-auto pt-4 border-t border-on-primary/10">
+                        <div className="flex items-center gap-3 px-2">
+                            <div className="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden border border-outline-variant">
+                                <img className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuACJp2N_FrnLc2UBg_tcDRn3aLJ39UY2jlLPTfWrRpLIQptdzAhCXoFdaS5dUONzpvrtVcfmBf1gzrBakLLl_07SdCkWeifHkCZ07iKI7fWMPHdpruuJ6oaql6GfM-UXIZyArH71ldaZ9qQPIAfM2JB_ZK5bKOc7UwXdQ96JlUuDYKWrxTeNCb3gjnBUY3DFotpkPEbW68Ko1nTwwcNLtkcrEGVFlh1SaQp3JFgsHxn_Q8M70lBWCDCAxZX-r47VKTB1fHisAMHUFk" alt="Profile" />
+                            </div>
+                            <div>
+                                <p className="text-on-primary text-body-sm font-bold">김관리 매니저</p>
+                                <p className="text-on-primary/60 text-[11px]">열원설비 관리 시스템</p>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            );
+        };
+
+        const Header = ({ title }) => {
+            return (
+                <header className="flex justify-between items-center h-16 px-container-padding sticky top-0 z-40 bg-surface/80 backdrop-blur-md border-b border-border-subtle ml-sidebar-width">
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-headline-md font-headline-md text-primary">{title}</h1>
+                    </div>
+                    <div className="flex items-center gap-6">
+                        <div className="relative hidden lg:block">
+                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+                            <input className="pl-10 pr-4 py-2 bg-surface-container rounded-full border-none text-body-sm w-64 focus:ring-2 focus:ring-primary" placeholder="통합 검색..." type="text"/>
+                        </div>
+                        <div className="flex items-center gap-4 text-on-surface-variant">
+                            <button className="hover:bg-surface-container p-2 rounded-full transition-colors relative">
+                                <span className="material-symbols-outlined">notifications</span>
+                                <span className="absolute top-2 right-2 w-2 h-2 bg-status-critical rounded-full"></span>
+                            </button>
+                            <button className="hover:bg-surface-container p-2 rounded-full transition-colors">
+                                <span className="material-symbols-outlined">help</span>
+                            </button>
+                            <button className="hover:bg-surface-container p-2 rounded-full transition-colors">
+                                <span className="material-symbols-outlined">account_circle</span>
+                            </button>
+                        </div>
+                    </div>
+                </header>
+            );
+        };
+
+        // --- Screen Components ---
+
+        // Screen 2: Dashboard
+        const DashboardPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div className="ml-sidebar-width min-h-screen">
+                    <Header title="대시보드" />
+                    <main className="p-container-padding max-w-[1600px] mx-auto w-full flex flex-col gap-gutter">
+                        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+                            {[
+                                { label: "이번달 고장건수", val: "12", diff: "+15% ↑", icon: "warning", color: "text-status-warning" },
+                                { label: "조치중 건수", val: "04", diff: "처리율 66%", icon: "build", color: "text-primary" },
+                                { label: "다발 설비 Top1", val: "급수펌프 B-102", sub: "발생 빈도: 월 5회", icon: "star", color: "text-primary" },
+                                { label: "누적 건수 (YTD)", val: "248", diff: "-5% ↓", icon: "analytics", color: "text-primary" }
+                            ].map((card, i) => (
+                                <div key={i} className="bg-white p-stack-md rounded-xl border border-border-subtle flex flex-col justify-between min-h-[120px]">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-on-surface-variant font-label-caps text-label-caps uppercase">{card.label}</p>
+                                        <span className={`material-symbols-outlined ${card.color}`}>{card.icon}</span>
+                                    </div>
+                                    <div className="mt-4 flex flex-col">
+                                        <span className={`${card.val.length > 5 ? 'text-title-sm' : 'text-display-lg'} font-bold text-primary`}>{card.val}</span>
+                                        {card.diff && <span className={`text-body-sm ${card.diff.includes('+') ? 'text-status-critical' : card.diff.includes('-') ? 'text-status-success' : 'text-on-surface-variant'} font-bold`}>{card.diff}</span>}
+                                        {card.sub && <span className="text-body-sm text-on-surface-variant">{card.sub}</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </section>
+
+                        <section className="grid grid-cols-1 lg:grid-cols-2 gap-gutter">
+                            <div className="bg-white p-gutter rounded-xl border border-border-subtle flex flex-col">
+                                <div className="flex justify-between items-center mb-stack-md">
+                                    <h3 className="text-title-sm font-title-sm text-primary">월별 고장 추이</h3>
+                                    <select className="text-xs bg-surface-container border-none rounded-lg px-2 py-1">
+                                        <option>최근 6개월</option>
+                                    </select>
+                                </div>
+                                <div className="relative h-60 flex items-end justify-between px-4 pb-6 border-b border-border-subtle">
+                                    <div className="absolute inset-x-0 bottom-6 h-[80%]">
+                                        <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 600 160">
+                                            <path d="M0,140 L100,100 L200,120 L300,40 L400,60 L500,20 L600,30" fill="none" stroke="#1e3a5f" strokeWidth="3" />
+                                            {[100, 300, 500].map(x => <circle key={x} cx={x} cy={x===100?100:x===300?40:20} fill="#1e3a5f" r="4" />)}
+                                        </svg>
+                                    </div>
+                                    {['01월','02월','03월','04월','05월','06월'].map(m => <span key={m} className="text-[10px] text-on-surface-variant z-10">{m}</span>)}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-gutter">
+                                <div className="bg-white p-gutter rounded-xl border border-border-subtle">
+                                    <h3 className="text-title-sm font-title-sm text-primary mb-stack-md">분야별 비율</h3>
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-32 h-32 rounded-full border-[16px] border-primary-container relative flex items-center justify-center">
+                                            <div className="absolute inset-0 border-[16px] border-secondary-container rounded-full" style={{clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 50%)'}}></div>
+                                            <span className="text-xs font-bold text-primary">기계 42%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-gutter rounded-xl border border-border-subtle">
+                                    <h3 className="text-title-sm font-title-sm text-primary mb-stack-md">지사별 건수</h3>
+                                    <div className="flex flex-col gap-3">
+                                        {[
+                                            { city: "서울", count: 24, w: "80%" },
+                                            { city: "경기", count: 18, w: "60%" },
+                                            { city: "충청", count: 12, w: "40%" },
+                                            { city: "강원", count: 8, w: "25%" }
+                                        ].map(item => (
+                                            <div key={item.city} className="flex flex-col gap-1">
+                                                <div className="flex justify-between text-[10px] font-bold"><span>{item.city}지사</span><span>{item.count}건</span></div>
+                                                <div className="h-2 bg-surface-container rounded-full overflow-hidden">
+                                                    <div className="h-full bg-primary" style={{width: item.w}}></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="grid grid-cols-1 lg:grid-cols-12 gap-gutter mb-8">
+                            <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle overflow-hidden flex flex-col">
+                                <div className="p-gutter border-b border-border-subtle bg-table-header flex justify-between items-center">
+                                    <h3 className="text-title-sm font-title-sm text-primary">다발 설비 Top 10</h3>
+                                </div>
+                                <table className="w-full text-left">
+                                    <thead className="bg-table-header/50 text-label-caps text-on-surface-variant">
+                                        <tr><th className="px-4 py-3">순위</th><th className="px-4 py-3">설비명</th><th className="px-4 py-3 text-right">고장수</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border-subtle">
+                                        {[
+                                            { r: 1, name: "급수펌프 B-102", code: "P-FW-0102", count: 5, color: "text-status-critical" },
+                                            { r: 2, name: "냉각탑 팬 M-04", code: "C-CT-0004", count: 3, color: "text-primary" },
+                                            { r: 3, name: "열교환기 HE-02", code: "H-EX-0002", count: 2, color: "text-primary" }
+                                        ].map(row => (
+                                            <tr key={row.r} className="hover:bg-background transition-colors">
+                                                <td className="px-4 py-3 font-bold text-primary">{row.r}</td>
+                                                <td className="px-4 py-3 text-body-sm font-semibold">{row.name}</td>
+                                                <td className={`px-4 py-3 text-right font-bold ${row.color}`}>{row.count}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle overflow-hidden">
+                                <div className="p-gutter border-b border-border-subtle bg-table-header flex justify-between items-center">
+                                    <h3 className="text-title-sm font-title-sm text-primary uppercase">최근 등록 고장이력</h3>
+                                    <Link to="/history" className="text-primary hover:underline text-xs font-bold">전체보기</Link>
+                                </div>
+                                <div className="p-gutter flex flex-col gap-4 overflow-y-auto max-h-[400px]">
+                                    <div onClick={() => navigate('/detail')} className="flex items-start gap-4 p-3 rounded-lg border border-border-subtle hover:bg-background cursor-pointer group transition-all">
+                                        <div className="w-10 h-10 rounded bg-error-container flex items-center justify-center text-error flex-shrink-0">
+                                            <span className="material-symbols-outlined">error</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-xs font-bold text-status-critical">긴급정지</span>
+                                                <span className="text-xs text-on-surface-variant font-data-mono">2023-11-20 14:22</span>
+                                            </div>
+                                            <h4 className="text-body-md font-bold text-primary truncate">B-102 급수펌프 베어링 과열 발생</h4>
+                                            <p className="text-body-sm text-on-surface-variant line-clamp-1">운전 중 이상 진동 및 베어링 온도 95도 상회로 인한 강제 정지...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </main>
+                    <button onClick={() => navigate('/register')} className="fixed bottom-8 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-transform z-50">
+                        <span className="material-symbols-outlined scale-125">add</span>
+                    </button>
+                </div>
+            );
+        };
+
+        // Screen 3: History List
+        const HistoryListPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div className="ml-sidebar-width min-h-screen">
+                    <Header title="고장이력 관리" />
+                    <div className="p-container-padding space-y-gutter max-w-[1600px] mx-auto w-full">
+                        <section className="bg-white p-6 rounded-lg border border-border-subtle shadow-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 items-end">
+                                <div className="space-y-2">
+                                    <label className="text-label-caps text-secondary font-bold uppercase">지사</label>
+                                    <select className="w-full border-border-subtle rounded text-body-md bg-surface-container-low focus:ring-primary"><option>전체</option></select>
+                                </div>
+                                <div className="space-y-2 lg:col-span-2">
+                                    <label className="text-label-caps text-secondary font-bold uppercase">발생기간</label>
+                                    <div className="flex items-center gap-2">
+                                        <input className="flex-1 border-border-subtle rounded text-body-md bg-surface-container-low" type="date" />
+                                        <span>~</span>
+                                        <input className="flex-1 border-border-subtle rounded text-body-md bg-surface-container-low" type="date" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 lg:col-span-2 xl:col-span-2">
+                                    <button className="flex-1 bg-primary text-white py-2 rounded-lg font-bold hover:bg-primary-container flex items-center justify-center gap-2">
+                                        <span className="material-symbols-outlined text-[20px]">search</span>조회하기
+                                    </button>
+                                    <button onClick={() => navigate('/register')} className="px-4 py-2 border border-primary text-primary rounded-lg font-bold hover:bg-primary/5 flex items-center justify-center gap-2">
+                                        <span className="material-symbols-outlined text-[20px]">add</span>신규 등록
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+                        <section className="bg-white rounded-lg border border-border-subtle shadow-sm overflow-hidden flex flex-col">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-table-header border-b border-border-subtle">
+                                        <tr>
+                                            <th className="px-6 py-4 text-label-caps text-secondary font-bold">발생일시</th>
+                                            <th className="px-6 py-4 text-label-caps text-secondary font-bold">지사</th>
+                                            <th className="px-6 py-4 text-label-caps text-secondary font-bold">설비명</th>
+                                            <th className="px-6 py-4 text-label-caps text-secondary font-bold">고장제목</th>
+                                            <th className="px-6 py-4 text-label-caps text-secondary font-bold">상태</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border-subtle text-body-md">
+                                        {[
+                                            { date: "2023-11-20 14:32", b: "강남지사", name: "PL-01B 펌프", title: "순환펌프 베어링 이상 소음 발생", status: "조치완료", sCol: "bg-green-100 text-status-success" },
+                                            { date: "2023-11-21 09:15", b: "서부지사", name: "TR-04 변압기", title: "절연유 온도 상승 알람 점검", status: "조치중", sCol: "bg-red-100 text-status-critical" }
+                                        ].map((row, i) => (
+                                            <tr key={i} onClick={() => navigate('/detail')} className="hover:bg-slate-50 cursor-pointer transition-colors">
+                                                <td className="px-6 py-4 font-data-mono text-secondary">{row.date}</td>
+                                                <td className="px-6 py-4">{row.b}</td>
+                                                <td className="px-6 py-4 font-bold">{row.name}</td>
+                                                <td className="px-6 py-4 truncate max-w-[200px]">{row.title}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${row.sCol}`}>{row.status}</span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            );
+        };
+
+        // Screen 1: History Detail
+        const HistoryDetailPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div className="ml-sidebar-width min-h-screen">
+                    <Header title="고장이력 상세보기" />
+                    <main className="p-container-padding">
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-stack-lg">
+                            <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="bg-error-container text-on-error-container px-3 py-1 rounded text-label-caps font-bold flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[14px]">priority_high</span>고장 (REPAIRING)
+                                    </span>
+                                    <span className="text-outline text-body-sm">ID: FL-20231027-004</span>
+                                </div>
+                                <h2 className="text-display-lg font-display-lg text-primary mb-2">분당지사 2호기 순환펌프 베어링 과열 및 소음 발생</h2>
+                                <div className="flex items-center gap-6 text-on-surface-variant">
+                                    <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">calendar_today</span><span className="font-bold">발생: 2023-10-27 14:20</span></div>
+                                    <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">history</span><span className="font-bold">복구: 2023-10-28 09:30</span></div>
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <button className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-primary text-primary font-bold hover:bg-primary/5">
+                                    <span className="material-symbols-outlined text-[20px]">edit</span>수정하기
+                                </button>
+                                <button onClick={() => navigate('/history')} className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-outline text-on-surface font-bold hover:bg-surface-container">
+                                    <span className="material-symbols-outlined text-[20px]">list</span>목록으로
+                                </button>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter mb-stack-lg">
+                            <div className="lg:col-span-2 bg-white border border-border-subtle rounded-xl p-6 shadow-sm">
+                                <div className="flex items-center gap-2 mb-6 text-primary"><span className="material-symbols-outlined" style={{fontVariationSettings: "'FILL' 1"}}>info</span><h3 className="font-title-sm text-title-sm">기본 정보</h3></div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-y-6 gap-x-4">
+                                    <div><p className="text-label-caps text-on-surface-variant mb-1 uppercase">지사</p><p className="font-bold">분당지사</p></div>
+                                    <div><p className="text-label-caps text-on-surface-variant mb-1 uppercase">열공급시설</p><p className="font-bold">제2기계실</p></div>
+                                    <div><p className="text-label-caps text-on-surface-variant mb-1 uppercase">설비명</p><p className="font-bold">지역난방 순환펌프</p></div>
+                                    <div><p className="text-label-caps text-on-surface-variant mb-1 uppercase">고장분야</p><p className="font-bold text-status-warning">기계설비 / 베어링부</p></div>
+                                    <div><p className="text-label-caps text-on-surface-variant mb-1 uppercase">관리번호</p><p className="font-data-mono">MC-BN-202-02</p></div>
+                                </div>
+                            </div>
+                            <div className="bg-white border border-border-subtle rounded-xl p-6 shadow-sm">
+                                <div className="flex items-center gap-2 mb-6 text-status-critical"><span className="material-symbols-outlined" style={{fontVariationSettings: "'FILL' 1"}}>block</span><h3 className="font-title-sm text-title-sm">공급중단 현황</h3></div>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center py-2 border-b border-surface-container"><span>APT 세대수</span><span className="font-headline-md text-primary">1,240 세대</span></div>
+                                    <div className="flex justify-between items-center py-2 border-b border-surface-container"><span>중단시간</span><span className="font-headline-md text-status-critical">19시간 10분</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-6">
+                            <section className="bg-white border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+                                <div className="bg-table-header px-6 py-3 border-b border-border-subtle flex items-center gap-2"><span className="material-symbols-outlined text-primary">sensors</span><h4 className="font-bold">고장 상황 (Scenario)</h4></div>
+                                <div className="p-6 text-on-surface">2023년 10월 27일 14시경, 제2기계실 순환펌프 2호기에서 비정상적인 진동과 금속 마찰음이 감지됨. 중앙 제어실 모니터링 결과 베어링 온도가 급격히 상승하여 설비 보호를 위해 긴급 정지 조치를 취함.</div>
+                            </section>
+                            <section className="bg-white border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+                                <div className="bg-table-header px-6 py-3 border-b border-border-subtle flex items-center gap-2"><span className="material-symbols-outlined text-primary">psychology</span><h4 className="font-bold">원인 분석 (4M+1)</h4></div>
+                                <div className="p-6 grid grid-cols-1 md:grid-cols-5 gap-4">
+                                    {['MAN', 'MACHINE', 'MATERIAL', 'METHOD'].map(m => (
+                                        <div key={m} className="p-4 bg-surface-container-low rounded-lg">
+                                            <p className="text-label-caps text-primary font-bold mb-2 uppercase">{m}</p>
+                                            <p className="text-body-sm">기반 원인 분석 데이터 상세 내용이 이곳에 표시됩니다.</p>
+                                        </div>
+                                    ))}
+                                    <div className="p-4 bg-primary text-on-primary rounded-lg">
+                                        <p className="text-label-caps font-bold mb-2 uppercase">ROOT CAUSE</p>
+                                        <p className="text-body-sm opacity-90">윤활 관리 체계 부실로 인한 하드웨어 조기 파손</p>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        // Screen 4: Register History
+        const RegisterPage = () => {
+            const navigate = useNavigate();
+            const [extracted, setExtracted] = useState(false);
+
+            const simulateExtraction = () => {
+                setExtracted(true);
+                setTimeout(() => setExtracted(false), 3000);
+            };
+
+            return (
+                <div className="ml-sidebar-width min-h-screen">
+                    <Header title="고장이력 등록" />
+                    <main className="p-container-padding max-w-[1600px] mx-auto w-full space-y-gutter">
+                        <section className="bg-white border border-border-subtle rounded-xl p-8 text-center space-y-4">
+                            <div onClick={simulateExtraction} className="border-2 border-dashed border-outline-variant rounded-lg p-10 hover:bg-primary-container/5 transition-all cursor-pointer group">
+                                <span className="material-symbols-outlined text-primary/40 text-5xl mb-4 group-hover:scale-110 transition-transform block">upload_file</span>
+                                <h3 className="text-title-sm font-title-sm text-primary">PDF/HWP 파일을 올리면 자동으로 내용을 채워줍니다</h3>
+                                <p className="text-on-surface-variant text-body-sm mt-2">파일을 드래그하거나 클릭하여 선택하세요 (최대 20MB)</p>
+                            </div>
+                            {extracted && (
+                                <div className="bg-secondary-container/50 border border-secondary text-on-secondary-container px-6 py-4 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-status-success">check_circle</span>
+                                        <span className="font-bold">자동 추출 완료 - 내용을 검토하고 저장해주세요</span>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                        <form className="space-y-gutter">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+                                <div className="bg-white border border-border-subtle rounded-lg p-gutter md:col-span-2">
+                                    <div className="flex items-center gap-2 mb-6 border-b border-border-subtle pb-3"><span className="material-symbols-outlined text-primary">info</span><h2 className="text-title-sm font-bold">기본 정보</h2></div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-stack-md">
+                                        <div className="space-y-2"><label className="text-label-caps font-bold text-on-surface-variant block">지사</label><select className="w-full rounded-lg border-border-subtle"><option>서울 북부지사</option></select></div>
+                                        <div className="space-y-2"><label className="text-label-caps font-bold text-on-surface-variant block">설비명</label><input className="w-full rounded-lg border-border-subtle" defaultValue="증기터빈 #2" /></div>
+                                    </div>
+                                </div>
+                                <div className="bg-white border border-border-subtle rounded-lg p-gutter">
+                                    <div className="flex items-center gap-2 mb-6 border-b border-border-subtle pb-3"><span className="material-symbols-outlined text-status-critical">report_problem</span><h2 className="text-title-sm font-bold">공급중단 현황</h2></div>
+                                    <div className="space-y-2"><label className="text-label-caps font-bold text-on-surface-variant block uppercase">공급중단 세대수</label><input className="w-full rounded-lg border-border-subtle" placeholder="0" type="number" /></div>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-stack-md pt-stack-lg">
+                                <button type="button" onClick={() => navigate('/history')} className="px-8 py-3 rounded-lg border border-primary text-primary font-bold">취소</button>
+                                <button type="button" onClick={() => navigate('/history')} className="px-10 py-3 rounded-lg bg-primary text-on-primary font-bold shadow-lg">최종 저장</button>
+                            </div>
+                        </form>
+                    </main>
+                </div>
+            );
+        };
+
+        // Screen 5: Equipment List
+        const EquipmentPage = () => {
+            return (
+                <div className="ml-sidebar-width min-h-screen">
+                    <Header title="설비 목록 관리" />
+                    <main className="p-container-padding">
+                        <div className="mb-stack-lg bg-white p-6 rounded-lg border border-border-subtle shadow-sm flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="flex flex-col gap-1.5"><label className="text-label-caps text-on-surface-variant uppercase">지사 선택</label><select className="border border-border-subtle rounded-lg px-4 py-2"><option>전체 지사</option></select></div>
+                                <button className="mt-auto h-10 px-4 flex items-center gap-2 bg-surface-container text-on-surface rounded-lg font-semibold text-body-sm"><span className="material-symbols-outlined text-sm">filter_list</span>필터 적용</button>
+                            </div>
+                            <button className="bg-primary text-on-primary px-6 py-2.5 rounded-lg flex items-center gap-2 font-semibold shadow-md"><span className="material-symbols-outlined">add_circle</span>설비 추가</button>
+                        </div>
+                        <div className="bg-white rounded-lg border border-border-subtle shadow-sm overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-table-header border-b border-border-subtle">
+                                        <th className="px-6 py-4 text-label-caps text-on-surface-variant">설비명</th>
+                                        <th className="px-6 py-4 text-label-caps text-on-surface-variant">설비코드</th>
+                                        <th className="px-6 py-4 text-label-caps text-on-surface-variant">지사</th>
+                                        <th className="px-6 py-4 text-label-caps text-on-surface-variant text-center">고장이력</th>
+                                        <th className="px-6 py-4 text-label-caps text-on-surface-variant text-right">상태</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border-subtle">
+                                    {[
+                                        { name: "순환펌프-A", code: "CP-2024-001", b: "강남지사", hist: 12, status: "정상 가동", sCol: "bg-green-100 text-status-success" },
+                                        { name: "증기터빈 가압기 ST-2", code: "ST-2023-45B", b: "분당지사", hist: 5, status: "점검 대기", sCol: "bg-orange-100 text-status-warning" },
+                                        { name: "배열회수보일러 #1 (HRSG)", code: "HR-2022-108", b: "판교지사", hist: 28, status: "정비중", sCol: "bg-red-100 text-status-critical" }
+                                    ].map((row, i) => (
+                                        <tr key={i} className="hover:bg-surface-container-low transition-colors">
+                                            <td className="px-6 py-4 font-semibold text-primary">{row.name}</td>
+                                            <td className="px-6 py-4 font-data-mono text-secondary">{row.code}</td>
+                                            <td className="px-6 py-4">{row.b}</td>
+                                            <td className="px-6 py-4 text-center"><span className="inline-flex px-2 py-1 bg-primary-fixed text-on-primary-fixed rounded-full text-xs font-bold">{row.hist}</span></td>
+                                            <td className="px-6 py-4 text-right"><span className={`px-2 py-1 rounded text-[11px] font-bold ${row.sCol}`}>{row.status}</span></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        // Screen 6: Migration
+        const MigrationPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div className="ml-sidebar-width min-h-screen">
+                    <Header title="이력 마이그레이션" />
+                    <main className="p-container-padding space-y-6 max-w-[1600px] mx-auto w-full">
+                        <div className="bg-surface-container-low border border-border-subtle rounded-lg p-6 flex items-start gap-4">
+                            <span className="material-symbols-outlined text-primary-container mt-1">info</span>
+                            <div>
+                                <h3 className="text-primary font-bold text-body-md mb-2">업로드 안내 및 데이터 형식</h3>
+                                <p className="text-secondary text-body-sm leading-relaxed mb-4">지사, 열공급시설, 보고유형, 고장제목 등 컬럼 순서의 엑셀만 지원합니다.</p>
+                                <button className="inline-flex items-center gap-2 bg-white border border-border-subtle px-4 py-2 rounded-lg text-body-sm font-semibold text-primary">
+                                    <span className="material-symbols-outlined text-sm">download</span>표준 샘플 양식 다운로드
+                                </button>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2 space-y-6">
+                                <div className="bg-white border-2 border-dashed border-outline-variant rounded-xl p-10 flex flex-col items-center justify-center text-center hover:bg-primary/5 transition-all">
+                                    <span className="material-symbols-outlined text-3xl text-primary/60 mb-4">upload_file</span>
+                                    <h4 className="text-title-sm font-bold text-primary mb-1">엑셀 파일 업로드</h4>
+                                    <p className="text-on-surface-variant text-body-sm">xlsx, csv 지원 (MAX 50MB)</p>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="bg-white border border-border-subtle rounded-lg p-4"><p className="text-xs font-label-caps text-outline mb-1">총 행수</p><p className="text-2xl font-bold text-primary">250건</p></div>
+                                    <div className="bg-white border border-border-subtle rounded-lg p-4 border-l-4 border-l-status-success"><p className="text-xs font-label-caps text-outline mb-1">정상 건수</p><p className="text-2xl font-bold text-status-success">242건</p></div>
+                                    <div className="bg-white border border-border-subtle rounded-lg p-4 border-l-4 border-l-status-critical"><p className="text-xs font-label-caps text-outline mb-1">오류 건수</p><p className="text-2xl font-bold text-status-critical">8건</p></div>
+                                </div>
+                            </div>
+                            <div className="bg-white border border-border-subtle rounded-xl flex flex-col overflow-hidden">
+                                <div className="p-4 bg-table-header border-b border-border-subtle font-bold text-body-sm text-primary">컬럼 매핑 미리보기</div>
+                                <div className="flex-grow overflow-auto p-4 space-y-2">
+                                    {['지사 -> Branch_ID', '열공급시설 -> Facility_Name', '보고유형 -> Report_Type'].map((m, i) => (
+                                        <div key={i} className="flex justify-between text-body-sm py-1 border-b border-border-subtle"><span>{m.split(' -> ')[0]}</span><span className="text-status-success font-data-mono">{m.split(' -> ')[1]}</span></div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end pt-6 border-t border-border-subtle">
+                            <button onClick={() => navigate('/export-success')} className="px-8 py-2.5 bg-primary text-white font-bold text-body-sm rounded-lg shadow-lg flex items-center gap-2">
+                                <span className="material-symbols-outlined text-sm">cloud_sync</span>일괄 등록 실행 (242건)
+                            </button>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        // Screen 7: Export Result
+        const ExportSuccessPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div className="ml-sidebar-width min-h-screen">
+                    <Header title="엑셀 내보내기 결과" />
+                    <main className="p-container-padding max-w-[1200px] mx-auto">
+                        <div className="bg-white border border-border-subtle rounded-lg p-stack-lg shadow-sm flex flex-col items-center text-center py-12 relative overflow-hidden">
+                            <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-primary/5 blur-3xl"></div>
+                            <div className="relative z-10 w-24 h-24 bg-status-success/10 rounded-full flex items-center justify-center mb-6">
+                                <span className="material-symbols-outlined text-[48px] text-status-success" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
+                            </div>
+                            <h2 className="text-display-lg font-display-lg text-primary mb-2">엑셀 파일이 생성되었습니다</h2>
+                            <p className="text-secondary font-body-md mb-10 max-w-lg">데이터 추출이 성공적으로 완료되었습니다.</p>
+                            <div className="bg-surface-container-low border border-border-subtle rounded-xl p-6 mb-10 w-full max-w-md text-left">
+                                <div className="flex justify-between border-b border-outline-variant/30 pb-4 mb-4">
+                                    <div><p className="text-label-caps text-secondary uppercase">파일명</p><p className="font-bold font-data-mono text-primary">고장이력_추출_20240115.xlsx</p></div>
+                                    <div className="text-right"><p className="text-label-caps text-secondary uppercase">크기</p><p className="font-bold text-primary">1.24 MB</p></div>
+                                </div>
+                                <div className="flex justify-between">
+                                    <div><p className="text-label-caps text-secondary uppercase">생성 일시</p><p className="text-primary">2024-01-15 14:30:05</p></div>
+                                    <div className="text-right"><p className="text-label-caps text-secondary uppercase">형식</p><p className="text-primary">Excel Spreadsheet</p></div>
+                                </div>
+                            </div>
+                            <div className="flex gap-4">
+                                <button className="px-10 py-4 bg-primary text-on-primary rounded-lg font-bold text-title-sm hover:bg-primary-container shadow-md flex items-center gap-3">
+                                    <span className="material-symbols-outlined">download</span>다운로드
+                                </button>
+                                <button onClick={() => navigate('/history')} className="px-8 py-4 border border-outline text-primary rounded-lg font-bold">기록 보기</button>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        // --- Root App ---
+
+        const App = () => {
+            return (
+                <MemoryRouter>
+                    <div className="flex min-h-screen">
+                        <Sidebar />
+                        <div className="flex-1">
+                            <Routes>
+                                <Route path="/" element={<DashboardPage />} />
+                                <Route path="/history" element={<HistoryListPage />} />
+                                <Route path="/detail" element={<HistoryDetailPage />} />
+                                <Route path="/register" element={<RegisterPage />} />
+                                <Route path="/equipment" element={<EquipmentPage />} />
+                                <Route path="/migration" element={<MigrationPage />} />
+                                <Route path="/export-success" element={<ExportSuccessPage />} />
+                            </Routes>
+                        </div>
+                    </div>
+                </MemoryRouter>
+            );
+        };
+
+        const container = document.getElementById('root');
+        const root = createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
