@@ -5,22 +5,3 @@ dist
 .vercel
 
 .vercel
-
-# --- CheonJae-DDasomi (DCS 유지보수 챗봇) ---
-CheonJae-DDasomi/backend/.env
-CheonJae-DDasomi/backend/chroma_db/
-CheonJae-DDasomi/backend/documents/*
-!CheonJae-DDasomi/backend/documents/.gitkeep
-CheonJae-DDasomi/backend/fault_cases/*
-!CheonJae-DDasomi/backend/fault_cases/.gitkeep
-CheonJae-DDasomi/backend/chat_history.db
-CheonJae-DDasomi/backend/*.log
-CheonJae-DDasomi/backend/__pycache__/
-CheonJae-DDasomi/backend/**/__pycache__/
-CheonJae-DDasomi/backend/venv/
-CheonJae-DDasomi/backend/.venv/
-
-CheonJae-DDasomi/frontend/node_modules/
-CheonJae-DDasomi/frontend/.next/
-CheonJae-DDasomi/frontend/.env.local
-CheonJae-DDasomi/frontend/tsconfig.tsbuildinfo

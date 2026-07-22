@@ -17,7 +17,10 @@ const COLUMN_PATTERNS = {
   unit: ['단위', 'unit'],
   remark: ['비고', 'remark', 'note', '적요'],
   tag: ['tagno', 'tagno.', 'tagnumber', 'tag', '태그', '태그번호'],
-  // 작업 예정일 (선택) — "2026-07-10~2026-07-15" 같은 기간, 있으면 계획일정으로 사용
+  // 작업 시작일/종료일 (별도 두 컬럼) — 있으면 이걸 최우선으로 계획일정 사용
+  planStart: ['작업시작일', '시작일', '착수일', '개시일', 'startdate'],
+  planEnd: ['작업종료일', '종료일', '완료일', '완료예정일', '종료예정', 'enddate', 'finishdate'],
+  // 작업 예정일 (단일 컬럼) — "2026-07-10~2026-07-15" 같은 기간
   plandate: ['작업예정일', '예정일', '작업일정', '계획일정', '공정예정', '착수예정', '일정', 'plannedstart', 'plandate', 'schedule'],
 }
 // 명칭 컬럼 후보 — STRONG(실제 작업명)을 WEAK(색인성 헤더)보다 우선 선택
@@ -116,6 +119,13 @@ function parsePlanDates(cell) {
   if (!found.length) return null
   return { start: found[0], end: found.length > 1 ? found[found.length - 1] : null }
 }
+// 단일 셀 → 하나의 날짜(YYYY-MM-DD). 엑셀 날짜 일련번호 또는 날짜 문자열 지원
+function parseOneDate(cell) {
+  if (cell == null || cell === '') return null
+  if (typeof cell === 'number') return cell > 30000 && cell < 80000 ? excelSerialToYMD(cell) : null
+  const m = String(cell).match(/(\d{4})\s*[-.\/년]\s*(\d{1,2})\s*[-.\/월]\s*(\d{1,2})/)
+  return m ? `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}` : null
+}
 
 function parseQty(v) {
   if (v == null || v === '') return null
@@ -191,6 +201,15 @@ function mapColumns(headerRow) {
 
 // 명칭 셀이 번호(색인)/공백이면 오른쪽에서 첫 텍스트 셀을 명칭으로 대체
 // (번호열이 명칭 앞/병합셀에 오는 내역서 대응 — 예: "항목"열에 Ⅰ-1, 실제 명칭은 옆 칸)
+// 헤더 후보 행에 명칭류 컬럼이 있는지 — 단가/금액만 있는 2행 헤더의 하위행을 헤더로 오인하지 않도록
+function hasNameHeader(row) {
+  return row.some((c) => {
+    const t = squash(c)
+    if (!t) return false
+    return NAME_STRONG.some((p) => t === p || t.includes(p)) || NAME_WEAK.some((p) => t === p || t.includes(p))
+  })
+}
+
 function resolveName(row, colMap) {
   const raw = norm(row[colMap.name])
   if (raw && !isIndexToken(raw)) return raw
@@ -231,7 +250,8 @@ function analyzeSheet(sheetName, rows, fileName) {
   let best = 0
   for (let i = 0; i < Math.min(rows.length, 15); i++) {
     const s = headerScore(rows[i])
-    if (s > best && s >= 2) {
+    // 명칭류 컬럼이 있는 행만 헤더 후보 (단가/금액 반복 하위행이 점수만 높아 오선택되는 것 방지)
+    if (s >= 2 && s > best && hasNameHeader(rows[i])) {
       best = s
       headerIdx = i
     }
@@ -251,7 +271,15 @@ function analyzeSheet(sheetName, rows, fileName) {
     const qty = colMap.qty != null ? parseQty(row[colMap.qty]) : null
     const remark = colMap.remark != null ? norm(row[colMap.remark]) : ''
     const tag = colMap.tag != null ? norm(row[colMap.tag]) : ''
-    const plan = colMap.plandate != null ? parsePlanDates(row[colMap.plandate]) : null
+    // 계획일정: ① 시작일/종료일 별도 컬럼 → ② 단일 예정일 컬럼(기간)
+    const psCol = colMap.planStart != null ? parseOneDate(row[colMap.planStart]) : null
+    const peCol = colMap.planEnd != null ? parseOneDate(row[colMap.planEnd]) : null
+    const plan =
+      psCol || peCol
+        ? { start: psCol || peCol, end: peCol || psCol }
+        : colMap.plandate != null
+        ? parsePlanDates(row[colMap.plandate])
+        : null
     const allText = row.map(squash).join(' ')
 
     const ex = isExcludedRow(name, qty, unit, allText)

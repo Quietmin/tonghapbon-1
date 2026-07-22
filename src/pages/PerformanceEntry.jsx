@@ -47,8 +47,99 @@ function PhotoSlot({ label, value, onChange, disabled }) {
   )
 }
 
+// 정비 이력 타임라인 — 이 작업항목의 날짜별 기록
+function HistoryTimeline({ task, activeDate, onPick, onDelete, canEdit }) {
+  const entries = useMemo(
+    () => [...(task.entries || [])].sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [task.entries]
+  )
+  if (!entries.length) {
+    return (
+      <Card lift={false} className="p-card-padding">
+        <h5 className="text-title-sm text-on-surface flex items-center gap-2 mb-3">
+          <Icon name="history" className="text-base text-primary" /> 정비 이력
+        </h5>
+        <p className="text-sm text-on-surface-variant py-3 text-center">아직 저장된 실적 이력이 없습니다. 위에서 일자별로 실적을 기록하세요.</p>
+      </Card>
+    )
+  }
+  return (
+    <Card lift={false} className="p-card-padding">
+      <div className="flex items-center justify-between mb-4">
+        <h5 className="text-title-sm text-on-surface flex items-center gap-2">
+          <Icon name="history" className="text-base text-primary" /> 정비 이력
+          <span className="text-xs font-normal text-on-surface-variant">{entries.length}건</span>
+        </h5>
+        <span className="text-xs text-on-surface-variant">행을 클릭하면 해당 일자를 불러와 수정합니다</span>
+      </div>
+      <div className="relative pl-5">
+        {/* 세로 타임라인 라인 */}
+        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-border-subtle" />
+        <ul className="space-y-1">
+          {entries.map((e) => {
+            const rate = task.planQty > 0 ? Math.min(100, Math.round((e.cumulative / task.planQty) * 1000) / 10) : 0
+            const active = e.date === activeDate
+            const delayed = e.delayReason && e.delayReason !== '지연 없음'
+            return (
+              <li key={e.date} className="relative">
+                <span className={`absolute -left-5 top-3.5 w-3.5 h-3.5 rounded-full border-2 border-surface ${active ? 'bg-primary' : delayed ? 'bg-status-error' : 'bg-status-success'}`} />
+                <button
+                  onClick={() => onPick(e.date)}
+                  className={`w-full text-left rounded-xl p-3 transition-colors border ${
+                    active ? 'bg-primary/5 border-primary/30' : 'border-transparent hover:bg-surface-container-low'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono-data text-sm font-bold text-on-surface">{e.date}</span>
+                      {e.doneToday > 0 && (
+                        <span className="text-xs font-bold text-primary whitespace-nowrap">+{e.doneToday} {task.unit}</span>
+                      )}
+                      <span className="text-xs text-on-surface-variant whitespace-nowrap">누적 {e.cumulative}/{task.planQty} · {rate}%</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(e.photos?.before || e.photos?.after) && <Icon name="photo_library" className="text-sm text-on-surface-variant" />}
+                      {delayed && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-error/10 text-status-error">지연</span>}
+                      {canEdit && (
+                        <span
+                          role="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            if (window.confirm(`${e.date} 실적 이력을 삭제할까요?`)) onDelete(e.date)
+                          }}
+                          className="text-on-surface-variant hover:text-error p-1 rounded"
+                          title="이 이력 삭제"
+                        >
+                          <Icon name="delete" className="text-sm" />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {(e.notes || e.plan || delayed) && (
+                    <div className="mt-1.5 text-xs space-y-0.5">
+                      {e.notes && <p className="text-on-surface"><span className="text-on-surface-variant">작업: </span>{e.notes}</p>}
+                      {delayed && <p className="text-error"><span className="text-on-surface-variant">지연사유: </span>{e.delayReason}</p>}
+                      {e.plan && <p className="text-on-surface-variant">익일계획: {e.plan}</p>}
+                    </div>
+                  )}
+                  {(e.photos?.before || e.photos?.after) && (
+                    <div className="flex gap-2 mt-2">
+                      {e.photos?.before && <img src={e.photos.before} alt="분해 전" className="w-16 h-12 object-cover rounded-lg" />}
+                      {e.photos?.after && <img src={e.photos.after} alt="분해 후" className="w-16 h-12 object-cover rounded-lg" />}
+                    </div>
+                  )}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    </Card>
+  )
+}
+
 export default function PerformanceEntry() {
-  const { state, can, addEntry } = useStore()
+  const { state, can, addEntry, removeEntry } = useStore()
   const { tasks, project } = state
   const [params, setParams] = useSearchParams()
 
@@ -56,25 +147,48 @@ export default function PerformanceEntry() {
   const task = tasks.find((t) => t.id === selectedId) || tasks[0]
 
   const today = project.today
-  const existing = useMemo(() => task?.entries?.find((e) => e.date === today), [task, today])
-
   const [form, setForm] = useState(null)
   const [saved, setSaved] = useState(false)
 
-  // 작업 변경 시 폼 초기화
+  // 특정 날짜 이전까지의 누적 (새 날짜 실적의 기준값)
+  function priorCumulative(dateStr) {
+    const prev = (task?.entries || []).filter((e) => e.date < dateStr)
+    return prev.length ? Math.max(...prev.map((e) => e.cumulative || 0)) : 0
+  }
+
+  // 날짜에 해당하는 폼 구성 — 기록이 있으면 로드, 없으면 빈 폼(누적은 직전일 기준)
+  function buildForm(dateStr) {
+    const ex = task?.entries?.find((e) => e.date === dateStr)
+    if (ex) {
+      return {
+        date: dateStr,
+        doneToday: ex.doneToday ?? '',
+        cumulative: ex.cumulative ?? 0,
+        notes: ex.notes ?? '',
+        delayReason: ex.delayReason ?? '지연 없음',
+        plan: ex.plan ?? '',
+        before: ex.photos?.before ?? null,
+        after: ex.photos?.after ?? null,
+        existing: true,
+      }
+    }
+    return {
+      date: dateStr,
+      doneToday: '',
+      cumulative: priorCumulative(dateStr),
+      notes: '',
+      delayReason: '지연 없음',
+      plan: '',
+      before: null,
+      after: null,
+      existing: false,
+    }
+  }
+
+  // 작업 변경 시 기준일로 폼 초기화
   useEffect(() => {
     if (!task) return
-    const ex = task.entries?.find((e) => e.date === today)
-    setForm({
-      date: today,
-      doneToday: ex?.doneToday ?? '',
-      cumulative: ex?.cumulative ?? task.doneQty ?? 0,
-      notes: ex?.notes ?? '',
-      delayReason: ex?.delayReason ?? '지연 없음',
-      plan: ex?.plan ?? '',
-      before: ex?.photos?.before ?? null,
-      after: ex?.photos?.after ?? null,
-    })
+    setForm(buildForm(today))
     setSaved(false)
   }, [selectedId, today]) // eslint-disable-line
 
@@ -95,11 +209,17 @@ export default function PerformanceEntry() {
     setSaved(false)
   }
 
-  // 금일 완료 입력 시 누적 자동 계산
+  // 날짜 변경 — 해당 일자 기록 로드(없으면 빈 폼)
+  function changeDate(dateStr) {
+    setForm(buildForm(dateStr))
+    setSaved(false)
+  }
+
+  // 금일 완료 입력 시 누적 자동 계산 (직전일 누적 + 금일)
   function onDoneToday(v) {
-    const n = v === '' ? '' : Number(v)
-    const base = task.doneQty || 0
-    setForm((f) => ({ ...f, doneToday: v, cumulative: v === '' ? base : Math.min(task.planQty, base + n) }))
+    const n = v === '' ? 0 : Number(v)
+    const base = priorCumulative(form.date)
+    setForm((f) => ({ ...f, doneToday: v, cumulative: Math.min(task.planQty, base + n) }))
     setSaved(false)
   }
 
@@ -113,6 +233,7 @@ export default function PerformanceEntry() {
       plan: form.plan,
       photos: { before: form.before, after: form.after },
     })
+    setForm((f) => ({ ...f, existing: true }))
     setSaved(true)
   }
 
@@ -122,7 +243,7 @@ export default function PerformanceEntry() {
         <div>
           <h3 className="text-display-lg text-on-surface font-bold">실적 입력</h3>
           <p className="text-on-surface-variant text-body-md">
-            오버홀 특정 과업의 일일 실적과 사진 근거를 기록합니다. (기준일 {today})
+            일자별로 실적·사진을 기록하면 그날 기록으로 저장됩니다. 다른 날짜를 선택하면 빈 양식으로 새로 입력합니다.
           </p>
         </div>
         {/* 작업 선택 */}
@@ -172,7 +293,7 @@ export default function PerformanceEntry() {
         <Card className="p-card-padding space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field label="입력일자">
-              <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} className="input" />
+              <input type="date" value={form.date} onChange={(e) => changeDate(e.target.value)} className="input" />
             </Field>
             <Field label={`금일 완료 (${task.unit})`}>
               <input type="number" min="0" value={form.doneToday} onChange={(e) => onDoneToday(e.target.value)} placeholder="0" className="input" />
@@ -214,23 +335,33 @@ export default function PerformanceEntry() {
           </div>
 
           <div className="flex items-center justify-between gap-3 pt-2">
-            <p className="text-sm text-status-success flex items-center gap-1.5 min-h-[20px]">
-              {saved && (<><Icon name="check_circle" className="text-base" fill /> 실적이 저장되었습니다.</>)}
-              {!saved && existing && <span className="text-on-surface-variant flex items-center gap-1.5"><Icon name="history" className="text-base" /> 오늘 입력 내역이 있습니다. 수정 시 덮어씁니다.</span>}
+            <p className="text-sm min-h-[20px]">
+              {saved && (<span className="text-status-success flex items-center gap-1.5"><Icon name="check_circle" className="text-base" fill /> {form.date} 실적이 저장되었습니다.</span>)}
+              {!saved && form.existing && <span className="text-on-surface-variant flex items-center gap-1.5"><Icon name="history" className="text-base" /> {form.date} 기록을 불러왔습니다. 수정 시 덮어씁니다.</span>}
+              {!saved && !form.existing && <span className="text-on-surface-variant flex items-center gap-1.5"><Icon name="edit_calendar" className="text-base" /> {form.date} 신규 입력 (직전 누적 {priorCumulative(form.date)}{task.unit} 기준)</span>}
             </p>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={submit} disabled={!canInput}>임시 저장</Button>
-              <Button onClick={submit} disabled={!canInput}>
-                <Icon name="send" className="text-base" /> 실적 제출
-              </Button>
-            </div>
+            <Button onClick={submit} disabled={!canInput}>
+              <Icon name="save" className="text-base" /> {form.existing ? '이 날짜 수정 저장' : '이 날짜로 저장'}
+            </Button>
           </div>
         </Card>
       </fieldset>
 
+      {/* 정비 이력 타임라인 */}
+      <HistoryTimeline
+        task={task}
+        activeDate={form.date}
+        canEdit={canInput}
+        onPick={(d) => changeDate(d)}
+        onDelete={(d) => {
+          removeEntry(task.id, d)
+          if (d === form.date) setForm(buildForm(d))
+        }}
+      />
+
       <p className="text-xs text-on-surface-variant flex items-start gap-2 px-1">
         <Icon name="info" className="text-sm mt-0.5" />
-        입력하신 금일 완료 물량은 계획수량과 대비하여 공정률에 자동 반영되며, 누적 완료수량 기준으로 설비별·분야별 진행률이 재계산됩니다.
+        일자별 기록은 각각 저장되어 <b className="text-on-surface">정비 이력</b>으로 누적됩니다. 누적 완료수량 기준으로 설비별·분야별 진행률이 재계산됩니다.
       </p>
     </>
   )

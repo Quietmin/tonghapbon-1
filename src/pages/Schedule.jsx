@@ -42,7 +42,19 @@ export default function Schedule() {
         const planned = plannedProgressOn(sch, project.today)
         const behind = actual < 100 && planned - actual >= 15
         const status = actual >= 100 ? '완료' : behind ? '지연' : actual > 0 ? '진행중' : '대기'
-        return { task: t, sch, actual, planned, behind, status }
+        // 실적 바: 실적 입력 이력의 날짜 범위(있으면), 없으면 진척률 비례(계획 시작 기준)
+        const clampT = (v) => Math.max(0, Math.min(total, v))
+        const dates = (t.entries || []).map((e) => e.date).sort()
+        let actualBar = null
+        if (dates.length) {
+          const aS = clampT(diffDays(project.startDate, dates[0]))
+          const aE = clampT(diffDays(project.startDate, dates[dates.length - 1]))
+          actualBar = { startOff: aS, endOff: Math.max(aS, aE), real: true, startStr: dates[0], endStr: dates[dates.length - 1] }
+        } else if (actual > 0) {
+          const span = Math.max(sch.endOff - sch.startOff, 1)
+          actualBar = { startOff: sch.startOff, endOff: sch.startOff + Math.max(0.4, span * (actual / 100)), real: false }
+        }
+        return { task: t, sch, actual, planned, behind, status, actualBar }
       })
       .filter((r) => !onlyDelay || r.behind)
   }, [tasks, project, field, equipment, onlyDelay])
@@ -131,9 +143,10 @@ export default function Schedule() {
               <Icon name="warning" className="text-base" fill={onlyDelay} /> 지연 위험만
             </button>
           </div>
-          <div className="flex items-center gap-4 text-xs text-on-surface-variant">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-full bg-surface-container-highest" /> 계획</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-full bg-primary" /> 실적</span>
+          <div className="flex items-center gap-x-4 gap-y-1 text-xs text-on-surface-variant flex-wrap">
+            <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-full bg-surface-container-highest" /> 윗줄=계획</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-full bg-primary" /> 아랫줄=실적</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-full bg-status-success" /> 완료</span>
             <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-full bg-status-error" /> 지연</span>
             <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-status-error" /> 오늘</span>
           </div>
@@ -200,34 +213,63 @@ export default function Schedule() {
                       </div>
                     </div>
 
-                    {/* 작업 상세 행 */}
+                    {/* 작업 상세 행 — 윗줄 계획 / 아랫줄 실적 */}
                     {isOpen &&
-                      g.list.map((r) => (
-                        <div
-                          key={r.task.id}
-                          className="flex items-center py-1.5 group cursor-pointer"
-                          onClick={() => navigate(`/entry?task=${r.task.id}`)}
-                        >
-                          <div className="w-[220px] shrink-0 pr-3 pl-7">
-                            <p className="text-xs text-on-surface truncate group-hover:text-primary transition-colors">{r.task.name}</p>
-                            <p className="text-[10px] text-on-surface-variant font-mono-data">
-                              {r.sch.plannedStartStr.slice(5)} ~ {r.sch.plannedEndStr.slice(5)} · {r.sch.phase.label}
-                            </p>
-                          </div>
-                          <div className="relative flex-1 h-5">
-                            <div
-                              className="absolute top-1/2 -translate-y-1/2 h-2.5 rounded-full bg-surface-container overflow-hidden group-hover:ring-2 group-hover:ring-primary/20"
-                              style={{ left: pos(r.sch.startOff), width: pos(Math.max(1, r.sch.endOff - r.sch.startOff)) }}
-                              title={`계획 ${r.planned}% / 실적 ${r.actual}%`}
-                            >
+                      g.list.map((r) => {
+                        const barColor = r.actual >= 100 ? 'status-success' : r.behind ? 'status-error' : FIELD_BAR[r.task.field] || 'primary'
+                        const labelOff = Math.max(r.sch.endOff, r.actualBar?.endOff || 0)
+                        return (
+                          <div
+                            key={r.task.id}
+                            className="flex items-center py-1.5 group cursor-pointer border-b border-border-subtle/40 last:border-0"
+                            onClick={() => navigate(`/entry?task=${r.task.id}`)}
+                          >
+                            <div className="w-[220px] shrink-0 pr-3 pl-7">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-medium text-on-surface truncate group-hover:text-primary transition-colors">{r.task.name}</p>
+                                {r.actual >= 100 && (
+                                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-success/15 text-status-success shrink-0 flex items-center gap-0.5">
+                                    <Icon name="check" className="text-[10px]" /> 완료
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-on-surface-variant font-mono-data">계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}</p>
+                              <p className={`text-[10px] font-mono-data ${r.actualBar ? `text-${barColor}` : 'text-on-surface-variant/50'}`}>
+                                {r.actualBar?.real
+                                  ? `실적 ${r.actualBar.startStr.slice(5)}~${r.actualBar.endStr.slice(5)}`
+                                  : r.actual > 0
+                                  ? `실적 ${r.actual}% · 일자 미입력`
+                                  : '실적 미입력'}
+                              </p>
+                            </div>
+                            <div className="relative flex-1 h-11">
+                              {/* 계획 (윗줄) */}
                               <div
-                                className={`h-full rounded-full ${r.behind ? 'bg-status-error' : r.actual >= 100 ? 'bg-status-success' : `bg-${FIELD_BAR[r.task.field] || 'primary'}`}`}
-                                style={{ width: `${r.actual}%` }}
+                                className="absolute top-1.5 h-2.5 rounded-full bg-surface-container-highest"
+                                style={{ left: pos(r.sch.startOff), width: pos(Math.max(1, r.sch.endOff - r.sch.startOff)) }}
+                                title={`계획 ${r.sch.plannedStartStr} ~ ${r.sch.plannedEndStr}`}
                               />
+                              {/* 실적 (아랫줄) */}
+                              {r.actualBar ? (
+                                <div
+                                  className={`absolute top-6 h-2.5 rounded-full bg-${barColor} ${r.actualBar.real ? '' : 'opacity-60'} group-hover:ring-2 group-hover:ring-primary/20`}
+                                  style={{ left: pos(r.actualBar.startOff), width: pos(Math.max(1, r.actualBar.endOff - r.actualBar.startOff)) }}
+                                  title={`실적 ${r.actual}%`}
+                                />
+                              ) : (
+                                <div
+                                  className="absolute top-6 h-2.5 rounded-full border border-dashed border-outline-variant"
+                                  style={{ left: pos(r.sch.startOff), width: pos(Math.max(1, r.sch.endOff - r.sch.startOff)) }}
+                                />
+                              )}
+                              {/* 진행률 라벨 */}
+                              <span className={`absolute top-[13px] text-[10px] font-bold text-${barColor}`} style={{ left: `calc(${pos(labelOff)} + 6px)` }}>
+                                {r.actual}%
+                              </span>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                   </div>
                 )
               })}
