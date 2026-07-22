@@ -1,10 +1,16 @@
 import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
+import os from "node:os";
 import crypto from "node:crypto";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+// Vercel's serverless functions only allow writes under the OS temp dir, and
+// even that doesn't persist across invocations — fine for a demo deployment,
+// but a real deployment needs a proper server (see PRD 비기능요구사항) or a
+// managed DB/blob store instead of local files.
+const RUNTIME_ROOT = process.env.VERCEL ? os.tmpdir() : process.cwd();
+const DATA_DIR = path.join(RUNTIME_ROOT, "data");
+const UPLOADS_DIR = path.join(RUNTIME_ROOT, "uploads");
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 

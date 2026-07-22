@@ -1,6 +1,69 @@
-import { PDFParse } from "pdf-parse";
 import { parseFailureReportText } from "@/lib/parseFailureReport";
 import { saveUploadedFile } from "@/lib/db";
+
+// pdfjs-dist (used by pdf-parse) tries to polyfill DOMMatrix itself via the
+// optional `canvas` package; we don't install `canvas` (not needed for plain
+// text extraction), so that polyfill attempt silently no-ops, and later
+// unconditional `new DOMMatrix(...)` calls deep inside pdfjs-dist then throw
+// "DOMMatrix is not defined" on serverless runtimes that don't already have
+// it as a global (Vercel's Node runtime doesn't; local `next dev` happened
+// to hit a code path that avoided it). A minimal stub is enough since we
+// only read extracted text, not render anything.
+if (typeof globalThis.DOMMatrix === "undefined") {
+  class DOMMatrixPolyfill {
+    a = 1;
+    b = 0;
+    c = 0;
+    d = 1;
+    e = 0;
+    f = 0;
+    constructor(init?: number[] | string) {
+      if (Array.isArray(init) && init.length >= 6) {
+        [this.a, this.b, this.c, this.d, this.e, this.f] = init;
+      }
+    }
+    multiply() {
+      return new DOMMatrixPolyfill();
+    }
+    inverse() {
+      return new DOMMatrixPolyfill();
+    }
+    translate() {
+      return new DOMMatrixPolyfill();
+    }
+    scale() {
+      return new DOMMatrixPolyfill();
+    }
+    transformPoint(point: unknown) {
+      return point;
+    }
+  }
+  // @ts-expect-error - minimal Node/serverless stand-in, not a spec-complete DOMMatrix
+  globalThis.DOMMatrix = DOMMatrixPolyfill;
+}
+
+const { PDFParse } = await import("pdf-parse");
+
+// pdfjs-dist looks for its worker script by resolving into its own package
+// path at runtime (`pdfjs-dist/legacy/build/pdf.worker.mjs`); nothing
+// statically imports that file, so Next's build-time tracer misses it and it
+// doesn't get copied into the deployed function bundle (forced back in via
+// `outputFileTracingIncludes` in next.config.ts). `import.meta.url` inside a
+// Turbopack-bundled server chunk doesn't map to a real filesystem path, so
+// `createRequire(import.meta.url)` can't resolve node_modules from it either
+// - use `process.cwd()` instead, which is the function/project root in both
+// Vercel and local dev.
+try {
+  const path = await import("node:path");
+  const url = await import("node:url");
+  const workerPath = path.join(
+    process.cwd(),
+    "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+  );
+  PDFParse.setWorker(url.pathToFileURL(workerPath).href);
+} catch (error) {
+  console.error("Failed to configure pdf-parse worker path", error);
+}
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB, matches the upload UI copy
 const ALLOWED_EXTENSIONS = ["pdf", "hwp", "hwpx"];
