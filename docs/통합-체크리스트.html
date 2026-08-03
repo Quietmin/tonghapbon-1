@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plant Ops Hub 통합 - 현황과 체크리스트</title>
+<style>
+:root{
+  --ink:#2C2C2A; --ink2:#5F5E5A; --ink3:#888780; --line:#D3D1C7; --paper:#FFFFFF; --panel:#F7F6F2;
+  --ok-bg:#E1F5EE; --ok-tx:#0F6E56; --ok-hd:#085041;
+  --half-bg:#FAEEDA; --half-tx:#854F0B; --half-hd:#633806;
+  --no-bg:#FCEBEB; --no-tx:#A32D2D; --no-hd:#791F1F;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink)}
+body{font-family:"Malgun Gothic","Apple SD Gothic Neo","Segoe UI",sans-serif;font-size:15px;line-height:1.75}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 28px 80px}
+h1{font-size:26px;font-weight:600;margin:0 0 8px}
+h2{font-size:20px;font-weight:600;margin:48px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:16px;font-weight:600;margin:26px 0 10px}
+.lead{color:var(--ink2);margin:0 0 4px}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
+.pill{font-size:13px;padding:4px 12px;border-radius:999px}
+.pill.ok{background:var(--ok-bg);color:var(--ok-hd)}
+.pill.half{background:var(--half-bg);color:var(--half-hd)}
+.pill.no{background:var(--no-bg);color:var(--no-hd)}
+.pill.n{background:var(--panel);color:var(--ink2)}
+nav{margin:24px 0 0;font-size:14px}
+nav a{color:var(--ink2);text-decoration:none;margin-right:16px;border-bottom:1px solid var(--line)}
+nav a:hover{color:var(--ink)}
+.card{border-radius:12px;padding:18px 22px 20px;margin:0 0 14px}
+.card .hd{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;white-space:nowrap}
+.card .hd strong{font-size:17px;font-weight:600}
+.card .hd em{font-style:normal;font-size:22px;font-weight:600}
+.card ul{margin:0;padding:0;list-style:none}
+.card li{font-size:15px;line-height:1.95}
+.card.ok{background:var(--ok-bg)} .card.ok .hd strong,.card.ok .hd em{color:var(--ok-hd)} .card.ok li{color:var(--ok-tx)}
+.card.half{background:var(--half-bg)} .card.half .hd strong,.card.half .hd em{color:var(--half-hd)} .card.half li{color:var(--half-tx)}
+.card.no{background:var(--no-bg)} .card.no .hd strong,.card.no .hd em{color:var(--no-hd)} .card.no li{color:var(--no-tx)}
+.oneline{background:var(--panel);border-radius:12px;padding:16px 22px;margin:0}
+.oneline b{font-weight:600}
+.figure{overflow-x:auto;margin:0;padding:0 0 6px}
+.figure svg{display:block;min-width:1100px;width:100%;height:auto}
+figcaption{font-size:13px;color:var(--ink3);margin-top:8px}
+.progress{font-size:14px;color:var(--ink2);margin:0 0 18px}
+.progress b{font-weight:600;color:var(--ink)}
+.group{border:1px solid var(--line);border-radius:12px;padding:6px 20px 14px;margin:0 0 14px}
+.group>h3{margin:14px 0 6px}
+.group>h3 span{font-weight:400;color:var(--ink3);font-size:14px;margin-left:6px}
+.item{display:flex;gap:12px;padding:10px 0;border-top:1px solid #EFEDE6}
+.item:first-of-type{border-top:0}
+.item input{margin:5px 0 0;width:16px;height:16px;flex:0 0 auto;accent-color:#0F6E56}
+.item .body{flex:1 1 auto;min-width:0}
+.item .t{font-size:15px}
+.item.done .t{color:var(--ink3);text-decoration:line-through}
+.item .src{display:block;font-family:Consolas,"Courier New",monospace;font-size:12.5px;color:var(--ink3);line-height:1.6;margin-top:3px;word-break:break-all}
+.item .why{display:block;font-size:13px;color:var(--ink2);margin-top:3px}
+table.def{border-collapse:collapse;width:100%;font-size:14.5px}
+table.def th,table.def td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+table.def th{width:120px;font-weight:600;white-space:nowrap}
+footer{margin-top:50px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink3)}
+footer a{color:var(--ink2)}
+#dg text.hd{font-size:13px;font-weight:600;fill:#2C2C2A}
+#dg text.hs{font-size:11px;font-weight:400;fill:#5F5E5A}
+#dg text.nm{font-size:12px;font-weight:600;fill:#2C2C2A}
+#dg text.st{font-size:11px;font-weight:600;fill:#5F5E5A}
+#dg text.dt{font-size:11px;font-weight:400;fill:#5F5E5A}
+#dg rect.box{fill:#F1EFE8;stroke:#B4B2A9;stroke-width:.5}
+#dg g.t>rect{fill:#E1F5EE;stroke:#0F6E56;stroke-width:.5}
+#dg g.t>text.nm{fill:#085041} #dg g.t>text.st,#dg g.t>text.dt{fill:#0F6E56}
+#dg g.a>rect{fill:#FAEEDA;stroke:#854F0B;stroke-width:.5}
+#dg g.a>text.nm{fill:#633806} #dg g.a>text.st,#dg g.a>text.dt{fill:#854F0B}
+#dg g.r>rect{fill:#FCEBEB;stroke:#A32D2D;stroke-width:.5}
+#dg g.r>text.nm{fill:#791F1F} #dg g.r>text.st,#dg g.r>text.dt{fill:#A32D2D}
+#dg line.flow{stroke:#888780;stroke-width:1}
+@media print{
+  body{font-size:12px}
+  .wrap{max-width:none;padding:0}
+  nav,.progress{display:none}
+  h2{margin-top:26px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .figure svg{min-width:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Plant Ops Hub 통합 · 현황과 체크리스트</h1>
+<p class="lead">작성일 2026-08-03 · 대상: 오버홀 공정관리 + 고장이력 관리 + 정비 챗봇 3개를 단일 앱으로 통합<br>근거: <code>src/</code>, <code>supabase/schema.sql</code>, <code>legacy/</code> 코드 확인 및 로컬 Postgres 18 실행 검증</p>
+<div class="stats">
+  <span class="pill n">전체 기능 38개</span>
+  <span class="pill ok">동작 7</span>
+  <span class="pill half">일부 동작 8</span>
+  <span class="pill no">동작 안함 23</span>
+  <span class="pill n">할 일 36개</span>
+</div>
+<nav>
+  <a href="#summary">쉬운 말 요약</a>
+  <a href="#diagram">단계별 다이어그램</a>
+  <a href="#checklist">할 일 체크리스트</a>
+  <a href="#criteria">판단 기준</a>
+</nav>
+
+<h2 id="summary">쉬운 말 요약</h2>
+
+<div class="card ok">
+  <div class="hd"><strong>지금 되는 것</strong><em>7</em></div>
+  <ul>
+    <li>원본 3개를 지우지 않고 legacy 폴더로 옮겨두고, 통합 앱 자리를 만들었다</li>
+    <li>통합 앱이 실제로 뜬다 (Next.js 16 · React 19 · TypeScript · Tailwind 4)</li>
+    <li>PlantSync 디자인이 색·글자·유리카드까지 그대로 옮겨졌다</li>
+    <li>메인 메뉴 3개와 화면 주소 13개가 전부 연결돼 눌러서 돌아다닐 수 있다</li>
+    <li>배포용 빌드가 통과한다 (화면 15개 전부 정적 생성)</li>
+    <li>Vercel 주소로 열린다</li>
+    <li>DB 설계가 진짜 Postgres에서 돌아간다. 두 번 실행해도 안전하고, 자동 계산 컬럼과 시각 갱신 장치까지 확인했다</li>
+  </ul>
+</div>
+
+<div class="card half">
+  <div class="hd"><strong>반만 된 것</strong><em>8</em></div>
+  <ul>
+    <li>화면 13개는 열리지만 전부 "포팅 예정"이라는 안내만 있고 내용이 없다</li>
+    <li>태그를 어떻게 적어도 같은 걸로 찾아주는 기능(PIT-7610 = pit 7610)은 DB에서 확인했지만 쓸 화면이 없다</li>
+    <li>고장 증상 검색 방법은 정했지만 아직 앱에 넣지 않았다</li>
+    <li>그 방법으로도 말끝이 바뀐 말(튐 ↔ 튀는)은 못 찾는다. Postgres에 한국어 형태소 분석기가 없어서다</li>
+    <li>Supabase에 붙는 코드는 있는데 프로젝트와 키가 없어 실제로는 안 붙어 있다</li>
+    <li>파일 보관함(Storage) 3개는 설계서에 적혀만 있고 만들어지지 않았다</li>
+    <li>설비 마스터는 설계만 있고 화면도 데이터도 없다</li>
+    <li>배포된 주소는 로그인 없이 누구나 열린다. 지금은 빈 껍데기라 괜찮지만 실제 자료가 들어가면 문제가 된다</li>
+  </ul>
+</div>
+
+<div class="card no">
+  <div class="hd"><strong>아직 아무것도 안 된 것</strong><em>23</em></div>
+  <ul>
+    <li>설계내역서 엑셀을 올릴 수 없다</li>
+    <li>작업항목 자동 추출이 안 된다</li>
+    <li>공정률과 지연 위험이 계산되지 않는다</li>
+    <li>공정표(간트차트)가 없다</li>
+    <li>날짜별 실적과 분해 전·후 사진을 넣을 수 없다</li>
+    <li>일일보고서·경영진 보고서가 안 나온다</li>
+    <li>고장 이력을 등록할 수 없다</li>
+    <li>고장 이력을 찾거나 걸러낼 수 없다</li>
+    <li>고장상보 파일에서 항목을 자동으로 읽어내지 못한다</li>
+    <li>고장상보를 한꺼번에 올릴 수 없다</li>
+    <li>첨부파일을 올리거나 받을 수 없다</li>
+    <li>월별·분야별·설비별 고장 통계가 안 나온다</li>
+    <li>챗봇에 질문할 수 없다</li>
+    <li>준공도서 PDF를 올릴 수 없다</li>
+    <li>PDF에서 글자를 뽑아 검색용으로 쌓는 기능이 없다</li>
+    <li>찾은 근거 문서를 옆에서 미리 볼 수 없다</li>
+    <li>설비를 등록하거나 목록으로 볼 수 없다</li>
+    <li>기기·태그를 설비에 붙일 수 없다</li>
+    <li>설비 하나로 오버홀 작업·고장 이력·준공도서를 함께 보는 화면이 없다</li>
+    <li>실적 입력에서 고장 이력으로 바로 넘어가는 동선이 없다</li>
+    <li>GitHub에 올려도 자동으로 배포되지 않는다</li>
+    <li>배포 주소에 접근 제한을 걸지 않았다</li>
+    <li>배포된 곳에서는 입력한 자료가 남지 않는다</li>
+  </ul>
+</div>
+
+<p class="oneline"><b>한 줄로:</b> 세 앱이 한 집에 들어올 뼈대와 DB 설계는 끝났고 실제로 돌아가는 것도 확인했다. 다만 안에 들어갈 기능은 아직 한 개도 옮기지 않았다.</p>
+
+<h2 id="diagram">단계별 다이어그램</h2>
+
+<figure class="figure">
+<svg id="dg" viewBox="0 0 1372 500" role="img" xmlns="http://www.w3.org/2000/svg"><title>통합 단계별 진행 상태</title><desc>1단계 기반 구축부터 7단계 배포·운영까지 38개 항목의 진행 상태</desc>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+<rect class="box" x="20" y="20" width="180" height="56" rx="4"/>
+<text class="hd" x="32" y="38">1 기반 구축</text><text class="hs" x="32" y="54">src/app · src/shared</text><text class="hs" x="32" y="70">동작 4 · 일부 0 · 안함 0</text>
+<g class="t"><rect x="20" y="86" width="180" height="58" rx="4"/><text class="nm" x="32" y="104">리포 구조 재편</text><text class="st" x="188" y="104" text-anchor="end">동작</text><text class="dt" x="32" y="122">원본 3개 legacy/로,</text><text class="dt" x="32" y="136">git mv라 이력 보존</text></g>
+<g class="t"><rect x="20" y="152" width="180" height="58" rx="4"/><text class="nm" x="32" y="170">앱 스캐폴드</text><text class="st" x="188" y="170" text-anchor="end">동작</text><text class="dt" x="32" y="188">Next 16 · React 19 ·</text><text class="dt" x="32" y="202">TS · Tailwind 4</text></g>
+<g class="t"><rect x="20" y="218" width="180" height="58" rx="4"/><text class="nm" x="32" y="236">디자인 토큰 이식</text><text class="st" x="188" y="236" text-anchor="end">동작</text><text class="dt" x="32" y="254">색·타이포·글래스카드</text><text class="dt" x="32" y="268">브라우저 실측 확인</text></g>
+<g class="t"><rect x="20" y="284" width="180" height="58" rx="4"/><text class="nm" x="32" y="302">메뉴·라우팅</text><text class="st" x="188" y="302" text-anchor="end">동작</text><text class="dt" x="32" y="320">메인 3개 + 13개 주소,</text><text class="dt" x="32" y="334">활성 표시까지 동작</text></g>
+<line class="flow" x1="200" y1="48" x2="211" y2="48" marker-end="url(#ar)"/>
+
+<rect class="box" x="212" y="20" width="180" height="56" rx="4"/>
+<text class="hd" x="224" y="38">2 데이터 계층</text><text class="hs" x="224" y="54">supabase/schema.sql</text><text class="hs" x="224" y="70">동작 1 · 일부 2 · 안함 3</text>
+<g class="t"><rect x="212" y="86" width="180" height="58" rx="4"/><text class="nm" x="224" y="104">DB 스키마</text><text class="st" x="380" y="104" text-anchor="end">동작</text><text class="dt" x="224" y="122">Postgres 18 실행 검증,</text><text class="dt" x="224" y="136">재실행 안전</text></g>
+<g class="a"><rect x="212" y="152" width="180" height="58" rx="4"/><text class="nm" x="224" y="170">Supabase 연결</text><text class="st" x="380" y="170" text-anchor="end">일부</text><text class="dt" x="224" y="188">클라이언트 코드만,</text><text class="dt" x="224" y="202">프로젝트·키 없음</text></g>
+<g class="a"><rect x="212" y="218" width="180" height="58" rx="4"/><text class="nm" x="224" y="236">Storage 버킷</text><text class="st" x="380" y="236" text-anchor="end">일부</text><text class="dt" x="224" y="254">SQL에 정의만,</text><text class="dt" x="224" y="268">실제 생성 안 됨</text></g>
+<g class="r"><rect x="212" y="284" width="180" height="58" rx="4"/><text class="nm" x="224" y="302">로컬 DB(PGlite)</text><text class="st" x="380" y="302" text-anchor="end">안함</text><text class="dt" x="224" y="320">구동 가능 확인했으나</text><text class="dt" x="224" y="334">앱에 미연결</text></g>
+<g class="r"><rect x="212" y="350" width="180" height="58" rx="4"/><text class="nm" x="224" y="368">저장소 어댑터</text><text class="st" x="380" y="368" text-anchor="end">안함</text><text class="dt" x="224" y="386">PGlite ↔ Supabase</text><text class="dt" x="224" y="400">전환 계층 없음</text></g>
+<g class="r"><rect x="212" y="416" width="180" height="58" rx="4"/><text class="nm" x="224" y="434">설비 upsert 공용</text><text class="st" x="380" y="434" text-anchor="end">안함</text><text class="dt" x="224" y="452">세 모듈이 쓸 설비</text><text class="dt" x="224" y="466">자동 생성 헬퍼 없음</text></g>
+<line class="flow" x1="392" y1="48" x2="403" y2="48" marker-end="url(#ar)"/>
+
+<rect class="box" x="404" y="20" width="180" height="56" rx="4"/>
+<text class="hd" x="416" y="38">3 오버홀 공정관리</text><text class="hs" x="416" y="54">src/app/overhaul</text><text class="hs" x="416" y="70">동작 0 · 일부 1 · 안함 5</text>
+<g class="a"><rect x="404" y="86" width="180" height="58" rx="4"/><text class="nm" x="416" y="104">화면 6개 골격</text><text class="st" x="572" y="104" text-anchor="end">일부</text><text class="dt" x="416" y="122">주소는 열리지만</text><text class="dt" x="416" y="136">내용은 안내 문구뿐</text></g>
+<g class="r"><rect x="404" y="152" width="180" height="58" rx="4"/><text class="nm" x="416" y="170">엑셀 자동분석</text><text class="st" x="572" y="170" text-anchor="end">안함</text><text class="dt" x="416" y="188">excelParser.js 미이식,</text><text class="dt" x="416" y="202">업로드 자체가 없음</text></g>
+<g class="r"><rect x="404" y="218" width="180" height="58" rx="4"/><text class="nm" x="416" y="236">공정률 산정</text><text class="st" x="572" y="236" text-anchor="end">안함</text><text class="dt" x="416" y="254">progress.js 미이식,</text><text class="dt" x="416" y="268">지연 위험 판정 없음</text></g>
+<g class="r"><rect x="404" y="284" width="180" height="58" rx="4"/><text class="nm" x="416" y="302">공정표 자동배치</text><text class="st" x="572" y="302" text-anchor="end">안함</text><text class="dt" x="416" y="320">schedule.js 미이식,</text><text class="dt" x="416" y="334">간트차트 없음</text></g>
+<g class="r"><rect x="404" y="350" width="180" height="58" rx="4"/><text class="nm" x="416" y="368">실적·사진 입력</text><text class="st" x="572" y="368" text-anchor="end">안함</text><text class="dt" x="416" y="386">날짜별 저장·타임라인</text><text class="dt" x="416" y="400">모두 없음</text></g>
+<g class="r"><rect x="404" y="416" width="180" height="58" rx="4"/><text class="nm" x="416" y="434">보고서 출력</text><text class="st" x="572" y="434" text-anchor="end">안함</text><text class="dt" x="416" y="452">일일·경영진 보고서</text><text class="dt" x="416" y="466">생성·인쇄 없음</text></g>
+<line class="flow" x1="584" y1="48" x2="595" y2="48" marker-end="url(#ar)"/>
+
+<rect class="box" x="596" y="20" width="180" height="56" rx="4"/>
+<text class="hd" x="608" y="38">4 고장이력 관리</text><text class="hs" x="608" y="54">src/app/failure</text><text class="hs" x="608" y="70">동작 0 · 일부 1 · 안함 5</text>
+<g class="a"><rect x="596" y="86" width="180" height="58" rx="4"/><text class="nm" x="608" y="104">화면 4개 골격</text><text class="st" x="764" y="104" text-anchor="end">일부</text><text class="dt" x="608" y="122">주소만 연결,</text><text class="dt" x="608" y="136">상세 화면은 아직 없음</text></g>
+<g class="r"><rect x="596" y="152" width="180" height="58" rx="4"/><text class="nm" x="608" y="170">이력 등록·수정</text><text class="st" x="764" y="170" text-anchor="end">안함</text><text class="dt" x="608" y="188">db.ts가 SQLite 전용,</text><text class="dt" x="608" y="202">Postgres 미이식</text></g>
+<g class="r"><rect x="596" y="218" width="180" height="58" rx="4"/><text class="nm" x="608" y="236">검색·필터</text><text class="st" x="764" y="236" text-anchor="end">안함</text><text class="dt" x="608" y="254">지사·상태·분야·기간</text><text class="dt" x="608" y="268">필터 모두 없음</text></g>
+<g class="r"><rect x="596" y="284" width="180" height="58" rx="4"/><text class="nm" x="608" y="302">고장상보 파싱</text><text class="st" x="764" y="302" text-anchor="end">안함</text><text class="dt" x="608" y="320">parseFailureReport</text><text class="dt" x="608" y="334">미이식</text></g>
+<g class="r"><rect x="596" y="350" width="180" height="58" rx="4"/><text class="nm" x="608" y="368">일괄 업로드</text><text class="st" x="764" y="368" text-anchor="end">안함</text><text class="dt" x="608" y="386">여러 건 한 번에</text><text class="dt" x="608" y="400">등록하는 경로 없음</text></g>
+<g class="r"><rect x="596" y="416" width="180" height="58" rx="4"/><text class="nm" x="608" y="434">첨부파일</text><text class="st" x="764" y="434" text-anchor="end">안함</text><text class="dt" x="608" y="452">로컬 uploads/ 방식은</text><text class="dt" x="608" y="466">Vercel에서 못 씀</text></g>
+<line class="flow" x1="776" y1="48" x2="787" y2="48" marker-end="url(#ar)"/>
+
+<rect class="box" x="788" y="20" width="180" height="56" rx="4"/>
+<text class="hd" x="800" y="38">5 정비 챗봇</text><text class="hs" x="800" y="54">src/app/chatbot</text><text class="hs" x="800" y="70">동작 0 · 일부 3 · 안함 3</text>
+<g class="a"><rect x="788" y="86" width="180" height="58" rx="4"/><text class="nm" x="800" y="104">화면 2개 골격</text><text class="st" x="956" y="104" text-anchor="end">일부</text><text class="dt" x="800" y="122">챗·문서관리 주소만,</text><text class="dt" x="800" y="136">입력창 없음</text></g>
+<g class="a"><rect x="788" y="152" width="180" height="58" rx="4"/><text class="nm" x="800" y="170">태그 정확일치</text><text class="st" x="956" y="170" text-anchor="end">일부</text><text class="dt" x="800" y="188">PIT-7610 = pit 7610</text><text class="dt" x="800" y="202">DB 확인, 화면 없음</text></g>
+<g class="a"><rect x="788" y="218" width="180" height="58" rx="4"/><text class="nm" x="800" y="236">증상 검색</text><text class="st" x="956" y="236" text-anchor="end">일부</text><text class="dt" x="800" y="254">어절 분해로 방식 확정,</text><text class="dt" x="800" y="268">어미 변화는 못 잡음</text></g>
+<g class="r"><rect x="788" y="284" width="180" height="58" rx="4"/><text class="nm" x="800" y="302">PDF 텍스트 추출</text><text class="st" x="956" y="302" text-anchor="end">안함</text><text class="dt" x="800" y="320">PyMuPDF를 pdf-parse로</text><text class="dt" x="800" y="334">바꿔야 함</text></g>
+<g class="r"><rect x="788" y="350" width="180" height="58" rx="4"/><text class="nm" x="800" y="368">문서 인덱싱</text><text class="st" x="956" y="368" text-anchor="end">안함</text><text class="dt" x="800" y="386">청크 분할·해시 증분</text><text class="dt" x="800" y="400">적재 경로 없음</text></g>
+<g class="r"><rect x="788" y="416" width="180" height="58" rx="4"/><text class="nm" x="800" y="434">PDF 미리보기</text><text class="st" x="956" y="434" text-anchor="end">안함</text><text class="dt" x="800" y="452">근거 문서를 옆에서</text><text class="dt" x="800" y="466">열어볼 수 없음</text></g>
+<line class="flow" x1="968" y1="48" x2="979" y2="48" marker-end="url(#ar)"/>
+
+<rect class="box" x="980" y="20" width="180" height="56" rx="4"/>
+<text class="hd" x="992" y="38">6 설비 마스터·연계</text><text class="hs" x="992" y="54">src/app/equipment</text><text class="hs" x="992" y="70">동작 0 · 일부 1 · 안함 4</text>
+<g class="a"><rect x="980" y="86" width="180" height="58" rx="4"/><text class="nm" x="992" y="104">마스터 설계</text><text class="st" x="1148" y="104" text-anchor="end">일부</text><text class="dt" x="992" y="122">설비→기기 2단 스키마는</text><text class="dt" x="992" y="136">있으나 화면·데이터 없음</text></g>
+<g class="r"><rect x="980" y="152" width="180" height="58" rx="4"/><text class="nm" x="992" y="170">설비 등록·목록</text><text class="st" x="1148" y="170" text-anchor="end">안함</text><text class="dt" x="992" y="188">CRUD 화면 없음</text></g>
+<g class="r"><rect x="980" y="218" width="180" height="58" rx="4"/><text class="nm" x="992" y="236">기기·태그 관리</text><text class="st" x="1148" y="236" text-anchor="end">안함</text><text class="dt" x="992" y="254">설비에 태그를 붙일</text><text class="dt" x="992" y="268">수단이 없음</text></g>
+<g class="r"><rect x="980" y="284" width="180" height="58" rx="4"/><text class="nm" x="992" y="302">설비 통합 뷰</text><text class="st" x="1148" y="302" text-anchor="end">안함</text><text class="dt" x="992" y="320">오버홀·고장·도서를</text><text class="dt" x="992" y="334">한 화면에 못 모음</text></g>
+<g class="r"><rect x="980" y="350" width="180" height="58" rx="4"/><text class="nm" x="992" y="368">모듈 간 동선</text><text class="st" x="1148" y="368" text-anchor="end">안함</text><text class="dt" x="992" y="386">실적→고장등록,</text><text class="dt" x="992" y="400">고장→도서검색 없음</text></g>
+<line class="flow" x1="1160" y1="48" x2="1171" y2="48" marker-end="url(#ar)"/>
+
+<rect class="box" x="1172" y="20" width="180" height="56" rx="4"/>
+<text class="hd" x="1184" y="38">7 배포·운영</text><text class="hs" x="1184" y="54">Vercel · GitHub</text><text class="hs" x="1184" y="70">동작 2 · 일부 0 · 안함 3</text>
+<g class="t"><rect x="1172" y="86" width="180" height="58" rx="4"/><text class="nm" x="1184" y="104">프로덕션 빌드</text><text class="st" x="1340" y="104" text-anchor="end">동작</text><text class="dt" x="1184" y="122">15개 화면 정적 생성,</text><text class="dt" x="1184" y="136">타입체크 통과</text></g>
+<g class="t"><rect x="1172" y="152" width="180" height="58" rx="4"/><text class="nm" x="1184" y="170">Vercel 배포</text><text class="st" x="1340" y="170" text-anchor="end">동작</text><text class="dt" x="1184" y="188">plant-ops-hub</text><text class="dt" x="1184" y="202">.vercel.app 접속됨</text></g>
+<g class="r"><rect x="1172" y="218" width="180" height="58" rx="4"/><text class="nm" x="1184" y="236">자동 배포</text><text class="st" x="1340" y="236" text-anchor="end">안함</text><text class="dt" x="1184" y="254">GitHub 연동 안 함,</text><text class="dt" x="1184" y="268">매번 수동 업로드</text></g>
+<g class="r"><rect x="1172" y="284" width="180" height="58" rx="4"/><text class="nm" x="1184" y="302">접근 보호</text><text class="st" x="1340" y="302" text-anchor="end">안함</text><text class="dt" x="1184" y="320">로그인 없음 +</text><text class="dt" x="1184" y="334">보호 설정도 없음</text></g>
+<g class="r"><rect x="1172" y="350" width="180" height="58" rx="4"/><text class="nm" x="1184" y="368">데이터 영속</text><text class="st" x="1340" y="368" text-anchor="end">안함</text><text class="dt" x="1184" y="386">서버리스라 로컬 DB는</text><text class="dt" x="1184" y="400">배포지에서 안 남음</text></g>
+</svg>
+<figcaption>가로로 스크롤하면 7단계를 모두 볼 수 있습니다. 3·4·5단계가 담당자별 작업 영역과 그대로 대응합니다.</figcaption>
+</figure>
+
+<h2 id="checklist">할 일 체크리스트</h2>
+<p class="progress">진행 <b><span id="done">0</span> / 36</b> · 체크 상태는 이 브라우저에 저장됩니다.</p>
+
+<div class="group">
+<h3>1. 데이터 계층<span>4개 · 이게 먼저 끝나야 나머지가 붙는다</span></h3>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">PGlite로 로컬 DB를 띄우고 서버 시작 시 스키마를 자동 적용</span><span class="src">supabase/schema.sql</span><span class="why">Postgres 18에서 실행 검증 완료. 계정·서버·Docker 없이 파일로 저장된다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">저장소 어댑터를 만들어 환경변수 하나로 PGlite ↔ Supabase 전환</span><span class="src">src/shared/lib/supabase.ts</span><span class="why">같은 SQL을 쓰므로 쿼리는 한 번만 작성하면 된다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">설비 자동 생성 헬퍼 (이름 기준 upsert) — 세 모듈 공용</span><span class="src">supabase/schema.sql · equipment_name_key</span><span class="why">엑셀 업로드와 고장이력 등록 양쪽에서 설비 마스터가 채워져야 한다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">데모용 시드 데이터를 DB에 넣는 스크립트</span><span class="src">legacy/plantsync/src/lib/seed.js</span><span class="why">빈 화면으로는 포팅 결과를 확인할 수 없다</span></span></label>
+</div>
+
+<div class="group">
+<h3>2. 오버홀 공정관리<span>9개 · 오버홀 담당</span></h3>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">엑셀 자동분석 엔진을 TypeScript로 이식</span><span class="src">legacy/plantsync/src/lib/excelParser.js</span><span class="why">64개 시트·자간 공백 헤더·원가/집계 시트 혼재 처리. 통합에서 가장 덩치 큰 로직</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">파서가 뽑은 설비 유형을 설비 마스터에 연결</span><span class="src">legacy/plantsync/src/lib/excelParser.js:64 EQUIPMENT_RULES</span><span class="why">지금은 분류 문자열일 뿐 관리 대상이 아니다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">공정률 산정 이식 (물량 가중, 지연 위험 판정)</span><span class="src">legacy/plantsync/src/lib/progress.js</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">공정표 자동배치 이식 (예정일 파싱 → 키워드 배치 순)</span><span class="src">legacy/plantsync/src/lib/schedule.js</span><span class="why">엑셀 '작업 예정일' 우선, 없으면 작업명 키워드로 배치</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">업로드 분석 화면 (분야 지정, 여러 파일 대기열, 파일별 삭제)</span><span class="src">legacy/plantsync/src/pages/UploadAnalysis.jsx</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">대시보드 (전체·분야별·설비별 공정률, 지연 위험, 알림)</span><span class="src">legacy/plantsync/src/pages/Dashboard.jsx</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">작업 관리 (검색·필터·페이지네이션·상태 변경)</span><span class="src">legacy/plantsync/src/pages/TaskManagement.jsx</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">실적 입력 (날짜별 독립 저장 + 항목별 타임라인 + 분해 전·후 사진)</span><span class="src">legacy/plantsync/src/pages/PerformanceEntry.jsx</span><span class="why">사진은 Storage로. 로컬 개발 중에는 파일 경로만 보관</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">공정표 간트 + 보고서 (일일·경영진, 인쇄/PDF)</span><span class="src">legacy/plantsync/src/pages/Schedule.jsx · Reports.jsx · src/lib/exporter.js</span><span class="why">인쇄 CSS는 globals.css에 이미 옮겨져 있다</span></span></label>
+</div>
+
+<div class="group">
+<h3>3. 고장이력 관리<span>7개 · 고장이력 담당</span></h3>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">db.ts의 SQLite 쿼리를 Postgres로 이식</span><span class="src">legacy/고장이력(7.21)/web/src/lib/db.ts</span><span class="why">테이블 정의는 supabase/schema.sql에 이미 옮겨둠. 쿼리만 옮기면 된다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">전 컬럼 LIKE 검색을 어절 분해 + search_text 인덱스 검색으로 교체</span><span class="src">legacy/고장이력(7.21)/web/src/lib/db.ts:231 SEARCHABLE_COLUMNS</span><span class="why">문장 전체 유사도 비교는 한국어에서 0건이 나온다. 어절로 쪼개 매칭 개수로 순위</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">고장이력 목록 (지사·상태·분야·기간 필터, 정렬)</span><span class="src">legacy/고장이력(7.21)/web/src/components/HistoryTable.tsx</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">신규 등록 · 상세 · 수정 화면</span><span class="src">legacy/고장이력(7.21)/web/src/components/FailureHistoryForm.tsx</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">고장상보 파싱 이식 후 일괄 업로드 연결</span><span class="src">legacy/고장이력(7.21)/web/src/lib/parseFailureReport.ts</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">첨부파일을 로컬 uploads/에서 Storage로 전환</span><span class="src">legacy/고장이력(7.21)/web/src/app/api/attachments</span><span class="why">원본 db.ts:9 주석에도 서버리스에서는 파일이 안 남는다고 적혀 있다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">통계 대시보드 (월별 추이, 분야별·지사별·설비별 건수)</span><span class="src">legacy/고장이력(7.21)/web/src/lib/db.ts:382 getDashboardStats</span></span></label>
+</div>
+
+<div class="group">
+<h3>4. 정비 챗봇<span>7개 · 챗봇 담당 · 외부 API 사용 금지</span></h3>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">PDF 텍스트 추출을 PyMuPDF에서 pdf-parse로 대체 (페이지 단위 유지)</span><span class="src">legacy/CheonJae-DDasomi/backend/app/services/pdf_processor.py</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">청크 분할(800자·150자 겹침) 후 document_chunk에 적재</span><span class="src">supabase/schema.sql · document_chunk</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">파일 해시 기반 증분 인덱싱 (같은 파일은 건너뛰기)</span><span class="src">legacy/CheonJae-DDasomi/backend/app/routers/index_router.py</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">청크에서 태그를 뽑아 document_tag에 적재</span><span class="src">supabase/schema.sql · document_tag</span><span class="why">태그 정규화(PIT-7610 = pit 7610)는 DB 생성컬럼으로 이미 동작 확인</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">검색 API — 태그 정확일치 + 어절 분해 부분일치 + word_similarity 가산점</span><span class="src">legacy/CheonJae-DDasomi/backend/app/services/answer_builder.py · full_text_search.py</span><span class="why">LLM 없이 검색 결과 원문을 그대로 보여주는 원본 방침 유지</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">챗 화면 (질문 입력, 근거 문서 배지, 발췌 원문, 주의사항 문구)</span><span class="src">legacy/CheonJae-DDasomi/frontend/components/ChatPanel.tsx · ChatMessage.tsx</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">문서 관리 화면 + PDF 미리보기 (react-pdf 대신 iframe #page=N 검토)</span><span class="src">legacy/CheonJae-DDasomi/frontend/components/DocManagementPanel.tsx · PdfViewer.tsx</span><span class="why">react-pdf는 worker 설정이 필요하다. 브라우저 내장 뷰어로 충분한지 먼저 확인</span></span></label>
+</div>
+
+<div class="group">
+<h3>5. 설비 마스터와 연계<span>5개 · 통합의 실제 값어치가 나오는 부분</span></h3>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">설비 등록·목록·수정 화면</span><span class="src">src/app/equipment</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">기기·태그를 설비에 붙이는 화면</span><span class="src">supabase/schema.sql · device</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">설비 상세 통합 뷰 — 진행 중 오버홀 작업 + 과거 고장 이력 + 관련 준공도서</span><span class="why">이게 없으면 한 껍데기 안에 세 앱이 따로 도는 것과 같다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">고장이력의 자유 텍스트 설비명을 마스터 참조로 연결</span><span class="src">legacy/고장이력(7.21)/web/src/lib/db.ts:448</span><span class="why">원본 주석: 설비는 아직 관리 엔티티가 아님(PRD 오픈이슈)</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">모듈 간 동선 — 실적입력에서 고장 등록, 고장 상세에서 준공도서 검색</span></span></label>
+</div>
+
+<div class="group">
+<h3>6. 배포와 운영<span>4개</span></h3>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">Vercel을 개인 GitHub 저장소에 연결해 push 시 자동 배포</span><span class="src">vercel git connect https://github.com/Quietmin/tonghapbon-1.git</span><span class="why">CLI가 공용 저장소를 먼저 제안하므로 대상을 반드시 확인할 것</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">실제 자료를 넣기 전에 Vercel Deployment Protection 켜기</span><span class="why">로그인을 안 만들기로 했으므로 앱 안에는 막을 수단이 없다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">데이터를 팀원끼리 공유할 시점에 Supabase 프로젝트 생성 후 환경변수 전환</span><span class="src">.env.local.example</span><span class="why">스키마는 그대로 쓴다. 로컬 개발은 그때까지 PGlite로 계속</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">저장소를 공개로 바꿨으므로 legacy/ 안의 사내 문서 공개 범위 점검</span><span class="src">legacy/고장이력(7.21)/docs/PRD.md · legacy/CheonJae-DDasomi/README.md</span></span></label>
+</div>
+
+<h2 id="criteria">판단 기준</h2>
+<table class="def">
+  <tr><th>동작</th><td>지금 실행해서 눈으로 확인했다</td></tr>
+  <tr><th>일부 동작</th><td>일부만 되거나, 코드·설계는 있는데 화면이나 연결이 없다</td></tr>
+  <tr><th>동작 안함</th><td>기능 자체가 아직 없다</td></tr>
+</table>
+
+<footer>
+저장소 <a href="https://github.com/Quietmin/tonghapbon-1">Quietmin/tonghapbon-1</a> ·
+배포 <a href="https://plant-ops-hub.vercel.app">plant-ops-hub.vercel.app</a> ·
+DB 설계 <code>supabase/schema.sql</code> ·
+통합 전 원본 <code>legacy/</code>
+</footer>
+
+</div>
+<script>
+(function(){
+  var KEY='plant-ops-hub-checklist-v1';
+  var boxes=[].slice.call(document.querySelectorAll('.item input'));
+  var out=document.getElementById('done');
+  var saved={};
+  try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){saved={}}
+  function paint(){
+    var n=0;
+    boxes.forEach(function(b,i){
+      b.parentNode.classList.toggle('done',b.checked);
+      if(b.checked)n++;
+    });
+    out.textContent=n;
+  }
+  boxes.forEach(function(b,i){
+    b.checked=!!saved[i];
+    b.addEventListener('change',function(){
+      saved[i]=b.checked;
+      try{localStorage.setItem(KEY,JSON.stringify(saved))}catch(e){}
+      paint();
+    });
+  });
+  paint();
+})();
+</script>
+</body>
+</html>
