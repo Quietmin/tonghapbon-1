@@ -15,19 +15,31 @@
 
 ```bash
 npm install
-```
-
-```bash
 npm run dev
 ```
 
 DB는 첫 실행 때 `.data/` 아래에 자동으로 만들어진다. 따로 설치할 것이 없다.
 
+### 여러 사람이 같은 데이터를 봐야 할 때 (Supabase 등)
+
+`.env.local.example`을 복사해 `.env.local`을 만들고 `DATABASE_URL`을 채우면, 그 순간부터
+로컬도 그 Postgres를 그대로 쓴다. 처음 한 번은 스키마를 적용해야 한다.
+
+```bash
+cp .env.local.example .env.local   # DATABASE_URL 채운 뒤
+npm run db:migrate                 # db/schema.sql 적용 (최초 1회, 또는 스키마 수정 시)
+npm run dev
+```
+
+Vercel에 배포할 때도 프로젝트 환경변수에 같은 `DATABASE_URL`을 넣으면 된다 — 코드는 그대로다.
+
 ## 기술 스택
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PostgreSQL
 
-- **저장소**: PostgreSQL. 개발 중에는 PGlite로 앱 안에서 돌린다 — 계정·서버·Docker 불필요
+- **저장소**: PostgreSQL. `DATABASE_URL`이 없으면 PGlite로 앱 안에서 돌고(계정·서버·Docker
+  불필요), 있으면 그 Postgres에 그대로 연결한다 ([src/shared/lib/db.ts](src/shared/lib/db.ts)).
+  둘 다 같은 SQL을 쓰므로 호출하는 코드는 바뀌지 않는다
 - **인증**: 없음 (개발 단계 결정)
 - **챗봇 검색**: 태그 정확일치 + `pg_trgm` 유사도. **LLM·외부 API를 사용하지 않습니다.**
 - **디자인**: PlantSync Pro의 Stitch "Lumina Overhaul Director" 토큰을 Tailwind 4 `@theme`으로 이식
