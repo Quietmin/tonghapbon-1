@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
@@ -8,13 +9,20 @@ import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
  *
  * PGlite는 Postgres를 그대로 WASM으로 컴파일한 것이라, 여기서 쓰는 SQL은
  * 나중에 어떤 Postgres 서버에 붙이든 그대로 동작한다. 계정·서버·Docker가 필요 없고
- * 데이터는 프로젝트 안 .data/pgdata/ 에 파일로 남는다.
+ * 로컬에서는 데이터가 프로젝트 안 .data/pgdata/ 에 파일로 남는다.
+ *
+ * Vercel 서버리스에서는 배포 번들이 읽기 전용이라 process.cwd() 아래에 쓸 수 없다.
+ * 쓰기 가능한 곳은 os.tmpdir() 뿐이고, 그마저도 인스턴스가 재활용되거나 새로 배포되면
+ * 초기화된다 — 이 앱은 로그인·영속 저장을 아직 요구하지 않는 개발 단계라 지금은
+ * 이 정도로 충분하다. 실제 데이터를 여러 사람이 공유해야 하면 이 파일만 바꿔서
+ * 진짜 Postgres(Supabase 등)에 붙이면 된다.
  *
  * 주의: 서버 전용이다. 클라이언트 컴포넌트에서 import하면 안 된다
  * (API Route나 서버 컴포넌트에서만 부른다).
  */
 
-const DATA_DIR = path.join(process.cwd(), ".data", "pgdata");
+const RUNTIME_ROOT = process.env.VERCEL ? os.tmpdir() : process.cwd();
+const DATA_DIR = path.join(RUNTIME_ROOT, ".data", "pgdata");
 const SCHEMA_PATH = path.join(process.cwd(), "db", "schema.sql");
 
 // Next 개발 서버는 코드가 바뀔 때마다 모듈을 다시 평가한다.
