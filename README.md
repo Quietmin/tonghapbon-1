@@ -18,15 +18,16 @@ npm install
 ```
 
 ```bash
-cp .env.local.example .env.local   # Supabase URL·키를 채운 뒤
-npm run dev                        # http://localhost:3000
+npm run dev
 ```
+
+DB는 첫 실행 때 `.data/` 아래에 자동으로 만들어진다. 따로 설치할 것이 없다.
 
 ## 기술 스택
 
-Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Supabase (Postgres + Storage)
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PostgreSQL
 
-- **배포**: Vercel (프론트·API Route) + Supabase (DB·파일)
+- **저장소**: PostgreSQL. 개발 중에는 PGlite로 앱 안에서 돌린다 — 계정·서버·Docker 불필요
 - **인증**: 없음 (개발 단계 결정)
 - **챗봇 검색**: 태그 정확일치 + `pg_trgm` 유사도. **LLM·외부 API를 사용하지 않습니다.**
 - **디자인**: PlantSync Pro의 Stitch "Lumina Overhaul Director" 토큰을 Tailwind 4 `@theme`으로 이식
@@ -45,7 +46,7 @@ src/
 │   ├─ equipment/    ← 설비 마스터 (공통)
 │   └─ api/{overhaul,failure,chatbot}/
 ├─ modules/{overhaul,failure,chatbot}/   각 모듈의 로직·컴포넌트
-└─ shared/                               공통 — 레이아웃·UI·설비 마스터·supabase 클라이언트
+└─ shared/                               공통 — 레이아웃·UI·설비 마스터·DB 접근
                                          (여기를 고칠 때만 담당자 간 협의 필요)
 ```
 
@@ -60,11 +61,12 @@ legacy/
 └─ CheonJae-DDasomi/   천재따소미 원본 (FastAPI + Next 14)
 ```
 
-> **여기서 개발하지 마세요.** 저장소가 SQLite/IndexedDB/ChromaDB에서 Supabase로 바뀌었기 때문에
-> legacy 코드의 변경분은 통합 앱으로 그대로 옮겨지지 않습니다. 로직을 참고할 때만 열어보세요.
+> **여기서 개발하지 마세요.** 저장소가 IndexedDB / SQLite / ChromaDB 세 갈래에서 하나의
+> PostgreSQL로 합쳐졌기 때문에, legacy 코드의 변경분은 통합 앱으로 그대로 옮겨지지 않습니다.
+> 로직을 참고할 때만 열어보세요.
 
 ## 문서
 
 - [docs/OH WEB APP PRD.md](docs/OH%20WEB%20APP%20PRD.md) — 오버홀 공정관리 PRD
 - [legacy/고장이력(7.21)/docs/PRD.md](legacy/고장이력\(7.21\)/docs/PRD.md) — 고장이력 PRD
-- [supabase/schema.sql](supabase/schema.sql) — 통합 DB 스키마
+- [db/schema.sql](db/schema.sql) — 통합 DB 스키마

@@ -1,18 +1,18 @@
 -- ============================================================================
--- Plant Ops Hub — 통합 DB 스키마 (Supabase / PostgreSQL)
+-- Plant Ops Hub — 통합 DB 스키마 (PostgreSQL)
 --
--- Supabase 대시보드 → SQL Editor 에 그대로 붙여넣어 실행하면 됩니다.
--- 여러 번 실행해도 안전하도록(idempotent) 작성했습니다.
+-- 특정 서비스에 묶이지 않은 순수 PostgreSQL이다. 지금은 PGlite(앱 안에서 도는
+-- 임베디드 Postgres)로 로컬에서 실행하고, 계정·서버·클라우드가 필요 없다.
+-- 나중에 데이터를 공유해야 할 때 어떤 Postgres에 붙이든 이 파일을 그대로 쓴다.
+-- 여러 번 실행해도 안전하도록(idempotent) 작성했다.
 --
 -- 구성
 --   1) 공통 설비 마스터   equipment → device
 --   2) 오버홀 공정관리     overhaul_project / overhaul_source / overhaul_task / overhaul_entry
 --   3) 고장이력 관리       failure_history / failure_attachment
 --   4) 정비 챗봇           document / document_chunk / chat_message
---   5) Storage 버킷
 --
--- 인증이 없는 개발 단계 구성이므로 RLS를 켜지 않습니다. 모든 접근은 서버(API Route)에서
--- service role 키로만 이뤄집니다. 운영 전환 시 RLS + 정책 추가가 필요합니다.
+-- 인증이 없는 개발 단계 구성이라 접근 제어(RLS)를 넣지 않았다. 운영 전환 시 필요하다.
 -- ============================================================================
 
 -- gen_random_uuid()는 Postgres 13부터 코어 내장이라 pgcrypto가 필요 없다.
@@ -179,7 +179,7 @@ create table if not exists overhaul_entry (
   done_qty      numeric(14, 3) not null default 0,
   work_detail   text,
   delay_reason  text,
-  -- Supabase Storage 'overhaul-photos' 버킷 내 경로
+  -- 파일 경로 (.data/uploads/overhaul-photos/…)
   photo_before  text,
   photo_after   text,
   created_at    timestamptz not null default now(),
@@ -273,7 +273,7 @@ create table if not exists failure_attachment (
   id           bigint generated always as identity primary key,
   failure_id   bigint not null references failure_history(id) on delete cascade,
   file_name    text not null,
-  -- Supabase Storage 'failure-attachments' 버킷 내 경로 (원본의 stored_name 대체)
+  -- 파일 경로 (.data/uploads/failure-attachments/…) — 원본의 stored_name 대체
   storage_path text not null,
   created_at   timestamptz not null default now()
 );
@@ -290,7 +290,7 @@ create index if not exists failure_attachment_failure_idx on failure_attachment 
 create table if not exists document (
   id            uuid primary key default gen_random_uuid(),
   file_name     text not null,
-  -- Supabase Storage 'documents' 버킷 내 경로
+  -- 파일 경로 (.data/uploads/documents/…)
   storage_path  text not null,
   kind          text not null default '준공도서',   -- 준공도서 / 벤더프린트 / 고장사례
   -- 파일 해시 — 내용이 같으면 재인덱싱을 건너뛴다 (원본의 증분 인덱싱 유지)
@@ -345,13 +345,13 @@ create index if not exists chat_message_created_idx on chat_message (created_at 
 
 
 -- ============================================================================
--- 5) Storage 버킷
---    비공개 버킷으로 만들고, 서버에서 signed URL을 발급해 내려준다.
+-- 첨부파일에 대하여
+--
+-- 파일 자체는 DB에 넣지 않는다. 아래 컬럼들이 파일 위치만 문자열로 들고 있다.
+--   failure_attachment.storage_path   고장이력 첨부
+--   overhaul_entry.photo_before/after 분해 전·후 사진
+--   document.storage_path             준공도서 PDF
+--
+-- 지금은 프로젝트 안 .data/uploads/ 에 저장한다(로컬 개발). 나중에 파일 저장소를
+-- 바꾸더라도 경로 문자열 규칙만 맞추면 되고, 이 스키마는 손대지 않는다.
 -- ============================================================================
-
-insert into storage.buckets (id, name, public)
-values
-  ('failure-attachments', 'failure-attachments', false),
-  ('overhaul-photos',     'overhaul-photos',     false),
-  ('documents',           'documents',           false)
-on conflict (id) do nothing;

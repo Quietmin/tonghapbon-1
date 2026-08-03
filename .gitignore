@@ -8,8 +8,11 @@ dist
 next-env.d.ts
 *.tsbuildinfo
 
-# 로컬 환경설정 (Supabase 키 등)
+# 로컬 환경설정
 .env
 .env.local
+
+# 로컬 DB와 업로드 파일 (개발용, 공유하지 않음)
+.data
 
 .vercel

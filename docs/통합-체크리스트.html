@@ -87,12 +87,12 @@ footer a{color:var(--ink2)}
 <div class="wrap">
 
 <h1>Plant Ops Hub 통합 · 현황과 체크리스트</h1>
-<p class="lead">작성일 2026-08-03 · 대상: 오버홀 공정관리 + 고장이력 관리 + 정비 챗봇 3개를 단일 앱으로 통합<br>근거: <code>src/</code>, <code>supabase/schema.sql</code>, <code>legacy/</code> 코드 확인 및 로컬 Postgres 18 실행 검증</p>
+<p class="lead">작성일 2026-08-03 · 대상: 오버홀 공정관리 + 고장이력 관리 + 정비 챗봇 3개를 단일 앱으로 통합<br>근거: <code>src/</code>, <code>db/schema.sql</code>, <code>legacy/</code> 코드 확인 및 로컬 Postgres 18 실행 검증</p>
 <div class="stats">
-  <span class="pill n">전체 기능 38개</span>
+  <span class="pill n">전체 기능 37개</span>
   <span class="pill ok">동작 7</span>
-  <span class="pill half">일부 동작 8</span>
-  <span class="pill no">동작 안함 23</span>
+  <span class="pill half">일부 동작 6</span>
+  <span class="pill no">동작 안함 24</span>
   <span class="pill n">오늘 계획 4개</span>
 </div>
 <nav>
@@ -118,22 +118,21 @@ footer a{color:var(--ink2)}
 </div>
 
 <div class="card half">
-  <div class="hd"><strong>반만 된 것</strong><em>8</em></div>
+  <div class="hd"><strong>반만 된 것</strong><em>6</em></div>
   <ul>
     <li>화면 13개는 열리지만 전부 "포팅 예정"이라는 안내만 있고 내용이 없다</li>
     <li>태그를 어떻게 적어도 같은 걸로 찾아주는 기능(PIT-7610 = pit 7610)은 DB에서 확인했지만 쓸 화면이 없다</li>
     <li>고장 증상 검색 방법은 정했지만 아직 앱에 넣지 않았다</li>
     <li>그 방법으로도 말끝이 바뀐 말(튐 ↔ 튀는)은 못 찾는다. Postgres에 한국어 형태소 분석기가 없어서다</li>
-    <li>Supabase에 붙는 코드는 있는데 프로젝트와 키가 없어 실제로는 안 붙어 있다</li>
-    <li>파일 보관함(Storage) 3개는 설계서에 적혀만 있고 만들어지지 않았다</li>
     <li>설비 마스터는 설계만 있고 화면도 데이터도 없다</li>
     <li>배포된 주소는 로그인 없이 누구나 열린다. 지금은 빈 껍데기라 괜찮지만 실제 자료가 들어가면 문제가 된다</li>
   </ul>
 </div>
 
 <div class="card no">
-  <div class="hd"><strong>아직 아무것도 안 된 것</strong><em>23</em></div>
+  <div class="hd"><strong>아직 아무것도 안 된 것</strong><em>24</em></div>
   <ul>
+    <li>앱이 아직 DB에 연결돼 있지 않다. 무엇을 입력해도 저장할 곳이 없다</li>
     <li>설계내역서 엑셀을 올릴 수 없다</li>
     <li>작업항목 자동 추출이 안 된다</li>
     <li>공정률과 지연 위험이 계산되지 않는다</li>
@@ -177,13 +176,12 @@ footer a{color:var(--ink2)}
 <line class="flow" x1="200" y1="48" x2="211" y2="48" marker-end="url(#ar)"/>
 
 <rect class="box" x="212" y="20" width="180" height="56" rx="4"/>
-<text class="hd" x="224" y="38">2 데이터 계층</text><text class="hs" x="224" y="54">supabase/schema.sql</text><text class="hs" x="224" y="70">동작 1 · 일부 2 · 안함 3</text>
+<text class="hd" x="224" y="38">2 데이터 계층</text><text class="hs" x="224" y="54">db/schema.sql</text><text class="hs" x="224" y="70">동작 1 · 일부 0 · 안함 4</text>
 <g class="t"><rect x="212" y="86" width="180" height="58" rx="4"/><text class="nm" x="224" y="104">DB 스키마</text><text class="st" x="380" y="104" text-anchor="end">동작</text><text class="dt" x="224" y="122">Postgres 18 실행 검증,</text><text class="dt" x="224" y="136">재실행 안전</text></g>
-<g class="a"><rect x="212" y="152" width="180" height="58" rx="4"/><text class="nm" x="224" y="170">Supabase 연결</text><text class="st" x="380" y="170" text-anchor="end">일부</text><text class="dt" x="224" y="188">클라이언트 코드만,</text><text class="dt" x="224" y="202">프로젝트·키 없음</text></g>
-<g class="a"><rect x="212" y="218" width="180" height="58" rx="4"/><text class="nm" x="224" y="236">Storage 버킷</text><text class="st" x="380" y="236" text-anchor="end">일부</text><text class="dt" x="224" y="254">SQL에 정의만,</text><text class="dt" x="224" y="268">실제 생성 안 됨</text></g>
-<g class="r"><rect x="212" y="284" width="180" height="58" rx="4"/><text class="nm" x="224" y="302">로컬 DB(PGlite)</text><text class="st" x="380" y="302" text-anchor="end">안함</text><text class="dt" x="224" y="320">구동 가능 확인했으나</text><text class="dt" x="224" y="334">앱에 미연결</text></g>
-<g class="r"><rect x="212" y="350" width="180" height="58" rx="4"/><text class="nm" x="224" y="368">저장소 어댑터</text><text class="st" x="380" y="368" text-anchor="end">안함</text><text class="dt" x="224" y="386">PGlite ↔ Supabase</text><text class="dt" x="224" y="400">전환 계층 없음</text></g>
-<g class="r"><rect x="212" y="416" width="180" height="58" rx="4"/><text class="nm" x="224" y="434">설비 upsert 공용</text><text class="st" x="380" y="434" text-anchor="end">안함</text><text class="dt" x="224" y="452">세 모듈이 쓸 설비</text><text class="dt" x="224" y="466">자동 생성 헬퍼 없음</text></g>
+<g class="r"><rect x="212" y="152" width="180" height="58" rx="4"/><text class="nm" x="224" y="170">로컬 DB(PGlite)</text><text class="st" x="380" y="170" text-anchor="end">안함</text><text class="dt" x="224" y="188">구동만 확인,</text><text class="dt" x="224" y="202">앱에 연결 안 됨</text></g>
+<g class="r"><rect x="212" y="218" width="180" height="58" rx="4"/><text class="nm" x="224" y="236">DB 접근 계층</text><text class="st" x="380" y="236" text-anchor="end">안함</text><text class="dt" x="224" y="254">쿼리 헬퍼가 없어</text><text class="dt" x="224" y="268">화면이 붙을 곳이 없음</text></g>
+<g class="r"><rect x="212" y="284" width="180" height="58" rx="4"/><text class="nm" x="224" y="302">설비 upsert 공용</text><text class="st" x="380" y="302" text-anchor="end">안함</text><text class="dt" x="224" y="320">세 모듈이 쓸 설비</text><text class="dt" x="224" y="334">자동 생성 헬퍼 없음</text></g>
+<g class="r"><rect x="212" y="350" width="180" height="58" rx="4"/><text class="nm" x="224" y="368">첨부파일 저장</text><text class="st" x="380" y="368" text-anchor="end">안함</text><text class="dt" x="224" y="386">.data/uploads 규칙만</text><text class="dt" x="224" y="400">정하고 미구현</text></g>
 <line class="flow" x1="392" y1="48" x2="403" y2="48" marker-end="url(#ar)"/>
 
 <rect class="box" x="404" y="20" width="180" height="56" rx="4"/>
@@ -241,13 +239,13 @@ footer a{color:var(--ink2)}
 
 <div class="group">
 <h3>오늘 할 것<span>4개 · 끝나면 "진짜 저장되고 조회되는 화면" 하나가 생긴다</span></h3>
-<label class="item"><input type="checkbox"><span class="body"><span class="t">로컬 DB 붙이기 — PGlite를 앱에 연결하고 시작할 때 스키마 자동 적용 <b>(40분)</b></span><span class="src">supabase/schema.sql</span><span class="why">Postgres 18에서 실행 검증까지 끝나 있다. 계정·서버·Docker 없이 파일로 저장된다. 이게 돼야 나머지가 전부 붙는다</span></span></label>
-<label class="item"><input type="checkbox"><span class="body"><span class="t">쿼리 헬퍼와 설비 자동 생성(upsert) 만들기 <b>(30분)</b></span><span class="src">src/shared/lib/</span><span class="why">세 모듈이 공용으로 쓸 최소 단위. 나중에 Supabase로 바꿀 때 여기만 갈아끼우면 된다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">로컬 DB 붙이기 — PGlite를 앱에 연결하고 시작할 때 스키마 자동 적용 <b>(40분)</b></span><span class="src">db/schema.sql</span><span class="why">Postgres 18에서 실행 검증까지 끝나 있다. 계정·서버·Docker·클라우드 없이 프로젝트 폴더 안에 파일로 저장된다. 이게 돼야 나머지가 전부 붙는다</span></span></label>
+<label class="item"><input type="checkbox"><span class="body"><span class="t">쿼리 헬퍼와 설비 자동 생성(upsert) 만들기 <b>(30분)</b></span><span class="src">src/shared/lib/</span><span class="why">세 모듈이 공용으로 쓸 최소 단위. 나중에 저장 위치를 바꾸더라도 여기만 갈아끼우면 된다</span></span></label>
 <label class="item"><input type="checkbox"><span class="body"><span class="t">고장이력 등록·목록 화면을 실제로 동작하게 <b>(80분)</b></span><span class="src">legacy/고장이력(7.21)/web/src/lib/db.ts · components/FailureHistoryForm.tsx · HistoryTable.tsx</span><span class="why">쿼리 로직이 이미 완성돼 있어 SQLite → Postgres로 옮기는 작업이 기계적이다. 오늘 눈에 보이는 결과를 내기에 가장 확실한 선택</span></span></label>
 <label class="item"><input type="checkbox"><span class="body"><span class="t">빌드·배포 확인하고 커밋·푸시 <b>(30분)</b></span><span class="src">https://github.com/Quietmin/tonghapbon-1</span><span class="why">팀원이 내일 바로 이어받을 수 있는 상태로 남긴다</span></span></label>
 </div>
 
-<p class="oneline"><b>오늘 안 하는 것:</b> <b>엑셀 자동분석</b>은 64개 시트·자간 공백 헤더·집계 시트 제외까지 얽힌 하루치 작업이라, 3시간에 손대면 절반만 된 채로 남는다. <b>정비 챗봇</b>은 PDF 글자 추출부터 인덱싱·검색까지 한 덩어리라 쪼개서 끝낼 수 없다. <b>Supabase 연결</b>은 지금 필요 없다 — 팀원끼리 같은 자료를 봐야 할 때 환경변수만 바꾸면 된다.</p>
+<p class="oneline"><b>오늘 안 하는 것:</b> <b>엑셀 자동분석</b>은 64개 시트·자간 공백 헤더·집계 시트 제외까지 얽힌 하루치 작업이라, 3시간에 손대면 절반만 된 채로 남는다. <b>정비 챗봇</b>은 PDF 글자 추출부터 인덱싱·검색까지 한 덩어리라 쪼개서 끝낼 수 없다. <b>외부 저장소 연결</b>은 지금 필요 없다 — 팀원끼리 같은 자료를 봐야 할 때 접속 주소만 바꾸면 된다.</p>
 
 <h2 id="criteria">판단 기준</h2>
 <table class="def">
@@ -259,7 +257,7 @@ footer a{color:var(--ink2)}
 <footer>
 저장소 <a href="https://github.com/Quietmin/tonghapbon-1">Quietmin/tonghapbon-1</a> ·
 배포 <a href="https://plant-ops-hub.vercel.app">plant-ops-hub.vercel.app</a> ·
-DB 설계 <code>supabase/schema.sql</code> ·
+DB 설계 <code>db/schema.sql</code> ·
 통합 전 원본 <code>legacy/</code>
 </footer>
 
