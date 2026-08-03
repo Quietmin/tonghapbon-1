@@ -1,0 +1,4 @@
+# 배치 파일은 반드시 CRLF여야 한다. LF로 체크아웃되면 cmd가 각 줄의 첫 글자를
+# 잘라먹어 "'cho'은(는) 내부 또는 외부 명령이 아닙니다" 같은 오류가 난다.
+*.bat text eol=crlf
+*.cmd text eol=crlf
