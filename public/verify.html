@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>구동 확인 — Plant Ops Hub</title>
+<style>
+:root{
+  --ink:#181c23; --ink2:#414755; --ink3:#888780; --line:#d3d1c7; --paper:#ffffff; --panel:#f7f6f2;
+  --ok-bg:#e1f5ee; --ok-tx:#0f6e56; --ok-hd:#085041;
+  --run-bg:#eef0fc; --run-tx:#414755;
+  --no-bg:#fcebeb; --no-tx:#a32d2d; --no-hd:#791f1f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink)}
+body{font-family:"Malgun Gothic","Apple SD Gothic Neo","Segoe UI",sans-serif;font-size:15px;line-height:1.7}
+.wrap{max-width:920px;margin:0 auto;padding:40px 24px 80px}
+h1{font-size:24px;font-weight:700;margin:0 0 6px}
+.lead{color:var(--ink2);margin:0 0 20px;font-size:14px}
+.summary{display:flex;align-items:center;gap:14px;background:var(--panel);border-radius:12px;padding:16px 20px;margin-bottom:24px;flex-wrap:wrap}
+.summary b{font-size:20px}
+button{font:inherit;cursor:pointer;border:none;border-radius:10px;padding:10px 18px;font-weight:700;background:#0058bc;color:#fff}
+button:disabled{opacity:.5;cursor:default}
+.badge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
+.badge.run{background:var(--run-bg);color:var(--run-tx)}
+.badge.ok{background:var(--ok-bg);color:var(--ok-hd)}
+.badge.no{background:var(--no-bg);color:var(--no-hd)}
+.test{border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:12px}
+.test .hd{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.test .hd h3{font-size:15px;margin:0;font-weight:700}
+.test .detail{margin-top:8px;font-size:13.5px;color:var(--ink2);line-height:1.8}
+.test .detail code{font-family:Consolas,"Courier New",monospace;font-size:12.5px;background:var(--panel);padding:1px 5px;border-radius:4px}
+.test.no{border-color:#e8b4b4}
+.test .row{display:flex;gap:8px;align-items:baseline}
+.test .row .k{color:var(--ink3);min-width:110px;flex:0 0 auto}
+footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>구동 확인 — Plant Ops Hub</h1>
+  <p class="lead">
+    이 페이지는 화면이 아니라 <b>서버(같은 origin의 /api/*)를 실제로 호출</b>해서 확인합니다.
+    엑셀 파싱 → 저장 → 설비 마스터 반영 → 조회·필터까지 실제 데이터로 왕복시키고,
+    테스트가 만든 데이터는 끝나면 스스로 지웁니다. 서버가 켜져 있어야 동작합니다.
+  </p>
+  <div class="summary">
+    <button id="run">다시 확인</button>
+    <span id="summaryText" style="color:var(--ink2)">실행 전</span>
+  </div>
+  <div id="list"></div>
+  <footer>
+    fixture: <code>/fixtures/sample-designbook.xlsx</code> (11개 작업항목이 나오도록 만든 합성 테스트 파일 —
+    실제 사내 문서 아님) · 이 파일이 만든 테스트 데이터는 실행이 끝나면 자동으로 삭제됩니다.
+  </footer>
+</div>
+
+<script>
+const list = document.getElementById('list');
+const summaryText = document.getElementById('summaryText');
+const runBtn = document.getElementById('run');
+
+function card(title) {
+  const el = document.createElement('div');
+  el.className = 'test';
+  el.innerHTML = `<div class="hd"><h3>${title}</h3><span class="badge run">실행 중</span></div><div class="detail"></div>`;
+  list.appendChild(el);
+  return {
+    pass(detailHtml) {
+      el.querySelector('.badge').className = 'badge ok';
+      el.querySelector('.badge').textContent = '통과';
+      el.querySelector('.detail').innerHTML = detailHtml;
+    },
+    fail(detailHtml) {
+      el.classList.add('no');
+      el.querySelector('.badge').className = 'badge no';
+      el.querySelector('.badge').textContent = '실패';
+      el.querySelector('.detail').innerHTML = detailHtml;
+    },
+  };
+}
+
+function row(k, v) { return `<div class="row"><span class="k">${k}</span><span>${v}</span></div>`; }
+function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+function assert(cond, msg) { if (!cond) throw new Error(msg); }
+
+async function j(url, opt) {
+  const res = await fetch(url, opt);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body.ok === false) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+
+async function run() {
+  runBtn.disabled = true;
+  list.innerHTML = '';
+  summaryText.textContent = '실행 중…';
+  let pass = 0, total = 0;
+  let createdSourceId = null;
+
+  const t = (title) => { total++; return card(title); };
+
+  // ── 1. DB 연결 + 스키마 ──────────────────────────────────────────────
+  {
+    const c = t('로컬 DB 연결 · 스키마 적용');
+    try {
+      const h = await j('/api/health');
+      assert(h.engine && h.engine.includes('PostgreSQL'), `engine이 이상함: ${h.engine}`);
+      assert(h.tableCount === 12, `테이블 12개가 있어야 하는데 ${h.tableCount}개`);
+      c.pass(row('엔진', h.engine) + row('테이블 수', h.tableCount) +
+        row('현재 데이터', Object.entries(h.counts).filter(([,n])=>n>0).map(([k,n])=>`${k} ${n}`).join(', ') || '(비어 있음)'));
+      pass++;
+    } catch (e) { c.fail(`서버가 꺼져 있거나 DB 초기화에 실패했습니다.<br>${e.message}`); }
+  }
+
+  // ── 2. 엑셀 자동분석 (저장 없이 파싱만) ─────────────────────────────
+  {
+    const c = t('엑셀 자동분석 — 표지·원가시트 제외, 색인행 처리, 분야·설비 자동분류');
+    try {
+      const buf = await (await fetch('/fixtures/sample-designbook.xlsx')).arrayBuffer();
+      const fd = new FormData();
+      fd.append('file', new Blob([buf]), '구동확인-샘플.xlsx');
+      fd.append('dryRun', '1');
+      const up = await j('/api/overhaul/upload', { method: 'POST', body: fd });
+      const r = up.results[0];
+      assert(r.sheetCount === 4, `시트 4개여야 하는데 ${r.sheetCount}`);
+      assert(r.totalRows === 27, `전체 27행이어야 하는데 ${r.totalRows}`);
+      assert(r.extractedCount === 11, `추출 11건이어야 하는데 ${r.extractedCount}`);
+      assert(r.excludedCount === 5, `제외 5건이어야 하는데 ${r.excludedCount}`);
+      assert(eq(r.byField, { 기계: 7, 전기: 2, 제어: 2 }), `분야별 집계가 다름: ${JSON.stringify(r.byField)}`);
+      c.pass(
+        row('시트 / 전체 행', `${r.sheetCount}개 / ${r.totalRows}행`) +
+        row('추출 / 제외', `${r.extractedCount}건 / ${r.excludedCount}건`) +
+        row('분야별', Object.entries(r.byField).map(([k,v])=>`${k} ${v}`).join(' · ')) +
+        row('설비별', Object.entries(r.byEquipment).map(([k,v])=>`${k} ${v}`).join(' · ')) +
+        row('※ 이 단계', 'dryRun=1 — 아직 저장하지 않음'),
+      );
+      pass++;
+    } catch (e) { c.fail(`분석 결과가 기대와 다릅니다.<br>${e.message}`); }
+  }
+
+  // ── 3. 저장 → 설비 마스터 반영 → 되돌리기 ───────────────────────────
+  {
+    const c = t('작업항목 저장 → 설비 마스터 자동 반영 → 되돌리기');
+    try {
+      const before = (await j('/api/health')).counts;
+
+      const buf = await (await fetch('/fixtures/sample-designbook.xlsx')).arrayBuffer();
+      const fd = new FormData();
+      fd.append('file', new Blob([buf]), '구동확인-샘플.xlsx');
+      const up = await j('/api/overhaul/upload', { method: 'POST', body: fd });
+      createdSourceId = up.results[0].sourceId;
+
+      const mid = (await j('/api/health')).counts;
+      assert(mid.overhaul_task === before.overhaul_task + 11, `task가 11건 늘어야 하는데 ${mid.overhaul_task - before.overhaul_task}건 늘었음`);
+      assert(mid.equipment === before.equipment || mid.equipment === before.equipment + 8,
+        `설비 마스터 증가치가 예상 밖: ${before.equipment} → ${mid.equipment}`);
+
+      // 같은 파일을 한 번 더 올려도 설비 마스터가 중복 생성되지 않아야 한다 (upsert 검증)
+      const fd2 = new FormData();
+      fd2.append('file', new Blob([buf]), '구동확인-샘플-2.xlsx');
+      const up2 = await j('/api/overhaul/upload', { method: 'POST', body: fd2 });
+      const afterSecond = (await j('/api/health')).counts;
+      assert(afterSecond.equipment === mid.equipment, `같은 설비가 다시 들어왔는데 설비 마스터가 늘어남: ${mid.equipment} → ${afterSecond.equipment}`);
+
+      // 되돌리기 — 방금 만든 source 2개 모두 삭제
+      await j(`/api/overhaul/sources?id=${createdSourceId}`, { method: 'DELETE' });
+      await j(`/api/overhaul/sources?id=${up2.results[0].sourceId}`, { method: 'DELETE' });
+      createdSourceId = null;
+      const after = (await j('/api/health')).counts;
+      assert(after.overhaul_task === before.overhaul_task, `되돌리기 후 task 건수가 원래대로 안 돌아옴 (${before.overhaul_task} → ${after.overhaul_task})`);
+      assert(after.overhaul_source === before.overhaul_source, `되돌리기 후 source 건수가 원래대로 안 돌아옴`);
+      assert(after.equipment === afterSecond.equipment, `되돌리기를 했는데 설비 마스터가 함께 지워짐 (설비는 공용 데이터라 남아야 함)`);
+
+      c.pass(
+        row('저장 전', `task ${before.overhaul_task} · 설비 ${before.equipment}`) +
+        row('1차 업로드 후', `task ${mid.overhaul_task} (+11) · 설비 ${mid.equipment}`) +
+        row('같은 파일 재업로드', `설비 ${afterSecond.equipment} (변화 없음 — 중복 생성 안 됨)`) +
+        row('되돌리기 후', `task ${after.overhaul_task} · source ${after.overhaul_source} · 설비 ${after.equipment} (유지)`),
+      );
+      pass++;
+    } catch (e) {
+      c.fail(`${e.message}`);
+    }
+  }
+
+  // ── 4. 작업 관리 — 필터 · 검색 · 페이지네이션 ───────────────────────
+  {
+    const c = t('작업 관리 — 분야 필터 · 검색 · 페이지네이션');
+    let tmpSourceId = null;
+    try {
+      const buf = await (await fetch('/fixtures/sample-designbook.xlsx')).arrayBuffer();
+      const fd = new FormData();
+      fd.append('file', new Blob([buf]), '구동확인-필터용.xlsx');
+      const up = await j('/api/overhaul/upload', { method: 'POST', body: fd });
+      tmpSourceId = up.results[0].sourceId;
+
+      const all = await j('/api/overhaul/tasks?page=1');
+      assert(all.total === 11, `전체 11건이어야 하는데 ${all.total}`);
+
+      const field = await j('/api/overhaul/tasks?field=' + encodeURIComponent('제어'));
+      assert(field.total === 2, `분야=제어 필터가 2건이어야 하는데 ${field.total}`);
+
+      const search = await j('/api/overhaul/tasks?q=' + encodeURIComponent('전송기'));
+      assert(search.total === 1, `검색 '전송기'가 1건이어야 하는데 ${search.total}`);
+      assert(search.rows[0].name === '압력 전송기 교정', `검색 결과가 다름: ${search.rows[0]?.name}`);
+
+      c.pass(
+        row('전체', `${all.total}건 · ${all.totalPages}페이지`) +
+        row(`필터 field=제어`, `${field.total}건 — ${field.rows.map(r=>r.name).join(', ')}`) +
+        row(`검색 q=전송기`, `${search.total}건 — ${search.rows[0].name}`),
+      );
+      pass++;
+    } catch (e) {
+      c.fail(e.message);
+    } finally {
+      if (tmpSourceId) await j(`/api/overhaul/sources?id=${tmpSourceId}`, { method: 'DELETE' }).catch(() => {});
+    }
+  }
+
+  // ── 5. 대시보드 — 계약기간 반영, 지연 위험 산정 ─────────────────────
+  {
+    const c = t('대시보드 — 계약기간 기준 경과일 · 지연 위험 산정');
+    let tmpSourceId = null;
+    try {
+      const proj = (await j('/api/overhaul/project')).project;
+
+      const buf = await (await fetch('/fixtures/sample-designbook.xlsx')).arrayBuffer();
+      const fd = new FormData();
+      fd.append('file', new Blob([buf]), '구동확인-대시보드용.xlsx');
+      const up = await j('/api/overhaul/upload', { method: 'POST', body: fd });
+      tmpSourceId = up.results[0].sourceId;
+
+      const d = await j('/api/overhaul/dashboard');
+      assert(d.taskCount === 11, `대시보드 task 수가 11이어야 하는데 ${d.taskCount}`);
+      assert(typeof d.overall === 'number' && d.overall >= 0 && d.overall <= 100, `overall 값 이상: ${d.overall}`);
+      assert(Array.isArray(d.equipment) && d.equipment.length > 0, `설비별 현황이 비어 있음`);
+
+      c.pass(
+        row('계약기간', proj.start_date && proj.end_date ? `${proj.start_date} ~ ${proj.end_date}` : '미설정 (경과일 계산 불가 상태)') +
+        row('경과일', d.hasPeriod ? `${d.sched.elapsed} / ${d.sched.totalDays}일` : '—') +
+        row('전체 공정률', `${d.overall}% (계획 ${d.planned}%)`) +
+        row('지연 위험', `${d.riskCount}건`) +
+        row('설비별 항목 수', d.equipment.length),
+      );
+      pass++;
+    } catch (e) {
+      c.fail(e.message);
+    } finally {
+      if (tmpSourceId) await j(`/api/overhaul/sources?id=${tmpSourceId}`, { method: 'DELETE' }).catch(() => {});
+    }
+  }
+
+  // ── 6. 실제 화면이 오류 없이 뜨는지 (같은 origin iframe) ─────────────
+  {
+    const c = t('실제 화면 렌더링 — 대시보드 · 작업 관리 · 업로드 분석');
+    try {
+      const pages = [
+        { path: '/overhaul', label: '대시보드', expect: '대시보드' },
+        { path: '/overhaul/tasks', label: '작업 관리', expect: '작업 관리' },
+        { path: '/overhaul/upload', label: '업로드 분석', expect: '업로드 분석' },
+      ];
+      const lines = [];
+      for (const p of pages) {
+        const html = await (await fetch(p.path)).text();
+        const text = html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ');
+        const hasError = /Application error|500 Internal Server Error/i.test(text);
+        assert(!hasError, `${p.label} 화면에서 서버 오류 문구 발견`);
+        assert(text.includes(p.expect), `${p.label} 화면에 '${p.expect}' 문구가 없음 — 렌더링 실패 가능성`);
+        lines.push(row(p.label, `<code>${p.path}</code> 정상 응답`));
+      }
+      c.pass(lines.join(''));
+      pass++;
+    } catch (e) {
+      c.fail(e.message);
+    }
+  }
+
+  // 혹시 어느 단계에서 실패해 정리가 안 된 경우 마지막 안전망
+  if (createdSourceId) {
+    await fetch(`/api/overhaul/sources?id=${createdSourceId}`, { method: 'DELETE' }).catch(() => {});
+  }
+
+  summaryText.innerHTML = `<b style="color:${pass===total?'#0f6e56':'#a32d2d'}">${pass} / ${total}</b> 통과 · ${new Date().toLocaleString('ko-KR')}`;
+  runBtn.disabled = false;
+}
+
+runBtn.addEventListener('click', run);
+run();
+</script>
+</body>
+</html>
