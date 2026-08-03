@@ -1,5 +1,5 @@
-import ModuleStub from "@/shared/components/ModuleStub";
+import Dashboard from "@/modules/overhaul/components/Dashboard";
 
 export default function OverhaulDashboardPage() {
-  return <ModuleStub title="오버홀 대시보드" from="legacy/plantsync/src/pages/Dashboard.jsx" />;
+  return <Dashboard />;
 }

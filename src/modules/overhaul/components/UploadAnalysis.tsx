@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, Icon, Button, FieldChip, EmptyState } from "@/shared/components/ui";
+import ProjectSettings from "./ProjectSettings";
 import type { ParsedTask } from "../lib/excelParser";
 
 /**
@@ -136,6 +137,8 @@ export default function UploadAnalysis() {
           않고, 추출된 항목만 남습니다.
         </p>
       </div>
+
+      <ProjectSettings />
 
       {/* 분야 지정 */}
       <Card className="p-card-padding" lift={false}>
