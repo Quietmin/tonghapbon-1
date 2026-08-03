@@ -1,11 +1,10 @@
-import ModuleStub from "@/shared/components/ModuleStub";
+import { Suspense } from "react";
+import PerformanceEntry from "@/modules/overhaul/components/PerformanceEntry";
 
 export default function OverhaulEntryPage() {
   return (
-    <ModuleStub
-      title="실적 입력"
-      from="legacy/plantsync/src/pages/PerformanceEntry.jsx"
-      note="분해 전/후 사진은 파일로 저장하고 DB에는 경로만 남깁니다."
-    />
+    <Suspense fallback={<p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>}>
+      <PerformanceEntry />
+    </Suspense>
   );
 }

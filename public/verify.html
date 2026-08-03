@@ -184,6 +184,49 @@ async function run() {
     }
   }
 
+  // ── 3.5. 실적 입력 — 저장 시 누적 최댓값 반영, 삭제 시 재계산 ────────
+  {
+    const c = t('실적 입력 — 날짜별 저장 → 누적 최댓값 반영 → 삭제 시 재계산');
+    let tmpSourceId = null;
+    try {
+      const buf = await (await fetch('/fixtures/sample-designbook.xlsx')).arrayBuffer();
+      const fd = new FormData();
+      fd.append('file', new Blob([buf]), '구동확인-실적용.xlsx');
+      const up = await j('/api/overhaul/upload', { method: 'POST', body: fd });
+      tmpSourceId = up.results[0].sourceId;
+
+      const opts = await j('/api/overhaul/task-options');
+      const task = opts.options.find((o) => o.name.includes('가스터빈 케이싱'));
+      assert(task, 'fixture에 있어야 할 작업을 찾지 못함');
+
+      // 날짜 두 개를 넣고 최신 날짜가 낮은 누적이어도(입력 순서와 무관하게) 최댓값이 반영되는지 확인
+      const e1 = await j('/api/overhaul/entries', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ taskId: task.id, date: '2026-07-11', cumulative: 1, workDetail: '테스트 저장 1' }),
+      });
+      assert(e1.task.done_qty === 1, `1건 저장 후 done_qty가 1이어야 하는데 ${e1.task.done_qty}`);
+
+      const dashAfter = await j('/api/overhaul/dashboard');
+      const gt = dashAfter.equipment.find((e) => e.equipment === 'GT');
+      assert(gt && gt.progress > 0, `대시보드 GT 진행률에 반영되지 않음: ${gt?.progress}`);
+
+      const delRes = await j(`/api/overhaul/entries?taskId=${task.id}&date=2026-07-11`, { method: 'DELETE' });
+      assert(delRes.task.done_qty === 0, `삭제 후 done_qty가 0으로 재계산돼야 하는데 ${delRes.task.done_qty}`);
+      assert(delRes.entries.length === 0, `삭제 후 이력이 남아 있음: ${delRes.entries.length}건`);
+
+      c.pass(
+        row('저장', `2026-07-11 · 누적 1 → task.done_qty ${e1.task.done_qty}`) +
+        row('대시보드 반영', `GT 진행률 ${gt.progress}%`) +
+        row('삭제 후 재계산', `task.done_qty ${delRes.task.done_qty} · 이력 ${delRes.entries.length}건`),
+      );
+      pass++;
+    } catch (e) {
+      c.fail(e.message);
+    } finally {
+      if (tmpSourceId) await j(`/api/overhaul/sources?id=${tmpSourceId}`, { method: 'DELETE' }).catch(() => {});
+    }
+  }
+
   // ── 4. 작업 관리 — 필터 · 검색 · 페이지네이션 ───────────────────────
   {
     const c = t('작업 관리 — 분야 필터 · 검색 · 페이지네이션');

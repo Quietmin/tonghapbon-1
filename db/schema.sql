@@ -172,6 +172,8 @@ create trigger overhaul_task_set_updated_at before update on overhaul_task
 
 
 -- 실적 입력 — 날짜별로 독립 저장하고, 항목별 정비 이력 타임라인으로 되짚어 본다.
+-- done_qty는 그날의 증가분이 아니라 "그날까지의 누적 완료수량"이다.
+-- overhaul_task.done_qty(공정률 계산에 쓰임)는 이 중 최댓값으로 갱신된다.
 create table if not exists overhaul_entry (
   id            uuid primary key default gen_random_uuid(),
   task_id       uuid not null references overhaul_task(id) on delete cascade,
@@ -179,13 +181,19 @@ create table if not exists overhaul_entry (
   done_qty      numeric(14, 3) not null default 0,
   work_detail   text,
   delay_reason  text,
-  -- 파일 경로 (.data/uploads/overhaul-photos/…)
+  -- 익일 계획 / 조치계획
+  next_plan     text,
+  -- 개발 단계라 사진은 base64로 그대로 저장한다. 실제 저장소를 붙이면
+  -- 파일 경로 문자열(.data/uploads/overhaul-photos/…)로 바뀔 자리다.
   photo_before  text,
   photo_after   text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   unique (task_id, entry_date)
 );
+
+-- 기존에 만들어진 테이블에도 새 컬럼이 반영되도록 (idempotent)
+alter table overhaul_entry add column if not exists next_plan text;
 
 create index if not exists overhaul_entry_task_idx on overhaul_entry (task_id, entry_date desc);
 

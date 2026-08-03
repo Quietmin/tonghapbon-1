@@ -220,3 +220,108 @@ export async function listAllTasks(projectId: string): Promise<OverhaulTask[]> {
     [projectId],
   );
 }
+
+export async function getTask(taskId: string): Promise<OverhaulTask | null> {
+  return queryOne<OverhaulTask>(
+    `select id, source_id, equipment_id, name, spec, unit,
+            plan_qty::float8 as plan_qty, done_qty::float8 as done_qty,
+            field, equipment_type, tag, status, assignee,
+            plan_start::text, plan_end::text, needs_review, sheet_name, row_index
+       from overhaul_task where id = $1`,
+    [taskId],
+  );
+}
+
+/** 작업 선택 드롭다운용 — 목록 화면처럼 무겁게 조회할 필요 없다 */
+export async function listTaskOptions(
+  projectId: string,
+): Promise<{ id: string; name: string; equipment_type: string | null }[]> {
+  return query(
+    `select id, name, equipment_type from overhaul_task
+      where project_id = $1
+      order by sheet_name nulls last, row_index nulls last`,
+    [projectId],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 실적 입력
+// ---------------------------------------------------------------------------
+
+export interface OverhaulEntry {
+  id: string;
+  task_id: string;
+  entry_date: string;
+  /** 그날까지의 누적 완료수량 (그날 하루치 증가분이 아님) */
+  done_qty: number;
+  work_detail: string | null;
+  delay_reason: string | null;
+  next_plan: string | null;
+  photo_before: string | null;
+  photo_after: string | null;
+}
+
+export async function listEntries(taskId: string): Promise<OverhaulEntry[]> {
+  return query<OverhaulEntry>(
+    `select id, task_id, entry_date::text, done_qty::float8 as done_qty,
+            work_detail, delay_reason, next_plan, photo_before, photo_after
+       from overhaul_entry where task_id = $1
+      order by entry_date desc`,
+    [taskId],
+  );
+}
+
+/** task_id+entry_date가 이미 있으면 덮어쓰고, 없으면 새로 만든다. */
+export async function upsertEntry(input: {
+  taskId: string;
+  date: string;
+  cumulative: number;
+  workDetail?: string | null;
+  delayReason?: string | null;
+  nextPlan?: string | null;
+  photoBefore?: string | null;
+  photoAfter?: string | null;
+}): Promise<void> {
+  await execute(
+    `insert into overhaul_entry
+       (task_id, entry_date, done_qty, work_detail, delay_reason, next_plan, photo_before, photo_after)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)
+     on conflict (task_id, entry_date) do update
+       set done_qty     = excluded.done_qty,
+           work_detail   = excluded.work_detail,
+           delay_reason  = excluded.delay_reason,
+           next_plan     = excluded.next_plan,
+           photo_before  = excluded.photo_before,
+           photo_after   = excluded.photo_after,
+           updated_at    = now()`,
+    [
+      input.taskId,
+      input.date,
+      input.cumulative,
+      input.workDetail || null,
+      input.delayReason || null,
+      input.nextPlan || null,
+      input.photoBefore || null,
+      input.photoAfter || null,
+    ],
+  );
+  await recomputeTaskDoneQty(input.taskId);
+}
+
+export async function deleteEntry(taskId: string, date: string): Promise<void> {
+  await execute(`delete from overhaul_entry where task_id = $1 and entry_date = $2`, [taskId, date]);
+  await recomputeTaskDoneQty(taskId);
+}
+
+/**
+ * overhaul_task.done_qty = 그 작업의 모든 실적 중 누적 최댓값.
+ * (원본 store.jsx의 Math.max(...entries.map(e => e.cumulative)) 그대로)
+ */
+async function recomputeTaskDoneQty(taskId: string): Promise<void> {
+  await execute(
+    `update overhaul_task
+        set done_qty = coalesce((select max(done_qty) from overhaul_entry where task_id = $1), 0)
+      where id = $1`,
+    [taskId],
+  );
+}
