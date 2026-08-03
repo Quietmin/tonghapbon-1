@@ -347,3 +347,16 @@ export async function listEntryRanges(projectId: string): Promise<EntryRange[]> 
     [projectId],
   );
 }
+
+/** 보고서용 — 프로젝트 전체 실적 이력을 한 번에 가져온다 (작업별 날짜 내림차순) */
+export async function listAllEntriesForProject(projectId: string): Promise<OverhaulEntry[]> {
+  return query<OverhaulEntry>(
+    `select o.id, o.task_id, o.entry_date::text, o.done_qty::float8 as done_qty,
+            o.work_detail, o.delay_reason, o.next_plan, o.photo_before, o.photo_after
+       from overhaul_entry o
+       join overhaul_task t on t.id = o.task_id
+      where t.project_id = $1
+      order by o.task_id, o.entry_date desc`,
+    [projectId],
+  );
+}

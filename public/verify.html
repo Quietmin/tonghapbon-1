@@ -351,9 +351,53 @@ async function run() {
     }
   }
 
+  // ── 5.7. 보고서 — 금일 실적 · 지연사유 · 분야별 가중평균 집계 ─────────
+  {
+    const c = t('보고서 — 금일 실적·지연사유 반영, 분야별 가중평균 공정률');
+    let tmpSourceId = null;
+    try {
+      const buf = await (await fetch('/fixtures/sample-designbook.xlsx')).arrayBuffer();
+      const fd = new FormData();
+      fd.append('file', new Blob([buf]), '구동확인-보고서용.xlsx');
+      const up = await j('/api/overhaul/upload', { method: 'POST', body: fd });
+      tmpSourceId = up.results[0].sourceId;
+
+      const opts = await j('/api/overhaul/task-options');
+      const gt = opts.options.find((o) => o.name.includes('가스터빈 케이싱'));
+      const today = new Date().toISOString().slice(0, 10);
+
+      await j('/api/overhaul/entries', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ taskId: gt.id, date: today, cumulative: 1, workDetail: '테스트 실적' }),
+      });
+
+      const rep = await j('/api/overhaul/report');
+      const r = rep.report;
+      assert(r.todayResults.length === 1 && r.todayResults[0].name === gt.name, `금일 실적에 방금 넣은 항목이 없음: ${JSON.stringify(r.todayResults)}`);
+      assert(r.todayResults[0].doneToday === 1, `금일 증가분이 1이어야 하는데 ${r.todayResults[0].doneToday}`);
+      assert(!r.delayed.some((x) => x.name === gt.name), '실적을 채운 작업이 지연 목록에 남아 있음');
+      // 기계 분야 가중평균 = 1(케이싱 done) / (1+96+1250.5+2+340+120+800) 기계 전체 계획수량
+      const expectMechanical = Math.round((1 / (1 + 96 + 1250.5 + 2 + 340 + 120 + 800)) * 1000) / 10;
+      assert(r.byField['기계'] === expectMechanical, `기계 분야 가중평균이 ${expectMechanical}이어야 하는데 ${r.byField['기계']}`);
+      assert(rep.exportRows.length === 11, `엑셀 내보내기용 행이 11개여야 하는데 ${rep.exportRows.length}`);
+
+      c.pass(
+        row('금일 실적', `${r.todayResults[0].name} +${r.todayResults[0].doneToday}건`) +
+        row('지연 목록 제외', '실적을 채운 작업이 지연 목록에서 빠짐') +
+        row('분야별 가중평균', `기계 ${r.byField['기계']}% (물량 가중, 작업 수 평균 아님)`) +
+        row('엑셀 내보내기 행', `${rep.exportRows.length}건`),
+      );
+      pass++;
+    } catch (e) {
+      c.fail(e.message);
+    } finally {
+      if (tmpSourceId) await j(`/api/overhaul/sources?id=${tmpSourceId}`, { method: 'DELETE' }).catch(() => {});
+    }
+  }
+
   // ── 6. 실제 화면이 오류 없이 뜨는지 (같은 origin iframe) ─────────────
   {
-    const c = t('실제 화면 렌더링 — 대시보드 · 작업 관리 · 업로드 분석 · 공정표 · 실적 입력');
+    const c = t('실제 화면 렌더링 — 대시보드 · 작업 관리 · 업로드 분석 · 공정표 · 실적 입력 · 보고서');
     try {
       const pages = [
         { path: '/overhaul', label: '대시보드', expect: '대시보드' },
@@ -361,6 +405,7 @@ async function run() {
         { path: '/overhaul/upload', label: '업로드 분석', expect: '업로드 분석' },
         { path: '/overhaul/schedule', label: '공정표', expect: '공정표' },
         { path: '/overhaul/entry', label: '실적 입력', expect: '실적 입력' },
+        { path: '/overhaul/reports', label: '보고서', expect: '보고서' },
       ];
       const lines = [];
       for (const p of pages) {
