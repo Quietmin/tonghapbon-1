@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getOrCreateProject, listTasks, listAllTasks } from "@/modules/overhaul/lib/repo";
-import { overallProgress, scheduleInfo, delayRiskTasks } from "@/modules/overhaul/lib/progress";
+import { overallProgress, scheduleInfo } from "@/modules/overhaul/lib/progress";
+import { scheduleDelayTasks } from "@/modules/overhaul/lib/schedule";
 
 export const dynamic = "force-dynamic";
+const today = () => new Date().toISOString().slice(0, 10);
 
 const PAGE_SIZE = 12;
 
@@ -32,7 +34,9 @@ export async function GET(req: Request) {
 
     const all = await listAllTasks(project.id);
     const sched = scheduleInfo(project);
-    const risk = delayRiskTasks(all, sched.expected);
+    // 지연 판정은 계획일정(schedule.ts) 기준 — 원본 TaskManagement.jsx와 동일하게
+    // 기간 경과 비율이 아니라 엑셀 예정일/자동배치 기준으로 뒤처짐을 본다.
+    const risk = scheduleDelayTasks(all, project, today());
     const riskIds = new Set(risk.map((t) => t.id));
 
     return NextResponse.json({

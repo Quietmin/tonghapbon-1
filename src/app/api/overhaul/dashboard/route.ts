@@ -6,10 +6,11 @@ import {
   progressByEquipment,
   scheduleInfo,
   taskProgress,
-  delayRiskTasks,
 } from "@/modules/overhaul/lib/progress";
+import { plannedOverall, scheduleDelayTasks } from "@/modules/overhaul/lib/schedule";
 
 export const dynamic = "force-dynamic";
+const today = () => new Date().toISOString().slice(0, 10);
 
 export async function GET() {
   try {
@@ -18,10 +19,11 @@ export async function GET() {
 
     const sched = scheduleInfo(project);
     const overall = overallProgress(tasks);
-    // 계획 공정률: 지금은 기간 경과 비율(선형). 엑셀 예정일 기반의 정밀한 계획률은
-    // schedule.ts(공정표)를 이식할 때 이 자리를 대체한다.
-    const planned = sched.expected;
-    const risk = delayRiskTasks(tasks, planned);
+    // 계획 공정률 · 지연 위험 — schedule.ts(공정표)의 계획일정 기준.
+    // 엑셀 예정일이 있으면 그걸, 없으면 작업명 키워드 자동배치를 쓴다.
+    // (기간 경과 비율만 보는 선형 계산보다 정밀하다 — 원본 Dashboard.jsx와 동일한 방식)
+    const planned = plannedOverall(tasks, project, today());
+    const risk = scheduleDelayTasks(tasks, project, today());
 
     return NextResponse.json({
       ok: true,

@@ -1,5 +1,5 @@
-import ModuleStub from "@/shared/components/ModuleStub";
+import Schedule from "@/modules/overhaul/components/Schedule";
 
 export default function OverhaulSchedulePage() {
-  return <ModuleStub title="공정표" from="legacy/plantsync/src/pages/Schedule.jsx" />;
+  return <Schedule />;
 }

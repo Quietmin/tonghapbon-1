@@ -325,3 +325,25 @@ async function recomputeTaskDoneQty(taskId: string): Promise<void> {
     [taskId],
   );
 }
+
+export interface EntryRange {
+  task_id: string;
+  min_date: string;
+  max_date: string;
+  cnt: number;
+}
+
+/** 공정표의 "실적 바"용 — 작업별 실적 입력 날짜의 최초·최근 날짜 */
+export async function listEntryRanges(projectId: string): Promise<EntryRange[]> {
+  return query<EntryRange>(
+    `select o.task_id,
+            min(o.entry_date)::text as min_date,
+            max(o.entry_date)::text as max_date,
+            count(*)::int as cnt
+       from overhaul_entry o
+       join overhaul_task t on t.id = o.task_id
+      where t.project_id = $1
+      group by o.task_id`,
+    [projectId],
+  );
+}
