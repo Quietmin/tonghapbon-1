@@ -1,7 +1,13 @@
 node_modules
+.next
+out
 dist
 .DS_Store
 *.local
 .vercel
+next-env.d.ts
+*.tsbuildinfo
 
-.vercel
+# 로컬 환경설정 (Supabase 키 등)
+.env
+.env.local

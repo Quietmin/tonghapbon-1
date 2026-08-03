@@ -1,0 +1,76 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Icon } from "./ui";
+import { NAV_GROUPS, SHARED_NAV, isActive } from "@/shared/lib/nav";
+
+const LINK_BASE =
+  "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-body-md";
+
+export default function Sidebar() {
+  const pathname = usePathname();
+
+  return (
+    <aside className="hidden md:flex flex-col p-4 gap-2 h-screen fixed left-0 top-0 w-[280px] bg-surface-container border-r border-border-subtle z-50 overflow-y-auto">
+      <Link href="/" className="flex items-center gap-3 px-2 mb-6 shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary">
+          <Icon name="factory" />
+        </div>
+        <div>
+          <h1 className="text-title-sm font-black text-on-surface leading-tight">중앙 허브</h1>
+          <p className="text-xs text-on-surface-variant">공정 · 고장 · 문서 통합</p>
+        </div>
+      </Link>
+
+      <nav className="flex-1 flex flex-col gap-5">
+        {NAV_GROUPS.map((group) => {
+          const groupActive = pathname === group.root || pathname.startsWith(`${group.root}/`);
+          return (
+            <div key={group.key} className="flex flex-col gap-1">
+              <div
+                className={`flex items-center gap-2 px-2 mb-1 text-label-caps uppercase ${
+                  groupActive ? "text-primary" : "text-on-surface-variant"
+                }`}
+              >
+                <Icon name={group.icon} className="text-base" />
+                <span>{group.label}</span>
+              </div>
+              {group.items.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`${LINK_BASE} ${
+                    isActive(pathname, item)
+                      ? "bg-primary-container text-on-primary font-bold translate-x-1"
+                      : "text-on-surface-variant hover:bg-surface-container-high"
+                  }`}
+                >
+                  <Icon name={item.icon} className="text-lg" />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto pt-4 border-t border-border-subtle flex flex-col gap-1 shrink-0">
+        {SHARED_NAV.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`${LINK_BASE} ${
+              isActive(pathname, item)
+                ? "bg-primary-container text-on-primary font-bold"
+                : "text-on-surface-variant hover:bg-surface-container-high"
+            }`}
+          >
+            <Icon name={item.icon} className="text-lg" />
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </div>
+    </aside>
+  );
+}

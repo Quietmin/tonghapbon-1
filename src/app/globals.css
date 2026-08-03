@@ -1,0 +1,212 @@
+@import "tailwindcss";
+
+/*
+ * PlantSync Pro의 Stitch "Lumina Overhaul Director" 디자인 토큰을
+ * Tailwind 4의 CSS-first 방식(@theme)으로 이식한 것.
+ * 원본: legacy/plantsync/tailwind.config.js
+ */
+@theme {
+  --color-background: #f9f9ff;
+  --color-on-background: #181c23;
+
+  --color-surface: #f9f9ff;
+  --color-surface-bright: #f9f9ff;
+  --color-surface-dim: #d8d9e5;
+  --color-surface-glass: rgba(255, 255, 255, 0.7);
+  --color-surface-variant: #e0e2ed;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f1f3fe;
+  --color-surface-container: #ecedf9;
+  --color-surface-container-high: #e6e8f3;
+  --color-surface-container-highest: #e0e2ed;
+  --color-on-surface: #181c23;
+  --color-on-surface-variant: #414755;
+  --color-inverse-surface: #2d3039;
+  --color-inverse-on-surface: #eef0fc;
+  --color-surface-tint: #005bc1;
+
+  --color-primary: #0058bc;
+  --color-primary-container: #0070eb;
+  --color-primary-fixed: #d8e2ff;
+  --color-primary-fixed-dim: #adc6ff;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #fefcff;
+  --color-on-primary-fixed: #001a41;
+  --color-on-primary-fixed-variant: #004493;
+  --color-inverse-primary: #adc6ff;
+
+  --color-secondary: #5d5e60;
+  --color-secondary-container: #dfdfe1;
+  --color-secondary-fixed: #e2e2e4;
+  --color-secondary-fixed-dim: #c6c6c8;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #616365;
+  --color-on-secondary-fixed: #1a1c1d;
+  --color-on-secondary-fixed-variant: #454749;
+
+  --color-tertiary: #9e3d00;
+  --color-tertiary-container: #c64f00;
+  --color-tertiary-fixed: #ffdbcc;
+  --color-tertiary-fixed-dim: #ffb595;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #fffbff;
+  --color-on-tertiary-fixed: #351000;
+  --color-on-tertiary-fixed-variant: #7c2e00;
+
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  --color-outline: #717786;
+  --color-outline-variant: #c1c6d7;
+  --color-border-subtle: rgba(0, 0, 0, 0.1);
+
+  --color-status-success: #34c759;
+  --color-status-warning: #ff9500;
+  --color-status-error: #ff3b30;
+  --color-status-info: #5856d6;
+
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  --spacing-unit: 8px;
+  --spacing-card-padding: 24px;
+  --spacing-gutter: 24px;
+  --spacing-margin-mobile: 16px;
+  --spacing-margin-page: 32px;
+
+  --font-sans: Inter, Pretendard, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --text-display-lg: 34px;
+  --text-display-lg--line-height: 41px;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 700;
+  --text-headline-md: 24px;
+  --text-headline-md--line-height: 30px;
+  --text-headline-md--letter-spacing: -0.01em;
+  --text-headline-md--font-weight: 600;
+  --text-title-sm: 17px;
+  --text-title-sm--line-height: 22px;
+  --text-title-sm--font-weight: 600;
+  --text-body-md: 15px;
+  --text-body-md--line-height: 20px;
+  --text-label-caps: 12px;
+  --text-label-caps--line-height: 16px;
+  --text-label-caps--letter-spacing: 0.05em;
+  --text-label-caps--font-weight: 600;
+  --text-mono-data: 13px;
+  --text-mono-data--line-height: 18px;
+
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 10px 25px rgba(0, 0, 0, 0.06);
+
+  --container-content: 1440px;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-mono-data {
+  font-family: var(--font-mono);
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+}
+
+@layer components {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    /* 접두사는 Lightning CSS가 타깃에 맞춰 붙인다.
+       -webkit- 형을 직접 쓰면 표준 속성이 제거되어 블러가 사라진다. */
+    backdrop-filter: blur(25px);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-card);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+  }
+  .no-lift.glass-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-card);
+  }
+  .input {
+    @apply w-full h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm text-on-surface outline-none transition-colors focus:border-primary focus:bg-surface-container-lowest;
+  }
+  textarea.input {
+    @apply h-auto py-3 leading-relaxed;
+  }
+}
+
+/* thin scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.progress-ring__circle {
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+/* 인쇄 / PDF — 사이드바·헤더·네비 등 화면 UI 제거, 보고서 본문만 출력 */
+@media print {
+  aside,
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .glass-card {
+    box-shadow: none !important;
+    border: 1px solid #e0e2ed !important;
+    backdrop-filter: none !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+  .report-page {
+    break-after: page;
+  }
+  .report-page:last-child {
+    break-after: auto;
+  }
+  @page {
+    margin: 12mm;
+    size: A4;
+  }
+}
