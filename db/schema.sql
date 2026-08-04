@@ -11,6 +11,8 @@
 --   2) 오버홀 공정관리     overhaul_project / overhaul_source / overhaul_task / overhaul_entry
 --   3) 고장이력 관리       failure_history / failure_attachment
 --   4) 정비 챗봇           document / document_chunk / chat_message
+--   5) 중장기 보수계획     maintenance_plan / maintenance_plan_grade / maintenance_record
+--                          design_statement / design_statement_item
 --
 -- 인증이 없는 개발 단계 구성이라 접근 제어(RLS)를 넣지 않았다. 운영 전환 시 필요하다.
 -- ============================================================================
@@ -350,6 +352,151 @@ create table if not exists chat_message (
 );
 
 create index if not exists chat_message_created_idx on chat_message (created_at desc);
+
+
+-- ============================================================================
+-- 5) 중장기 보수계획
+--
+-- 오버홀은 두 단계로 나뉜다.
+--   ① 계획: 설비별 점검주기를 근거로 "올해 무엇을 보수해야 하는지" 판정하고
+--           수량산출서를 뽑는다 (이 섹션)
+--   ② 실행: 계약 후 설계내역서를 받아 공정을 관리한다 (위 2번 섹션)
+--
+-- 핵심은 판정을 사람이 매년 엑셀에 손으로 적는 게 아니라, 시스템이
+--   다음 보수 예정연도 = 마지막 보수연도 + 정밀점검주기
+-- 로 계산한다는 것이다. 그래서 오버홀이 끝나고 maintenance_record에 실적을
+-- 남기면 다음 회차 판정이 자동으로 갱신된다.
+-- ============================================================================
+
+-- 업로드한 중장기 보수계획 파일 1개 = source 1건 (파일 단위 되돌리기용)
+create table if not exists maintenance_plan_source (
+  id           uuid primary key default gen_random_uuid(),
+  file_name    text not null,
+  -- 기계 / 전기 / 제어 — 파일이 담당하는 분야
+  field        text,
+  sheet_count  integer not null default 0,
+  item_count   integer not null default 0,
+  uploaded_at  timestamptz not null default now()
+);
+
+-- 설비별 보수계획 1행 = 태그넘버로 개별 관리되는 설비 하나 (수량은 항상 1)
+create table if not exists maintenance_plan (
+  id            uuid primary key default gen_random_uuid(),
+  source_id     uuid references maintenance_plan_source(id) on delete cascade,
+  equipment_id  uuid references equipment(id) on delete set null,
+
+  -- 원본 엑셀의 식별 정보
+  category      text,          -- 설비구분 대분류 (1. 발전설비, 2. 송수전설비 …)
+  sub_category  text,          -- 설비구분 세부 (부속기기 등)
+  name          text not null, -- 기기명
+  tag_no        text,          -- 기기번호 (Tag No.)
+  maker         text,          -- 제작사
+  spec          text,          -- 사양 → 수량산출서의 Range로 나간다
+  field         text,          -- 기계 / 전기 / 제어
+
+  -- 판정의 근거가 되는 값들
+  /** 정밀점검주기 원문 ("2년", "5년±6월", "실내: 3년 주기, 실외: 2년 주기", "필요시") */
+  cycle_raw     text,
+  /** 파싱된 주기(년). 애매하거나 없으면 null */
+  cycle_years   integer,
+  /** fixed | ambiguous | asneeded | none — ambiguous면 사용자가 판단해야 한다 */
+  cycle_kind    text not null default 'none',
+  /** ambiguous일 때 후보 주기들 (예: [3,2]) */
+  cycle_options integer[],
+  /** 예방점검주기 (주간/월간/분기/연간) — 판정에는 쓰지 않고 참고용 */
+  patrol_cycle  text,
+  /** 시행방법 (O/H, 경상정비, UPS용역 …). O/H만 수량산출서에 들어간다 */
+  method        text,
+  completion    text,          -- 준공년도 원문 ("23년 준공")
+
+  /** 최초 업로드 시 엑셀의 A등급 이력에서 역산한 마지막 보수연도 */
+  last_done_year integer,
+
+  sheet_name    text,
+  row_index     integer,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists maintenance_plan_source_idx on maintenance_plan (source_id);
+create index if not exists maintenance_plan_field_idx  on maintenance_plan (field);
+create index if not exists maintenance_plan_method_idx on maintenance_plan (method);
+create index if not exists maintenance_plan_equip_idx  on maintenance_plan (equipment_id);
+create index if not exists maintenance_plan_name_trgm  on maintenance_plan using gin (name gin_trgm_ops);
+
+drop trigger if exists maintenance_plan_set_updated_at on maintenance_plan;
+create trigger maintenance_plan_set_updated_at before update on maintenance_plan
+  for each row execute function set_updated_at();
+
+
+-- 엑셀에 적혀 있던 연도별 등급 (A/B/C/X/-). 판정의 1차 근거가 아니라 참고·이력용.
+-- A가 찍힌 연도에서 last_done_year를 역산하고, 화면에서 원본 계획을 함께 보여준다.
+create table if not exists maintenance_plan_grade (
+  id       bigint generated always as identity primary key,
+  plan_id  uuid not null references maintenance_plan(id) on delete cascade,
+  year     integer not null,
+  /** A(강) / B / C(약) — 보수 강도. X·- 는 저장하지 않는다(그 해 보수 없음) */
+  grade    text not null,
+  unique (plan_id, year)
+);
+
+create index if not exists maintenance_plan_grade_plan_idx on maintenance_plan_grade (plan_id, year);
+
+
+-- 실제 보수 실적. 오버홀이 끝나면 여기에 남기고, 다음 회차 판정이 자동으로 갱신된다.
+-- 이 테이블이 있어야 "매년 엑셀을 손보지 않아도 계속 관리되는" 구조가 성립한다.
+create table if not exists maintenance_record (
+  id           uuid primary key default gen_random_uuid(),
+  plan_id      uuid not null references maintenance_plan(id) on delete cascade,
+  done_year    integer not null,
+  /** 실제 수행한 보수 강도 (A/B/C) */
+  grade        text,
+  /** 이 보수가 어느 오버홀 프로젝트에서 수행됐는지 (있으면 연결) */
+  project_id   uuid references overhaul_project(id) on delete set null,
+  note         text,
+  created_at   timestamptz not null default now(),
+  unique (plan_id, done_year)
+);
+
+create index if not exists maintenance_record_plan_idx on maintenance_record (plan_id, done_year desc);
+
+
+-- 연도별 설계내역서 (사용자가 확정한 오버홀 대상 목록).
+--
+-- 이 내역서를 엑셀로 뽑아 시공사에 주면, 시공사가 작업 시작일·종료일을 채워
+-- 되돌려준다. 그 파일을 다시 업로드하면 위 2번 섹션(공정관리)의 overhaul_task로
+-- 들어가 공정률·공정표 관리가 시작된다. 그래서 한 바퀴가 닫힌다.
+--
+-- 금액(재료비·노무비·경비)은 다루지 않는다 — 추정가 산정은 시스템 밖의 일이다.
+create table if not exists design_statement (
+  id           uuid primary key default gen_random_uuid(),
+  target_year  integer not null,
+  field        text,
+  title        text,          -- 공사명 (예: "2026년도 양산지사 정기점검보수공사")
+  item_count   integer not null default 0,
+  created_at   timestamptz not null default now()
+);
+
+create table if not exists design_statement_item (
+  id           bigint generated always as identity primary key,
+  statement_id uuid not null references design_statement(id) on delete cascade,
+  plan_id      uuid references maintenance_plan(id) on delete set null,
+  /** 대분류 그룹 (Ⅰ. 발전기 및 부속설비 …) — 출력 시 머리글 행이 된다 */
+  category     text,
+  seq          integer not null,        -- 그룹 내 순번 (1부터)
+  name         text not null,           -- 명칭
+  spec         text,                    -- 규격
+  qty          numeric(14,3) not null default 1,
+  unit         text not null default 'EA',
+  /** 시공사가 채워 올 칸. 뽑을 때는 비어 있다 */
+  plan_start   date,
+  plan_end     date,
+  note         text,                    -- 비고 (등급·판정근거 등)
+  /** 필수 / 선택 — 확정 당시의 분류를 남긴다 */
+  classification text
+);
+
+create index if not exists design_statement_item_stmt_idx on design_statement_item (statement_id, category, seq);
 
 
 -- ============================================================================

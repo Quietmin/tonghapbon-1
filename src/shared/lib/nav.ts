@@ -25,6 +25,9 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: "engineering",
     root: "/overhaul",
     items: [
+      // ── ① 보수계획: 이번 오버홀에서 무엇을 할지 정하는 단계 ──────────────
+      { href: "/overhaul/plan", label: "보수계획", icon: "event_note" },
+      // ── ② 공정관리: 계약 체결 후 실제로 진행·기록하는 단계 ───────────────
       { href: "/overhaul", label: "대시보드", icon: "dashboard", exact: true },
       { href: "/overhaul/upload", label: "업로드 분석", icon: "analytics" },
       { href: "/overhaul/tasks", label: "작업 관리", icon: "format_list_bulleted" },
