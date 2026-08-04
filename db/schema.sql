@@ -491,10 +491,14 @@ create table if not exists design_statement_item (
   /** 시공사가 채워 올 칸. 뽑을 때는 비어 있다 */
   plan_start   date,
   plan_end     date,
-  note         text,                    -- 비고 (등급·판정근거 등)
+  grade        text,                    -- 등급(A/B/C) — 명칭에 섞지 않고 별도 컬럼으로 낸다
+  note         text,                    -- 비고 (Tag No. 등)
   /** 필수 / 선택 — 확정 당시의 분류를 남긴다 */
   classification text
 );
+
+-- 이미 만들어진 테이블에도 grade 컬럼을 더한다 (기존 create table은 새로 만들 때만 적용됨)
+alter table design_statement_item add column if not exists grade text;
 
 create index if not exists design_statement_item_stmt_idx on design_statement_item (statement_id, category, seq);
 

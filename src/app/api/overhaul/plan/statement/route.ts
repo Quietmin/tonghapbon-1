@@ -9,7 +9,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** GET → 만들어둔 설계내역서 목록, GET ?id=... → 그 내역서의 항목 전체 */
+/** GET → 만들어둔 수량산출서 목록, GET ?id=... → 그 산출서의 항목 전체 */
 export async function GET(req: Request) {
   const id = new URL(req.url).searchParams.get("id");
   if (id) {
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   return NextResponse.json({ ok: true, statements: await listDesignStatements() });
 }
 
-/** 사용자가 선택한 항목으로 설계내역서를 확정 저장한다 */
+/** 사용자가 선택한 항목으로 수량산출서를 확정 저장한다 */
 export async function POST(req: Request) {
   try {
     const body = await req.json();

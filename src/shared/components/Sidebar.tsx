@@ -36,20 +36,29 @@ export default function Sidebar() {
                 <Icon name={group.icon} className="text-base" />
                 <span>{group.label}</span>
               </div>
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`${LINK_BASE} ${
-                    isActive(pathname, item)
-                      ? "bg-primary-container text-on-primary font-bold translate-x-1"
-                      : "text-on-surface-variant hover:bg-surface-container-high"
-                  }`}
-                >
-                  <Icon name={item.icon} className="text-lg" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
+              {group.items.map((item, i) => {
+                const showSection = item.section && item.section !== group.items[i - 1]?.section;
+                return (
+                  <div key={item.href}>
+                    {showSection && (
+                      <p className="px-3 mt-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60">
+                        {item.section}
+                      </p>
+                    )}
+                    <Link
+                      href={item.href}
+                      className={`${LINK_BASE} ${
+                        isActive(pathname, item)
+                          ? "bg-primary-container text-on-primary font-bold translate-x-1"
+                          : "text-on-surface-variant hover:bg-surface-container-high"
+                      }`}
+                    >
+                      <Icon name={item.icon} className="text-lg" />
+                      <span>{item.label}</span>
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           );
         })}

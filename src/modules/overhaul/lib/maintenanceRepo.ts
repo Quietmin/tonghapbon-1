@@ -235,9 +235,9 @@ export async function listAvailableYears(): Promise<number[]> {
 }
 
 // ---------------------------------------------------------------------------
-// 설계내역서
+// 수량산출서
 //
-// 확정한 대상을 내역서로 뽑아 시공사에 주고, 시공사가 작업 시작일·종료일을 채워
+// 확정한 대상을 수량산출서로 뽑아 시공사에 주고, 시공사가 작업 시작일·종료일을 채워
 // 되돌려주면 그 파일이 공정관리(overhaul_task)로 들어간다.
 // 금액은 다루지 않는다 — 추정가 산정은 시스템 밖의 일이다.
 // ---------------------------------------------------------------------------
@@ -249,6 +249,8 @@ export interface StatementItemInput {
   spec: string | null;
   qty: number;
   unit: string;
+  /** A/B/C — 명칭에 섞지 않고 별도 컬럼에 저장한다 */
+  grade?: string | null;
   note: string | null;
   classification: string;
 }
@@ -264,11 +266,11 @@ export async function createDesignStatement(params: {
      values ($1,$2,$3,$4) returning id`,
     [params.targetYear, params.field, params.title, params.items.length],
   );
-  if (!stmt) throw new Error("설계내역서를 만들지 못했습니다.");
+  if (!stmt) throw new Error("수량산출서를 만들지 못했습니다.");
 
   // 대분류 그룹별로 순번을 1부터 다시 매긴다 — 원본 내역서 양식과 같다
   const seqByCategory = new Map<string, number>();
-  const COLS = 9;
+  const COLS = 10;
   const CHUNK = 200;
 
   for (let start = 0; start < params.items.length; start += CHUNK) {
@@ -290,12 +292,13 @@ export async function createDesignStatement(params: {
         it.spec,
         it.qty,
         it.unit,
+        it.grade ?? null,
         it.note,
       );
     });
     await execute(
       `insert into design_statement_item
-         (statement_id, plan_id, category, seq, name, spec, qty, unit, note)
+         (statement_id, plan_id, category, seq, name, spec, qty, unit, grade, note)
        values ${ph.join(",")}`,
       values,
     );
@@ -348,6 +351,7 @@ export interface DesignStatementItemRow {
   unit: string;
   plan_start: string | null;
   plan_end: string | null;
+  grade: string | null;
   note: string | null;
   classification: string | null;
 }
@@ -363,7 +367,7 @@ export async function getDesignStatement(statementId: string): Promise<{
   );
   const items = await query<DesignStatementItemRow>(
     `select category, seq, name, spec, qty::float8 as qty, unit,
-            plan_start::text, plan_end::text, note, classification
+            plan_start::text, plan_end::text, grade, note, classification
        from design_statement_item
       where statement_id = $1
       order by category nulls last, seq`,

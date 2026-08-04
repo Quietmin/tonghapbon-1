@@ -9,7 +9,7 @@ import { exportDesignStatement } from "../lib/statementExporter";
  *
  *   ① 설비별 중장기 유지보수 관리계획 엑셀을 한 번 등록한다 (매년 다시 넣을 필요 없음)
  *   ② 연도를 고르면 시스템이 "점검주기 + 마지막 보수연도"로 대상을 판정한다
- *   ③ 사용자가 확정하면 설계내역서를 엑셀로 뽑는다 (일정은 빈칸)
+ *   ③ 사용자가 확정하면 수량산출서를 엑셀로 뽑는다 (일정은 빈칸)
  *
  * 그 내역서를 시공사가 일정을 채워 되돌려주면, 업로드 분석 화면에 넣어
  * 공정관리로 이어진다.
@@ -209,10 +209,11 @@ export default function MaintenancePlan() {
       title,
       items: chosen.map((r) => ({
         category: r.category,
-        name: r.plannedGrade ? `${r.name} (${r.plannedGrade}급)` : r.name,
+        name: r.name,
         spec: r.spec,
         qty: 1,
         unit: units[r.id] ?? "EA",
+        grade: r.plannedGrade,
         note: [
           r.tag_no && r.tag_no !== "-" ? r.tag_no : null,
           r.judge.classification === "선택" ? "선택 판단" : null,
@@ -220,13 +221,13 @@ export default function MaintenancePlan() {
           .filter(Boolean)
           .join(" · "),
       })),
-      fileName: `설계내역서_${data.targetYear}_${field}.xlsx`,
+      fileName: `수량산출서_${data.targetYear}_${field}.xlsx`,
     });
   }, [data, chosen, units, field]);
 
   const saveStatement = useCallback(async () => {
     if (!data || !chosen.length) return;
-    setBusy("설계내역서 저장 중…");
+    setBusy("수량산출서 저장 중…");
     setError(null);
     try {
       const json = await (
@@ -240,10 +241,11 @@ export default function MaintenancePlan() {
             items: chosen.map((r) => ({
               planId: r.id,
               category: r.category,
-              name: r.plannedGrade ? `${r.name} (${r.plannedGrade}급)` : r.name,
+              name: r.name,
               spec: r.spec,
               qty: 1,
               unit: units[r.id] ?? "EA",
+              grade: r.plannedGrade,
               note: r.tag_no && r.tag_no !== "-" ? r.tag_no : null,
               classification: r.judge.classification,
             })),
@@ -271,7 +273,7 @@ export default function MaintenancePlan() {
         <h1 className="text-display-lg text-on-surface pt-2">보수계획 수립</h1>
         <p className="text-body-md text-on-surface-variant mt-2">
           설비별 중장기 유지보수 관리계획을 한 번 등록하면, 연도만 고르면 그 해에 보수할 대상을
-          시스템이 점검주기로 판정합니다. 확정한 목록은 설계내역서 엑셀로 뽑아 시공사에 전달합니다.
+          시스템이 점검주기로 판정합니다. 확정한 목록은 수량산출서 엑셀로 뽑아 시공사에 전달합니다.
         </p>
       </div>
 
@@ -474,7 +476,7 @@ export default function MaintenancePlan() {
                 <p className="text-sm text-on-surface-variant flex items-start gap-2">
                   <Icon name="info" className="text-base mt-0.5" />
                   경상정비·용역 등 <b>오버홀 공사 범위가 아닌 항목</b>입니다. 확인만 하시고,
-                  설계내역서에는 들어가지 않습니다.
+                  수량산출서에는 들어가지 않습니다.
                 </p>
               </div>
             )}
@@ -595,10 +597,10 @@ export default function MaintenancePlan() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-title-sm text-on-surface">
-                  선택한 <b className="text-primary">{selected.size}건</b>으로 설계내역서를 만듭니다
+                  선택한 <b className="text-primary">{selected.size}건</b>으로 수량산출서를 만듭니다
                 </p>
                 <p className="text-sm text-on-surface-variant mt-1">
-                  명칭·규격·수량·단위·비고가 채워지고 <b>작업 시작일·종료일은 빈칸</b>으로
+                  명칭·규격·수량·단위·등급·비고가 채워지고 <b>작업 시작일·종료일은 빈칸</b>으로
                   나갑니다. 시공사가 그 칸을 채워 보내면 업로드 분석 화면에 넣어 공정관리를
                   시작하세요.
                 </p>
@@ -610,7 +612,7 @@ export default function MaintenancePlan() {
                 </Button>
                 <Button onClick={exportExcel} disabled={!selected.size}>
                   <Icon name="table_view" className="text-base" />
-                  설계내역서 엑셀
+                  수량산출서 엑셀
                 </Button>
               </div>
             </div>

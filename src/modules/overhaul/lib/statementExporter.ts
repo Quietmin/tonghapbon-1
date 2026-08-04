@@ -1,13 +1,14 @@
-// 설계내역서 엑셀 출력
+// 수량산출서 엑셀 출력
 //
 // 기초자료의 "내역서(전기)-test.xlsx" 양식을 따르되, 금액 컬럼(재료비·노무비·경비)은
 // 빼고 필요한 항목만 남긴다 — 추정가 산정은 시스템 밖의 일이다.
 //
-//   0행: 직 접 비 설 계 내 역 서
-//   1행: 공사명 : 2026년도 양산지사 정기점검보수공사
-//   2행: 명 칭 | 규 격 | 수량 | 단위 | 작업 시작일 | 작업 종료일 | 비 고
+//   0행: 공사명 : 2026년도 양산지사 정기점검보수공사
+//   1행: 수 량 산 출 서
+//   2행: 명 칭 | 규 격 | 수량 | 단위 | 작업 시작일 | 작업 종료일 | 등  급 | 비 고
 //   3행~: 대분류 머리글(Ⅰ. 발전설비) → 그 그룹 항목들 → 다음 대분류 …
 //
+// 등급(A/B/C)은 명칭에 섞지 않고 별도 컬럼으로 뺀다 — 명칭은 순수 설비명만 담는다.
 // 작업 시작일·종료일은 비워서 내보낸다. 시공사가 이 칸을 채워 되돌려주면
 // 그 파일을 업로드 분석 화면에 넣어 공정관리로 이어진다.
 import * as XLSX from "xlsx";
@@ -19,6 +20,8 @@ export interface StatementExportItem {
   spec: string | null;
   qty: number;
   unit: string;
+  /** A/B/C — 있으면 별도 "등급" 컬럼에 들어간다 */
+  grade?: string | null;
   note: string | null;
 }
 
@@ -53,9 +56,9 @@ export function exportDesignStatement(params: {
   const { title, items } = params;
 
   const aoa: (string | number)[][] = [
-    ["직 접 비 설 계 내 역 서"],
     [`공사명 : ${title}`],
-    ["명 칭", "규 격", "수량", "단위", "작업 시작일", "작업 종료일", "비 고"],
+    ["수 량 산 출 서"],
+    ["명 칭", "규 격", "수량", "단위", "작업 시작일", "작업 종료일", "등  급", "비 고"],
   ];
 
   // 대분류 순서를 항목 순서 그대로 유지하면서 그룹핑
@@ -78,6 +81,7 @@ export function exportDesignStatement(params: {
         it.unit,
         "", // 작업 시작일 — 시공사가 채운다
         "", // 작업 종료일 — 시공사가 채운다
+        it.grade ? `${it.grade}급` : "",
         it.note ?? "",
       ]);
     });
@@ -91,17 +95,18 @@ export function exportDesignStatement(params: {
     { wch: 7 },  // 단위
     { wch: 13 }, // 작업 시작일
     { wch: 13 }, // 작업 종료일
+    { wch: 9 },  // 등급
     { wch: 20 }, // 비고
   ];
-  // 제목·공사명 행은 표 너비만큼 병합
+  // 공사명·제목 행은 표 너비만큼 병합
   ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
   ];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "설계내역서");
+  XLSX.utils.book_append_sheet(wb, ws, "수량산출서");
 
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  XLSX.writeFile(wb, params.fileName ?? `설계내역서_${stamp}.xlsx`);
+  XLSX.writeFile(wb, params.fileName ?? `수량산출서_${stamp}.xlsx`);
 }
