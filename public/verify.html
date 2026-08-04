@@ -298,7 +298,18 @@ async function run() {
   {
     const c = t('공정표 — 엑셀 예정일 우선 배치, 실적 반영, 대시보드·작업관리와 지연 건수 일치');
     let tmpSourceId = null;
+    let originalPeriod = null;
     try {
+      // 계약기간이 없으면(신규 DB) 테스트용으로 잠깐 설정하고, 끝나면 원래 값으로 되돌린다.
+      const before = (await j('/api/overhaul/project')).project;
+      originalPeriod = { start_date: before.start_date, end_date: before.end_date };
+      if (!before.start_date || !before.end_date) {
+        await j('/api/overhaul/project', {
+          method: 'PATCH', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ start_date: '2026-07-10', end_date: '2026-08-20' }),
+        });
+      }
+
       const buf = await (await fetch('/fixtures/sample-designbook.xlsx')).arrayBuffer();
       const fd = new FormData();
       fd.append('file', new Blob([buf]), '구동확인-공정표용.xlsx');
@@ -348,6 +359,13 @@ async function run() {
       c.fail(e.message);
     } finally {
       if (tmpSourceId) await j(`/api/overhaul/sources?id=${tmpSourceId}`, { method: 'DELETE' }).catch(() => {});
+      if (originalPeriod && (!originalPeriod.start_date || !originalPeriod.end_date)) {
+        // 이 테스트가 임시로 채워 넣은 계약기간을 원래(미설정) 상태로 되돌린다.
+        await j('/api/overhaul/project', {
+          method: 'PATCH', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ start_date: null, end_date: null }),
+        }).catch(() => {});
+      }
     }
   }
 
