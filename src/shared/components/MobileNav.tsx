@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { Icon } from "./ui";
 import { NAV_GROUPS, SHARED_NAV } from "@/shared/lib/nav";
 
-// 모바일에서는 하위 메뉴까지 담을 공간이 없어 메인 메뉴 3개 + 설비 마스터만 노출한다.
+// 모바일에서는 하위 메뉴까지 담을 공간이 없어 홈 + 메인 메뉴 3개 + 설비 마스터만 노출한다.
 const TABS = [
+  { href: "/", label: "홈", icon: "home" },
   ...NAV_GROUPS.map((g) => ({ href: g.root, label: g.label, icon: g.icon })),
   ...SHARED_NAV.map((s) => ({ href: s.href, label: s.label, icon: s.icon })),
 ];
