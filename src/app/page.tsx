@@ -9,6 +9,8 @@ const GROUP_DESC: Record<string, string> = {
     "열원설비 고장 이력을 등록·검색하고, 설비별·분야별·월별 통계를 확인합니다.",
   chatbot:
     "태그명이나 고장 증상으로 준공도서·벤더프린트를 검색해 근거 문서와 원문 발췌를 그대로 보여줍니다.",
+  docgen:
+    "사진과 설명을 넣으면 A4 규격 사진대장·매뉴얼·고장 보고서를 자동으로 구성해 PDF로 출력합니다.",
 };
 
 export default function HomePage() {
@@ -17,11 +19,12 @@ export default function HomePage() {
       <section className="pt-2">
         <h1 className="text-display-lg text-on-surface">중앙 허브</h1>
         <p className="text-body-md text-on-surface-variant mt-2">
-          오버홀 공정관리 · 고장이력 관리 · 정비 챗봇을 하나의 설비 마스터 위에서 함께 봅니다.
+          오버홀 공정관리 · 고장이력 관리 · 정비 챗봇 · 문서 자동생성을 하나의 설비 마스터 위에서
+          함께 봅니다.
         </p>
       </section>
 
-      <section className="grid gap-gutter md:grid-cols-3">
+      <section className="grid gap-gutter md:grid-cols-2 xl:grid-cols-4">
         {NAV_GROUPS.map((group) => (
           <Card key={group.key} className="p-card-padding flex flex-col">
             <div className="w-12 h-12 rounded-2xl bg-primary-fixed text-on-primary-fixed-variant flex items-center justify-center mb-4">

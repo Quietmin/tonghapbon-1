@@ -19,7 +19,7 @@ export default function Sidebar() {
         </div>
         <div>
           <h1 className="text-title-sm font-black text-on-surface leading-tight">유지보수 마스터</h1>
-          <p className="text-xs text-on-surface-variant">공정 · 고장 · 문서 통합</p>
+          <p className="text-xs text-on-surface-variant">공정 · 고장 · 챗봇 · 문서 통합</p>
         </div>
       </Link>
 
@@ -36,7 +36,7 @@ export default function Sidebar() {
         <span>처음 화면으로</span>
       </Link>
 
-      {/* 메인 메뉴 3개 — 클릭한 그룹만 하위 항목이 펼쳐진다 */}
+      {/* 메인 메뉴 4개 — 클릭한 그룹만 하위 항목이 펼쳐진다 */}
       <nav className="flex-1 flex flex-col gap-1">
         {NAV_GROUPS.map((group) => {
           const groupActive = pathname === group.root || pathname.startsWith(`${group.root}/`);
