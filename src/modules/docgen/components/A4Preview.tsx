@@ -64,7 +64,7 @@ export const A4Page = forwardRef<HTMLDivElement, A4PageProps>(function A4Page(
                 <div className="photo-box">
                   {/* eslint-disable-next-line @next/next/no-img-element -- object URL 이라 next/image 대상이 아니고, html2canvas 가 그려야 한다 */}
                   <img
-                    src={item.url}
+                    src={item.previewUrl ?? item.url}
                     alt=""
                     style={{
                       transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
@@ -124,7 +124,7 @@ export const FaultA4Page = forwardRef<HTMLDivElement, FaultA4PageProps>(function
                 <div className="fr-photo-box">
                   {/* eslint-disable-next-line @next/next/no-img-element -- object URL */}
                   <img
-                    src={item.url}
+                    src={item.previewUrl ?? item.url}
                     alt=""
                     style={{
                       transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,

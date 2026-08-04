@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button, Card, EmptyState, Icon } from "@/shared/components/ui";
 import {
   MAX_PHOTOS,
@@ -9,12 +9,15 @@ import {
   PHOTOS_PER_PAGE,
   type DocMode,
 } from "../lib/constants";
+import { fitFaultPageLayout, fitReportPageLayout } from "../lib/fitPageLayout";
+import { composePreview, readImageFile } from "../lib/imageEdit";
 import { isDocgenSupabaseConfigured } from "../lib/supabase";
 import { saveToArchive, type SaveMeta } from "../lib/archive";
 import { isTextItem, type DocItem, type PhotoItem } from "../lib/types";
 import { exportPagesToPdf, renderPagesToBlob } from "../lib/pdf";
 import { A4Page, FaultA4Page, chunkFaultPages, chunkPages } from "./A4Preview";
 import { PageBanner } from "./Letterhead";
+import PhotoEditorModal, { type PhotoEditorResult } from "./PhotoEditorModal";
 
 /**
  * 3개 모드(사진대장·매뉴얼·고장 보고서)가 공유하는 편집기.
@@ -64,6 +67,7 @@ export default function DocEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -71,48 +75,66 @@ export default function DocEditor({
   const label = MODE_LABELS[mode];
 
   // object URL 은 브라우저가 자동으로 놓아주지 않는다 — 화면을 떠날 때 직접 해제한다.
+  // previewUrl 은 url 과 별개의 blob 일 수 있다(마킹 합성본)— 있으면 그것도 같이 놓는다.
   useEffect(() => {
     return () => {
       items.forEach((it) => {
-        if (!("kind" in it)) URL.revokeObjectURL(it.url);
+        if (!isTextItem(it)) {
+          URL.revokeObjectURL(it.url);
+          if (it.previewUrl && it.previewUrl !== it.url) URL.revokeObjectURL(it.previewUrl);
+        }
       });
     };
     // 언마운트 시 1회만 — items 를 의존성에 넣으면 편집 중에 URL 이 회수된다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addFiles = useCallback(
-    (files: FileList | null) => {
-      if (!files || files.length === 0) return;
-      setError(null);
+  // 사진마다 실제 픽셀 크기를 알아야(자르기·마킹 좌표 정규화) 해서, 파일을 읽어
+  // object URL 을 만드는 동안 잠깐 비동기로 기다린다(사진 선택 즉시 화면이 굳지 않음).
+  const addFiles = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setError(null);
 
-      const photos = Array.from(files).filter((f) => f.type.startsWith("image/"));
-      if (photos.length === 0) {
-        setError("이미지 파일만 추가할 수 있습니다.");
-        return;
-      }
+    const photos = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (photos.length === 0) {
+      setError("이미지 파일만 추가할 수 있습니다.");
+      return;
+    }
 
-      setItems((prev) => {
-        const room = MAX_PHOTOS - prev.length;
-        if (room <= 0) {
-          setError(`사진은 최대 ${MAX_PHOTOS}장까지 넣을 수 있습니다.`);
-          return prev;
-        }
-        if (photos.length > room) {
-          setError(`최대 ${MAX_PHOTOS}장까지만 들어갑니다. ${room}장만 추가했습니다.`);
-        }
-        const added: PhotoItem[] = photos.slice(0, room).map((file) => ({
-          id: nextId(),
-          file,
-          url: URL.createObjectURL(file),
-          desc: "",
-          rotation: 0,
-        }));
-        return [...prev, ...added];
-      });
-    },
-    [],
-  );
+    Promise.all(
+      photos.map((file) =>
+        readImageFile(file).then(
+          ({ url, width, height }): PhotoItem => ({
+            id: nextId(),
+            file,
+            url,
+            width,
+            height,
+            strokes: [],
+            previewUrl: url,
+            desc: "",
+            rotation: 0,
+          }),
+        ),
+      ),
+    )
+      .then((loaded) => {
+        setItems((prev) => {
+          const room = MAX_PHOTOS - prev.length;
+          if (room <= 0) {
+            setError(`사진은 최대 ${MAX_PHOTOS}장까지 넣을 수 있습니다.`);
+            loaded.forEach((it) => URL.revokeObjectURL(it.url));
+            return prev;
+          }
+          if (loaded.length > room) {
+            setError(`최대 ${MAX_PHOTOS}장까지만 들어갑니다. ${room}장만 추가했습니다.`);
+            loaded.slice(room).forEach((it) => URL.revokeObjectURL(it.url));
+          }
+          return [...prev, ...loaded.slice(0, room)];
+        });
+      })
+      .catch(() => setError("사진을 불러오지 못했습니다. 다시 시도해 주세요."));
+  }, []);
 
   function updateDesc(id: string, desc: string) {
     setItems((prev) => prev.map((it) => (it.id === id && !("kind" in it) ? { ...it, desc } : it)));
@@ -133,10 +155,79 @@ export default function DocEditor({
   function remove(id: string) {
     setItems((prev) => {
       const target = prev.find((it) => it.id === id);
-      if (target && !("kind" in target)) URL.revokeObjectURL(target.url);
+      if (target && !isTextItem(target)) {
+        URL.revokeObjectURL(target.url);
+        if (target.previewUrl && target.previewUrl !== target.url) {
+          URL.revokeObjectURL(target.previewUrl);
+        }
+      }
       return prev.filter((it) => it.id !== id);
     });
   }
+
+  /** 편집기에서 [저장]을 누르면 기준 이미지(자르기 반영분)와 마킹을 통째로 교체한다 */
+  function handleEditSave(id: string, result: PhotoEditorResult) {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== id || isTextItem(it)) return it;
+        if (it.url !== result.url) URL.revokeObjectURL(it.url);
+        if (it.previewUrl && it.previewUrl !== it.url && it.previewUrl !== result.url) {
+          URL.revokeObjectURL(it.previewUrl);
+        }
+        return {
+          ...it,
+          url: result.url,
+          width: result.width,
+          height: result.height,
+          strokes: result.strokes,
+          rotation: 0,
+          // previewUrl 을 비워 재합성 이펙트가 새로 만들게 한다
+          previewUrl: null,
+        };
+      }),
+    );
+    setEditingId(null);
+  }
+
+  const editingPhoto = items.find(
+    (it): it is PhotoItem => it.id === editingId && !isTextItem(it),
+  );
+
+  // url·strokes 가 바뀐(= previewUrl 이 비워진) 사진만 새로 합성한다. 마킹이 없으면
+  // 굳이 캔버스를 돌리지 않고 url 을 그대로 previewUrl 로 채운다.
+  useEffect(() => {
+    const stale = items.filter(
+      (it): it is PhotoItem => !isTextItem(it) && it.previewUrl === null,
+    );
+    if (stale.length === 0) return;
+
+    let cancelled = false;
+    Promise.all(
+      stale.map(async (it) => {
+        const previewUrl =
+          it.strokes.length === 0 ? it.url : await composePreview(it.url, it.width, it.height, it.strokes);
+        return { id: it.id, previewUrl };
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setItems((prev) => {
+        const byId = new Map(results.map((r) => [r.id, r.previewUrl]));
+        return prev.map((it) =>
+          !isTextItem(it) && byId.has(it.id) ? { ...it, previewUrl: byId.get(it.id)! } : it,
+        );
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
+
+  // 설명이 아무리 길어져도 페이지가 297mm 를 넘지 않도록, 렌더될 때마다 실제 DOM 을
+  // 측정해서 사진·설명 칸 높이를 맞춘다. items(=사진·설명 내용) 가 바뀔 때마다 다시 잰다.
+  useLayoutEffect(() => {
+    const fit = mode === "fault" ? fitFaultPageLayout : fitReportPageLayout;
+    pageRefs.current.forEach((el) => fit(el));
+  });
 
   /** 원본의 [순서 이동] — 옮길 순번을 골라 그 자리로 끼워 넣는다 */
   function move(id: string, to: number) {
@@ -315,14 +406,24 @@ export default function DocEditor({
                   </span>
                   <div className="flex items-center gap-1">
                     {!("kind" in item) && (
-                      <button
-                        type="button"
-                        onClick={() => rotate(item.id)}
-                        title="90도 회전"
-                        className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
-                      >
-                        <Icon name="rotate_right" className="text-base" />
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(item.id)}
+                          title="편집 (자르기·마킹)"
+                          className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                        >
+                          <Icon name="edit" className="text-base" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => rotate(item.id)}
+                          title="90도 회전"
+                          className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                        >
+                          <Icon name="rotate_right" className="text-base" />
+                        </button>
+                      </>
                     )}
                     <select
                       value={i}
@@ -360,7 +461,7 @@ export default function DocEditor({
                     <div className="aspect-4/3 bg-surface-container flex items-center justify-center overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element -- object URL */}
                       <img
-                        src={item.url}
+                        src={item.previewUrl ?? item.url}
                         alt=""
                         className="max-w-full max-h-full object-contain"
                         style={{
@@ -455,6 +556,18 @@ export default function DocEditor({
           </div>
         </div>
       </section>
+
+      {editingPhoto && (
+        <PhotoEditorModal
+          url={editingPhoto.url}
+          width={editingPhoto.width}
+          height={editingPhoto.height}
+          rotation={editingPhoto.rotation}
+          strokes={editingPhoto.strokes}
+          onCancel={() => setEditingId(null)}
+          onSave={(result) => handleEditSave(editingPhoto.id, result)}
+        />
+      )}
     </>
   );
 }
