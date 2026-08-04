@@ -47,7 +47,7 @@ create table if not exists public.docgen_documents (
   id            uuid primary key default gen_random_uuid(),
 
   -- 공통
-  doc_type      text        not null check (doc_type in ('photo', 'manual', 'fault')),
+  doc_type      text        not null check (doc_type in ('report', 'manual', 'fault')),
   file_name     text        not null,
   title         text        not null,
   -- 로그인이 없어 사용자가 직접 입력한다. 검증되지 않으므로 신원 증명으로 쓰면 안 된다.
@@ -163,6 +163,17 @@ create policy "docgen_storage_insert"
 -- ============================================================================
 --   select count(*) from public.docgen_documents;
 --   select id, public from storage.buckets where id = 'docgen-documents';
+
+-- ============================================================================
+-- 마이그레이션 — doc_type 체크 제약조건이 'photo' 로 만들어진 상태에서 이미
+-- 테이블이 생성돼 있다면(위 create table 은 if not exists 라 재실행해도 바뀌지
+-- 않는다) 아래를 한 번 실행해야 한다. 앱은 'report' | 'manual' | 'fault' 를
+-- 쓰는데 예전 제약조건이 'photo' 를 기대해서, 사진대장(report) 저장이 매번
+-- 체크 제약조건 위반으로 실패하고 있었다.
+-- ============================================================================
+--   alter table public.docgen_documents drop constraint if exists docgen_documents_doc_type_check;
+--   alter table public.docgen_documents add constraint docgen_documents_doc_type_check
+--     check (doc_type in ('report', 'manual', 'fault'));
 
 -- ============================================================================
 -- 필요해지면: 삭제를 허용하는 방법 (무인증이라 아무나 지울 수 있게 된다)
