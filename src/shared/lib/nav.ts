@@ -13,6 +13,8 @@ export interface NavItem {
   short?: string;
   /** 하위 경로까지 활성 처리하지 않고 정확히 일치할 때만 활성화 */
   exact?: boolean;
+  /** 그룹 안에서 시간 흐름상 단계가 나뉠 때 소제목으로 표시 (예: 계약 전/후) */
+  section?: string;
 }
 
 export interface NavGroup {
@@ -34,12 +36,15 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: "engineering",
     root: "/overhaul",
     items: [
-      { href: "/overhaul", label: "대시보드", icon: "dashboard", exact: true },
-      { href: "/overhaul/upload", label: "업로드 분석", icon: "analytics" },
-      { href: "/overhaul/tasks", label: "작업 관리", icon: "format_list_bulleted" },
-      { href: "/overhaul/schedule", label: "공정표", icon: "calendar_view_week" },
-      { href: "/overhaul/entry", label: "실적 입력", icon: "edit_note" },
-      { href: "/overhaul/reports", label: "보고서", icon: "summarize" },
+      // ── ① 계약 전: 이번 오버홀에서 무엇을 할지 정하는 단계 ──────────────
+      { href: "/overhaul/plan", label: "보수계획", icon: "event_note", section: "계약 전 — 보수계획 수립" },
+      // ── ② 계약 후: 체결 후 실제로 진행·기록하는 단계 ────────────────────
+      { href: "/overhaul", label: "대시보드", icon: "dashboard", exact: true, section: "계약 후 — 공정관리" },
+      { href: "/overhaul/upload", label: "업로드 분석", icon: "analytics", section: "계약 후 — 공정관리" },
+      { href: "/overhaul/tasks", label: "작업 관리", icon: "format_list_bulleted", section: "계약 후 — 공정관리" },
+      { href: "/overhaul/schedule", label: "공정표", icon: "calendar_view_week", section: "계약 후 — 공정관리" },
+      { href: "/overhaul/entry", label: "실적 입력", icon: "edit_note", section: "계약 후 — 공정관리" },
+      { href: "/overhaul/reports", label: "보고서", icon: "summarize", section: "계약 후 — 공정관리" },
     ],
   },
   {
