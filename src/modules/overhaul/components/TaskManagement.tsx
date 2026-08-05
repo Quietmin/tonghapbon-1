@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Card,
   Icon,
@@ -41,6 +42,7 @@ interface Payload {
 }
 
 export default function TaskManagement() {
+  const router = useRouter();
   const [q, setQ] = useState("");
   const [field, setField] = useState("전체");
   const [equipment, setEquipment] = useState("전체");
@@ -160,7 +162,12 @@ export default function TaskManagement() {
                   const status =
                     p >= 100 ? "완료" : risk.has(t.id) ? "지연" : p > 0 ? "진행중" : "대기";
                   return (
-                    <tr key={t.id} className="hover:bg-surface-container-low transition-colors">
+                    <tr
+                      key={t.id}
+                      onClick={() => router.push(`/overhaul/entry?task=${t.id}`)}
+                      title="눌러서 실적 입력으로 이동"
+                      className="group cursor-pointer hover:bg-surface-container-low transition-colors"
+                    >
                       <td className="py-3 pr-3">
                         <div className="flex items-center gap-2 mb-0.5">
                           <FieldChip field={t.field ?? "미분류"} />
@@ -178,7 +185,9 @@ export default function TaskManagement() {
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold text-on-surface text-sm">{t.name}</p>
+                        <p className="font-semibold text-on-surface text-sm group-hover:text-primary transition-colors">
+                          {t.name}
+                        </p>
                         <p className="text-xs text-on-surface-variant">
                           {t.equipment_type ?? "기타"}
                           {t.sheet_name ? ` · ${t.sheet_name}` : ""}
