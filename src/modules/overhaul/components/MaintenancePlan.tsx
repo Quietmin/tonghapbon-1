@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, Icon, Button, EmptyState, StatusChip } from "@/shared/components/ui";
 import { exportDesignStatement } from "../lib/statementExporter";
+import MaintenanceMatrix from "./MaintenanceMatrix";
+import StatementArchive from "./StatementArchive";
 
 /**
  * 보수계획 수립 — 오버홀의 첫 단계.
@@ -90,6 +92,8 @@ export default function MaintenancePlan() {
   const [field, setField] = useState("전기");
   const [tab, setTab] = useState<Tab>("필수");
   const [q, setQ] = useState("");
+  /** 연도별 판정(수량산출서용) ↔ 전체 설비 장기 현황(30년 추적용) ↔ 확정 내역서(이력 반영) */
+  const [view, setView] = useState<"판정" | "현황" | "내역서">("판정");
   const inputRef = useRef<HTMLInputElement>(null);
 
   /** 사용자가 확정한 대상 (plan id) */
@@ -370,6 +374,36 @@ export default function MaintenancePlan() {
 
       {!hasPlan ? null : (
         <>
+          {/* 판정(수량산출서용) ↔ 전체 현황(30년 추적용) ↔ 확정 내역서(이력 반영) */}
+          <div className="flex gap-1 p-1 bg-surface-container-high rounded-xl w-full lg:w-fit">
+            {(
+              [
+                { key: "판정" as const, label: "연도별 판정", icon: "fact_check" },
+                { key: "현황" as const, label: "전체 현황 (장기 추적)", icon: "timeline" },
+                { key: "내역서" as const, label: "확정 내역서 · 이력 반영", icon: "checklist" },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setView(t.key)}
+                className={`flex-1 lg:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5 justify-center ${
+                  view === t.key
+                    ? "bg-surface-container-lowest text-primary shadow-sm"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                <Icon name={t.icon} className="text-base" />
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {view === "현황" ? (
+            <MaintenanceMatrix />
+          ) : view === "내역서" ? (
+            <StatementArchive />
+          ) : (
+          <>
           {/* 연도 선택 + 판정 요약 */}
           <Card className="p-card-padding" lift={false}>
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -617,6 +651,8 @@ export default function MaintenancePlan() {
               </div>
             </div>
           </Card>
+          </>
+          )}
         </>
       )}
     </>

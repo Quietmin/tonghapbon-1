@@ -412,16 +412,26 @@ create table if not exists maintenance_plan (
   /** 최초 업로드 시 엑셀의 A등급 이력에서 역산한 마지막 보수연도 */
   last_done_year integer,
 
+  /**
+   * 사용중지(폐기·교체) 여부. 지우지 않는다 — 지우면 그 설비의 30년 보수 이력이
+   * 함께 사라진다. 사용중지된 설비는 기본 목록·판정에서 빠지고, 과거 이력만 남는다.
+   */
+  is_active     boolean not null default true,
+
   sheet_name    text,
   row_index     integer,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
 
+-- 이미 만들어진 테이블에도 반영 (idempotent)
+alter table maintenance_plan add column if not exists is_active boolean not null default true;
+
 create index if not exists maintenance_plan_source_idx on maintenance_plan (source_id);
 create index if not exists maintenance_plan_field_idx  on maintenance_plan (field);
 create index if not exists maintenance_plan_method_idx on maintenance_plan (method);
 create index if not exists maintenance_plan_equip_idx  on maintenance_plan (equipment_id);
+create index if not exists maintenance_plan_active_idx on maintenance_plan (is_active);
 create index if not exists maintenance_plan_name_trgm  on maintenance_plan using gin (name gin_trgm_ops);
 
 drop trigger if exists maintenance_plan_set_updated_at on maintenance_plan;
@@ -449,14 +459,23 @@ create table if not exists maintenance_record (
   id           uuid primary key default gen_random_uuid(),
   plan_id      uuid not null references maintenance_plan(id) on delete cascade,
   done_year    integer not null,
-  /** 실제 수행한 보수 강도 (A/B/C) */
+  /** 실제 수행한 보수 강도 (A/B/C). status='skipped'면 의미 없다 */
   grade        text,
+  /**
+   * done = 실제로 보수함 · skipped = 계약이 변경돼 보수하지 않음(확인된 사실).
+   * skipped도 행을 남기는 이유: "몰라서 비어 있음"과 "확인했는데 안 함"을 구분해야
+   * 판정(다음 도래 연도 계산)과 화면 표시가 갈리기 때문이다.
+   */
+  status       text not null default 'done',
   /** 이 보수가 어느 오버홀 프로젝트에서 수행됐는지 (있으면 연결) */
   project_id   uuid references overhaul_project(id) on delete set null,
   note         text,
   created_at   timestamptz not null default now(),
   unique (plan_id, done_year)
 );
+
+-- 이미 만들어진 테이블에도 반영 (idempotent)
+alter table maintenance_record add column if not exists status text not null default 'done';
 
 create index if not exists maintenance_record_plan_idx on maintenance_record (plan_id, done_year desc);
 
@@ -474,8 +493,12 @@ create table if not exists design_statement (
   field        text,
   title        text,          -- 공사명 (예: "2026년도 양산지사 정기점검보수공사")
   item_count   integer not null default 0,
-  created_at   timestamptz not null default now()
+  created_at   timestamptz not null default now(),
+  /** 준공 후 "이력 반영"을 마친 시각. null이면 아직 반영 전 — 목록에서 눈에 띄게 표시한다 */
+  reconciled_at timestamptz
 );
+
+alter table design_statement add column if not exists reconciled_at timestamptz;
 
 create table if not exists design_statement_item (
   id           bigint generated always as identity primary key,
