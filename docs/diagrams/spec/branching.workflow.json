@@ -1,0 +1,295 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Plant Ops Hub — 개발 · 통합 워크플로",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "happy-path",
+        "label": "정상 승격 경로",
+        "focus": [
+          "ohWork",
+          "ymCommit",
+          "merge",
+          "verify",
+          "main"
+        ],
+        "note": "담당 폴더에서 개발해 통합 브랜치를 거쳐 완료본으로 올라가는 길."
+      },
+      {
+        "id": "two-devs",
+        "label": "두 담당자",
+        "focus": [
+          "ohWork",
+          "ymCommit",
+          "dgWork",
+          "ysCommit",
+          "merge"
+        ],
+        "note": "ym은 오버홀, ys는 docgen — 소유 폴더가 겹치지 않는다."
+      },
+      {
+        "id": "conflict-path",
+        "label": "충돌 처리",
+        "focus": [
+          "merge",
+          "ownRule",
+          "sharedMerge",
+          "verify"
+        ],
+        "note": "분야 우선 규칙과, 그 규칙을 쓰면 안 되는 shared 파일."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "frontend": {
+          "label": "담당자 작업"
+        },
+        "backend": {
+          "label": "통합 브랜치"
+        },
+        "security": {
+          "label": "검증 · 판정"
+        },
+        "messagebus": {
+          "label": "수동 병합"
+        },
+        "cloud": {
+          "label": "완료본"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "ym",
+      "label": "ym — 오버홀 담당"
+    },
+    {
+      "id": "ys",
+      "label": "main-develop-ys — docgen 담당"
+    },
+    {
+      "id": "integrate",
+      "label": "main-dev-branch → personal/main"
+    },
+    {
+      "id": "conflict",
+      "label": "충돌 해결",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "devPhase",
+      "label": "담당자별 개발",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "integPhase",
+      "label": "통합 · 검증",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "promPhase",
+      "label": "승격",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "groups": [
+    {
+      "id": "conflictPath",
+      "label": "충돌 해결 경로",
+      "lane": "conflict",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "security"
+    }
+  ],
+  "mainPath": [
+    "ohWork",
+    "ymCommit",
+    "merge",
+    "verify",
+    "main"
+  ],
+  "nodes": [
+    {
+      "id": "ohWork",
+      "lane": "ym",
+      "col": 0,
+      "type": "frontend",
+      "label": "오버홀 개발",
+      "sublabel": "src/modules/overhaul",
+      "width": 172
+    },
+    {
+      "id": "ymCommit",
+      "lane": "ym",
+      "col": 1,
+      "type": "frontend",
+      "label": "ym 커밋",
+      "sublabel": "담당 폴더만",
+      "width": 172
+    },
+    {
+      "id": "dgWork",
+      "lane": "ys",
+      "col": 0,
+      "type": "frontend",
+      "label": "docgen 개발",
+      "sublabel": "src/modules/docgen",
+      "width": 172
+    },
+    {
+      "id": "ysCommit",
+      "lane": "ys",
+      "col": 1,
+      "type": "frontend",
+      "label": "ys 커밋",
+      "sublabel": "담당 폴더만",
+      "width": 172
+    },
+    {
+      "id": "merge",
+      "lane": "integrate",
+      "col": 2,
+      "type": "backend",
+      "label": "main-dev-branch 병합",
+      "sublabel": "두 담당자 작업 합침",
+      "tag": "통합 지점",
+      "width": 172
+    },
+    {
+      "id": "verify",
+      "lane": "integrate",
+      "col": 3,
+      "type": "security",
+      "label": "빌드 · 동작 확인",
+      "sublabel": "통합본 검증",
+      "tag": "통과해야 승격",
+      "width": 172
+    },
+    {
+      "id": "main",
+      "lane": "integrate",
+      "col": 4,
+      "type": "cloud",
+      "label": "personal/main 승격",
+      "sublabel": "보존용 완료본",
+      "tag": "완료 시에만",
+      "width": 172
+    },
+    {
+      "id": "ownRule",
+      "lane": "conflict",
+      "col": 2,
+      "type": "security",
+      "label": "분야 우선 판정",
+      "sublabel": "ys=docgen · ym=overhaul",
+      "width": 172
+    },
+    {
+      "id": "sharedMerge",
+      "lane": "conflict",
+      "col": 3,
+      "type": "messagebus",
+      "label": "shared 수동 병합",
+      "sublabel": "nav.ts · Sidebar",
+      "tag": "한쪽만 고르면 손실",
+      "width": 172
+    }
+  ],
+  "edges": [
+    {
+      "id": "oh-commit",
+      "from": "ohWork",
+      "to": "ymCommit"
+    },
+    {
+      "id": "dg-commit",
+      "from": "dgWork",
+      "to": "ysCommit"
+    },
+    {
+      "id": "ym-push",
+      "from": "ymCommit",
+      "to": "merge",
+      "label": "push",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ys-push",
+      "from": "ysCommit",
+      "to": "merge",
+      "label": "push"
+    },
+    {
+      "id": "merge-verify",
+      "from": "merge",
+      "to": "verify"
+    },
+    {
+      "id": "verify-main",
+      "from": "verify",
+      "to": "main",
+      "label": "통과 시 승격",
+      "variant": "emphasis"
+    },
+    {
+      "id": "merge-conflict",
+      "from": "merge",
+      "to": "ownRule",
+      "label": "충돌 발생",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "rule-shared",
+      "from": "ownRule",
+      "to": "sharedMerge",
+      "label": "shared 파일이면"
+    },
+    {
+      "id": "shared-back",
+      "from": "sharedMerge",
+      "to": "verify",
+      "label": "양쪽 다 살려 병합",
+      "variant": "dashed",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "합치는 순서",
+      "items": [
+        "ym과 ys가 각자 담당 폴더에서만 개발한다",
+        "두 사람 작업을 main-dev-branch로 모아 빌드·동작을 확인한다"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "충돌 규칙",
+      "items": [
+        "docgen 충돌은 ys, overhaul 충돌은 ym 쪽을 채택한다",
+        "단 src/shared는 예외 — 한쪽만 고르면 반대쪽 메뉴가 사라진다"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "지켜야 할 선",
+      "items": [
+        "origin(sau03206-ctrl)은 통합 이전 백업 — push 금지",
+        "personal/main은 통합본이 완료됐을 때만 올린다"
+      ]
+    }
+  ]
+}
