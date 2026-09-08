@@ -16,3 +16,6 @@ next-env.d.ts
 .data
 
 .vercel
+
+# Supabase 로컬 백업 덤프 (용량이 크고 자격증명이 섞일 수 있어 공유하지 않음)
+/통합본-1 저장소 pause 백업/

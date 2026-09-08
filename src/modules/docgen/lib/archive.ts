@@ -146,13 +146,22 @@ export interface ListFilter {
   year?: string;
   /** 파일명·고장내용·설비명 부분검색 (원본은 pg_trgm 인덱스를 깔아 둠) */
   keyword?: string;
+  /**
+   * 최대 건수. 챕터 첫 화면의 "최근 문서" 요약처럼 몇 건만 필요할 때 쓴다 —
+   * 200건을 받아 와서 잘라 쓰면 그만큼이 그냥 버려진다.
+   */
+  limit?: number;
 }
 
 export async function listArchive(filter: ListFilter = {}): Promise<ArchiveRow[]> {
   const client = getDocgenSupabase();
   if (!client) throw new Error("보관함이 설정되지 않았습니다.");
 
-  let q = client.from(DOCGEN_TABLE).select("*").order("created_at", { ascending: false }).limit(200);
+  let q = client
+    .from(DOCGEN_TABLE)
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(filter.limit ?? 200);
 
   if (filter.docType) q = q.eq("doc_type", filter.docType);
   if (filter.branch) q = q.eq("branch", filter.branch);

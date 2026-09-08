@@ -15,13 +15,13 @@ const CHOICES = [
     desc: "현장 사진과 설명을 정리하는 보고서",
   },
   {
-    href: "/docgen/manual",
+    href: "/manual/new",
     icon: "menu_book",
     title: "매뉴얼 만들기",
     desc: "사진마다 순번을 매겨 절차를 안내하는 문서",
   },
   {
-    href: "/docgen/fault-report",
+    href: "/failure/new",
     icon: "warning",
     title: "고장 보고서 만들기",
     desc: "고장 요약과 관련 사진을 정리하는 핫라인 메모",

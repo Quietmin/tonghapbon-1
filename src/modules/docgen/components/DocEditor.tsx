@@ -69,6 +69,9 @@ export default function DocEditor({
   const [notice, setNotice] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 앨범 선택과 별개로 카메라를 바로 여는 입력. capture 를 같은 input 에 붙이면
+  // 폰에서 앨범 선택이 막히므로 두 개로 나눈다 (현장에서 찍고 바로 붙일 때 씀).
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const archiveEnabled = isDocgenSupabaseConfigured();
@@ -358,6 +361,16 @@ export default function DocEditor({
             <Icon name="add_photo_alternate" className="text-lg" />
             사진 추가
           </Button>
+          {/* 촬영은 폰에서만 의미가 있어 모바일 폭에서만 보인다 */}
+          <Button
+            variant="ghost"
+            className="md:hidden"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={items.length >= MAX_PHOTOS}
+          >
+            <Icon name="photo_camera" className="text-lg" />
+            촬영
+          </Button>
           {allowTextItems && (
             <Button variant="ghost" onClick={addTextItem}>
               <Icon name="text_fields" className="text-lg" />
@@ -378,6 +391,19 @@ export default function DocEditor({
               e.target.value = "";
             }}
           />
+          {/* capture="environment" — 후면 카메라를 바로 연다. 촬영은 한 장씩이라
+              multiple 을 붙이지 않는다(붙이면 일부 기기에서 앨범으로 빠진다). */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(e) => {
+              addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
         </div>
 
         {error && (
@@ -391,7 +417,7 @@ export default function DocEditor({
           <EmptyState
             icon="photo_library"
             title="사진이 없습니다"
-            desc={`[사진 추가]로 앨범에서 사진을 고르세요. 한 번에 여러 장 선택할 수 있습니다.`}
+            desc="[사진 추가]로 앨범에서 고르세요. 한 번에 여러 장 선택할 수 있습니다. 폰에서는 [촬영]으로 바로 찍어 붙일 수 있습니다."
           />
         ) : (
           <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

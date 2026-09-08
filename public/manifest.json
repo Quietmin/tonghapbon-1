@@ -1,0 +1,23 @@
+{
+  "name": "유지보수 마스터 — 설비·고장·매뉴얼",
+  "short_name": "유지보수",
+  "description": "설비 마스터 위에서 고장 보고서와 현장 매뉴얼을 작성·조회하고, 정비 챗봇을 어느 화면에서나 함께 쓰는 앱",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "고장보고서 작성", "short_name": "고장작성", "url": "/failure/new" },
+    { "name": "고장보고서 조회", "short_name": "고장조회", "url": "/failure/archive" },
+    { "name": "매뉴얼 작성", "short_name": "매뉴얼작성", "url": "/manual/new" },
+    { "name": "매뉴얼 조회", "short_name": "매뉴얼조회", "url": "/manual/archive" }
+  ]
+}
