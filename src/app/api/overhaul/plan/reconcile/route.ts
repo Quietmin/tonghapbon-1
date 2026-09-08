@@ -5,6 +5,7 @@ import {
   reconcileStatement,
   type ReconcileDecision,
 } from "@/modules/overhaul/lib/maintenanceRepo";
+import { resolveProjectFromRequest } from "@/modules/overhaul/lib/activeProject";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,10 @@ export async function GET(req: Request) {
     const q = sp.get("q");
 
     if (statementId) {
-      const result = await suggestReconciliation(statementId);
-      return NextResponse.json({ ok: true, ...result });
+      // 계약 종료 여부·이력의 소속 회차는 지금 보고 있는 회차 기준으로 본다
+      const project = await resolveProjectFromRequest(req);
+      const result = await suggestReconciliation(statementId, project.id);
+      return NextResponse.json({ ok: true, project, ...result });
     }
     if (q != null) {
       const results = await searchActivePlansLite(q);
@@ -46,10 +49,12 @@ export async function POST(req: Request) {
     if (!body.statementId || !Number.isFinite(body.targetYear)) {
       throw new Error("statementId와 targetYear가 필요합니다.");
     }
+    const project = await resolveProjectFromRequest(req);
     const result = await reconcileStatement({
       statementId: body.statementId,
       targetYear: body.targetYear,
       decisions: Array.isArray(body.decisions) ? body.decisions : [],
+      projectId: project.id,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {

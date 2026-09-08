@@ -263,7 +263,24 @@ export async function setPlanItemActive(id: string, isActive: boolean): Promise<
  * 없으면 최초 업로드 시 엑셀에서 역산한 값을 쓴다. 그래서 오버홀이 끝나고
  * 실적만 남기면 다음 회차 판정이 자동으로 갱신된다.
  */
-export async function listJudgedPlans(targetYear: number): Promise<JudgedPlanRow[]> {
+/**
+ * 그 연도의 보수 대상 판정 결과.
+ *
+ * field를 주면 그 분야만 본다. 기계·전기·제어 계획을 함께 등록해 두면 판정 목록이
+ * 섞이는데, 수량산출서는 분야별로 따로 뽑아 시공사에 주므로 목록도 분야로 갈라야
+ * 한다. 안 주면 전체를 돌려준다.
+ */
+export async function listJudgedPlans(
+  targetYear: number,
+  field?: string | null,
+): Promise<JudgedPlanRow[]> {
+  const params: unknown[] = [targetYear];
+  let fieldClause = "";
+  if (field) {
+    params.push(field);
+    fieldClause = ` and p.field = $${params.length}`;
+  }
+
   const rows = await query<PlanRow & { planned_grade: string | null }>(
     `select p.id, p.category, p.sub_category, p.name, p.tag_no, p.maker, p.spec, p.field,
             p.cycle_raw, p.cycle_years, p.cycle_kind, p.cycle_options,
@@ -273,9 +290,9 @@ export async function listJudgedPlans(targetYear: number): Promise<JudgedPlanRow
             (select g.grade from maintenance_plan_grade g
               where g.plan_id = p.id and g.year = $1) as planned_grade
        from maintenance_plan p
-      where p.is_active
+      where p.is_active${fieldClause}
       order by p.sheet_name, p.row_index`,
-    [targetYear],
+    params,
   );
 
   return rows.map((r) => {
@@ -336,6 +353,16 @@ export async function listAvailableYears(): Promise<number[]> {
     `select distinct year from maintenance_plan_grade order by year`,
   );
   return rows.map((r) => r.year);
+}
+
+/** 등록된 계획에 실제로 들어있는 분야 — 화면의 분야 버튼을 이 값으로 만든다 */
+export async function listPlanFields(): Promise<string[]> {
+  const rows = await query<{ field: string }>(
+    `select distinct field from maintenance_plan
+      where is_active and field is not null and btrim(field) <> ''
+      order by field`,
+  );
+  return rows.map((r) => r.field);
 }
 
 // ---------------------------------------------------------------------------
@@ -608,12 +635,19 @@ export interface StatementItemInput {
   classification: string;
 }
 
+/**
+ * 수량산출서를 확정 저장한다.
+ *
+ * 저장한 항목을 그대로 돌려준다 — 엑셀로 뽑을 때 각 행에 "항목ID"를 실어야 하고,
+ * 그 ID는 저장하고 나서야 생기기 때문이다. 그 ID가 시공사를 거쳐 되돌아오면
+ * 공정관리 작업과 정확히 이어진다 (db/schema.sql의 statement_item_id 참고).
+ */
 export async function createDesignStatement(params: {
   targetYear: number;
   field: string | null;
   title: string;
   items: StatementItemInput[];
-}): Promise<{ statementId: string }> {
+}): Promise<{ statementId: string; items: DesignStatementItemRow[] }> {
   const stmt = await queryOne<{ id: string }>(
     `insert into design_statement (target_year, field, title, item_count)
      values ($1,$2,$3,$4) returning id`,
@@ -676,7 +710,8 @@ export async function createDesignStatement(params: {
     );
   }
 
-  return { statementId: stmt.id };
+  const { items } = await getDesignStatement(stmt.id);
+  return { statementId: stmt.id, items };
 }
 
 export interface DesignStatementRow {
@@ -741,37 +776,14 @@ export async function deleteDesignStatement(statementId: string): Promise<number
 // 보수 실적 — 오버홀 후 여기에 남기면 다음 회차 판정이 자동 갱신된다
 // ---------------------------------------------------------------------------
 
-export async function recordMaintenance(params: {
-  planId: string;
-  doneYear: number;
-  grade?: string | null;
-  status?: "done" | "skipped";
-  projectId?: string | null;
-  note?: string | null;
-}): Promise<void> {
-  await execute(
-    `insert into maintenance_record (plan_id, done_year, grade, status, project_id, note)
-     values ($1,$2,$3,$4,$5,$6)
-     on conflict (plan_id, done_year) do update
-       set grade = excluded.grade, status = excluded.status,
-           project_id = excluded.project_id, note = excluded.note`,
-    [
-      params.planId,
-      params.doneYear,
-      params.grade ?? null,
-      params.status ?? "done",
-      params.projectId ?? null,
-      params.note ?? null,
-    ],
-  );
-}
-
 // ---------------------------------------------------------------------------
 // 준공 후 이력 반영 — 확정했던 수량산출서를 실제 결과와 맞춰보고 과거 이력으로 넘긴다
 //
-// overhaul_task와 design_statement_item은 행 단위로 잇지 않기로 했다(계획을 짤 때와
-// 실행할 때 쓰는 표가 서로 다른 목적이라 강제로 묶으면 어긋난다). 그래서 실제
-// 공정관리 실적을 이름으로 "참고 삼아" 붙여만 주고, 최종 판단은 사람이 한다.
+// 내역서 항목 ↔ 공정관리 작업은 두 단계로 잇는다.
+//   1순위: overhaul_task.statement_item_id — 수량산출서 엑셀에 실어 보낸 "항목ID"가
+//          되돌아온 경우. 같은 항목이라고 확실히 말할 수 있다.
+//   2순위: 이름 유사도(pg_trgm) — 항목ID가 없는 파일(수기 작성 등)일 때의 참고 제안.
+// 어느 쪽이든 최종 판단은 사람이 한다. 시스템은 근거를 붙여 밀어주기만 한다.
 //   완료 → maintenance_record(status='done')
 //   계약기간이 지났는데도 미완료 → status='skipped' (계약변경으로 안 함 — 확인된 사실)
 //   계획에 없었지만 이번에 같이 한 설비 → 화면에서 직접 추가해 done으로 남긴다
@@ -784,10 +796,20 @@ export interface ReconcileCandidate {
   spec: string | null;
   grade: string | null;
   classification: string | null;
-  /** 이름으로 찾은 가장 비슷한 공정관리 작업 — 참고용 제안일 뿐, 확정은 사람이 한다 */
+  /** 이어붙인 공정관리 작업 — 항목ID로 확정된 것이거나, 이름으로 찾은 참고 제안 */
   suggestedTaskName: string | null;
   suggestedPlanQty: number | null;
   suggestedDoneQty: number | null;
+  /**
+   * 그 작업을 어떻게 찾았는지.
+   *   linked = 수량산출서의 항목ID가 되돌아와 정확히 이어짐 (신뢰)
+   *   guess  = 이름 유사도로 찾은 후보 (확인 필요)
+   *   none   = 못 찾음
+   */
+  matchKind: "linked" | "guess" | "none";
+  /** 이어붙은 작업이 있으면 그 계획일정 (시공사가 채워 온 값) */
+  planStart: string | null;
+  planEnd: string | null;
   /** 위 수량 비교로 시스템이 밀어보는 결론. 이미 반영됐으면 null */
   suggestedOutcome: "done" | "skipped" | null;
   /** 이미 이 해에 반영된 적이 있으면 그 결과 */
@@ -795,14 +817,22 @@ export interface ReconcileCandidate {
 }
 
 /**
- * 내역서 항목마다 이름이 가장 비슷한 공정관리 작업을 찾아 완료 여부를 제안한다.
- * (유사도 0.35 미만이면 매칭 없음으로 본다 — pg_trgm이 이미 설비 마스터 등에서
- * 쓰는 것과 같은 기준) 계약기간(프로젝트 종료일)이 지났는데 수량이 못 채워졌으면
- * "보수 안 함"을 제안하고, 아직 기간이 남았으면 제안하지 않는다(더 지켜봐야 하므로).
+ * 내역서 항목마다 대응하는 공정관리 작업을 찾아 완료 여부를 제안한다.
+ *
+ * 항목ID(statement_item_id)가 되돌아온 항목은 그 작업을 그대로 쓴다 — 추측이 아니다.
+ * 항목ID가 없으면 예전처럼 이름 유사도로 후보를 찾는다(0.35 미만은 매칭 없음으로 본다
+ * — pg_trgm이 설비 마스터 등에서 쓰는 것과 같은 기준).
+ *
+ * 계약기간(회차 종료일)이 지났는데 수량이 못 채워졌으면 "보수 안 함"을 제안하고,
+ * 아직 기간이 남았으면 제안하지 않는다(더 지켜봐야 하므로).
  */
-export async function suggestReconciliation(statementId: string): Promise<{
+export async function suggestReconciliation(
+  statementId: string,
+  projectId?: string | null,
+): Promise<{
   targetYear: number;
   candidates: ReconcileCandidate[];
+  linkedCount: number;
 }> {
   const statement = await queryOne<{ target_year: number }>(
     `select target_year from design_statement where id = $1`,
@@ -810,10 +840,20 @@ export async function suggestReconciliation(statementId: string): Promise<{
   );
   if (!statement) throw new Error("내역서를 찾을 수 없습니다.");
 
-  const project = await queryOne<{ end_date: string | null }>(
-    `select end_date::text from overhaul_project order by created_at limit 1`,
-  );
+  // 계약 종료 판단도, 공정관리 작업을 찾는 범위도 "이력을 반영하려는 그 회차" 기준이다.
+  // 회차를 안 주면 최신 회차를 쓴다.
+  const project = projectId
+    ? await queryOne<{ id: string; end_date: string | null }>(
+        `select id, end_date::text from overhaul_project where id = $1`,
+        [projectId],
+      )
+    : await queryOne<{ id: string; end_date: string | null }>(
+        `select id, end_date::text from overhaul_project
+          order by start_date desc nulls last, created_at desc limit 1`,
+      );
   const contractEnded = !!project?.end_date && new Date(project.end_date) < new Date();
+  // 회차가 하나도 없으면 매칭할 작업 자체가 없다 — 빈 uuid로 두면 후보가 안 잡힌다.
+  const scopeProjectId = project?.id ?? null;
 
   const rows = await query<{
     item_id: number;
@@ -822,35 +862,72 @@ export async function suggestReconciliation(statementId: string): Promise<{
     spec: string | null;
     grade: string | null;
     classification: string | null;
-    task_name: string | null;
-    plan_qty: number | null;
-    done_qty: number | null;
+    linked_name: string | null;
+    linked_plan_qty: number | null;
+    linked_done_qty: number | null;
+    linked_plan_start: string | null;
+    linked_plan_end: string | null;
+    guess_name: string | null;
+    guess_plan_qty: number | null;
+    guess_done_qty: number | null;
     existing_status: "done" | "skipped" | null;
   }>(
     `select i.id as item_id, i.plan_id, i.name, i.spec, i.grade, i.classification,
-            t.name as task_name, t.plan_qty::float8 as plan_qty, t.done_qty::float8 as done_qty,
+            lt.name as linked_name,
+            lt.plan_qty::float8 as linked_plan_qty,
+            lt.done_qty::float8 as linked_done_qty,
+            lt.plan_start::text as linked_plan_start,
+            lt.plan_end::text   as linked_plan_end,
+            gt.name as guess_name,
+            gt.plan_qty::float8 as guess_plan_qty,
+            gt.done_qty::float8 as guess_done_qty,
             r.status as existing_status
        from design_statement_item i
+       -- 1순위: 항목ID가 되돌아와 정확히 이어진 작업 (같은 항목에서 여러 건이
+       -- 나올 일은 없지만, 방어적으로 진척이 가장 앞선 한 건만 본다)
+       left join lateral (
+         select name, plan_qty, done_qty, plan_start, plan_end
+           from overhaul_task
+          where statement_item_id = i.id
+            and project_id = $3
+          order by done_qty desc
+          limit 1
+       ) lt on true
+       -- 2순위: 이름 유사도 후보 (1순위가 있으면 계산하지 않는다).
+       -- 반드시 이 회차 안에서만 찾는다 — 회차가 여럿이라 범위를 안 좁히면
+       -- 2027년 작업이 2026년 내역서의 후보로 잡혀, 하지도 않은 보수가
+       -- 완료로 기록될 수 있다.
        left join lateral (
          select name, plan_qty, done_qty
            from overhaul_task
-          where similarity(name, i.name) > 0.35
+          where lt.name is null
+            and project_id = $3
+            and similarity(name, i.name) > 0.35
           order by similarity(name, i.name) desc
           limit 1
-       ) t on true
+       ) gt on true
        left join maintenance_record r on r.plan_id = i.plan_id and r.done_year = $2
       where i.statement_id = $1
       order by i.category nulls last, i.seq`,
-    [statementId, statement.target_year],
+    [statementId, statement.target_year, scopeProjectId],
   );
 
+  let linkedCount = 0;
   const candidates: ReconcileCandidate[] = rows.map((r) => {
+    const linked = r.linked_name != null;
+    if (linked) linkedCount++;
+
+    const taskName = linked ? r.linked_name : r.guess_name;
+    const planQty = linked ? r.linked_plan_qty : r.guess_plan_qty;
+    const doneQty = linked ? r.linked_done_qty : r.guess_done_qty;
+
     let suggestedOutcome: "done" | "skipped" | null = null;
-    if (!r.existing_status && r.task_name) {
-      const complete = r.plan_qty != null && r.done_qty != null && r.done_qty >= r.plan_qty;
+    if (!r.existing_status && taskName) {
+      const complete = planQty != null && doneQty != null && doneQty >= planQty;
       if (complete) suggestedOutcome = "done";
       else if (contractEnded) suggestedOutcome = "skipped";
     }
+
     return {
       itemId: r.item_id,
       planId: r.plan_id,
@@ -858,15 +935,18 @@ export async function suggestReconciliation(statementId: string): Promise<{
       spec: r.spec,
       grade: r.grade,
       classification: r.classification,
-      suggestedTaskName: r.task_name,
-      suggestedPlanQty: r.plan_qty,
-      suggestedDoneQty: r.done_qty,
+      suggestedTaskName: taskName,
+      suggestedPlanQty: planQty,
+      suggestedDoneQty: doneQty,
+      matchKind: linked ? "linked" : taskName ? "guess" : "none",
+      planStart: linked ? r.linked_plan_start : null,
+      planEnd: linked ? r.linked_plan_end : null,
       suggestedOutcome,
       existingStatus: r.existing_status,
     };
   });
 
-  return { targetYear: statement.target_year, candidates };
+  return { targetYear: statement.target_year, candidates, linkedCount };
 }
 
 /** "계획에 없던 추가 보수" 대상을 찾을 때 쓰는 가벼운 설비 검색 (사용중지 제외) */
@@ -896,24 +976,30 @@ export interface ReconcileDecision {
 /**
  * 사람이 확인한 결정을 한 번에 이력으로 남기고, 내역서를 "반영 완료"로 표시한다.
  * 반복 실행해도 안전하다 — done_year가 같으면 덮어쓴다.
+ *
+ * projectId를 함께 남긴다. 그래야 나중에 "이 보수는 어느 회차에서 했는지"를
+ * 되짚을 수 있다 (maintenance_record.project_id).
  */
 export async function reconcileStatement(params: {
   statementId: string;
   targetYear: number;
   decisions: ReconcileDecision[];
+  projectId?: string | null;
 }): Promise<{ recorded: number }> {
   await transaction(async (tx) => {
     for (const d of params.decisions) {
       await tx.query(
-        `insert into maintenance_record (plan_id, done_year, grade, status, note)
-         values ($1,$2,$3,$4,$5)
+        `insert into maintenance_record (plan_id, done_year, grade, status, project_id, note)
+         values ($1,$2,$3,$4,$5,$6)
          on conflict (plan_id, done_year) do update
-           set grade = excluded.grade, status = excluded.status, note = excluded.note`,
+           set grade = excluded.grade, status = excluded.status,
+               project_id = excluded.project_id, note = excluded.note`,
         [
           d.planId,
           params.targetYear,
           d.outcome === "done" ? (d.grade ?? null) : null,
           d.outcome,
+          params.projectId ?? null,
           d.note ?? (d.outcome === "skipped" ? "계약변경으로 미시행" : null),
         ],
       );

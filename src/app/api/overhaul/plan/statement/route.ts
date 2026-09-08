@@ -35,13 +35,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "선택된 항목이 없습니다." }, { status: 400 });
     }
 
-    const { statementId } = await createDesignStatement({
+    const { statementId, items: saved } = await createDesignStatement({
       targetYear,
       field: body.field ?? null,
       title: String(body.title ?? `${targetYear}년도 정기점검보수공사`),
       items,
     });
-    return NextResponse.json({ ok: true, statementId });
+    // 저장된 항목을 그대로 돌려준다 — 화면이 이걸로 엑셀을 뽑아야
+    // 각 행에 "항목ID"가 실린다 (되돌아왔을 때 정확히 이어붙는 표식).
+    return NextResponse.json({ ok: true, statementId, items: saved });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : String(e) },

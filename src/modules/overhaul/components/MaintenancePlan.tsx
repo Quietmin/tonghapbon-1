@@ -70,10 +70,26 @@ interface Summary {
 
 interface Payload {
   targetYear: number;
+  /** 서버가 실제로 걸러서 준 분야 (null이면 전체) */
+  field: string | null;
   availableYears: number[];
+  /** 등록된 계획에 실제로 들어있는 분야들 */
+  availableFields: string[];
   sources: PlanSource[];
   summary: Summary;
   rows: PlanRow[];
+}
+
+/** 저장된 수량산출서 항목 — 엑셀로 뽑을 때 항목ID를 실어야 해서 저장 결과를 그대로 쓴다 */
+interface SavedStatementItem {
+  id: number;
+  category: string | null;
+  name: string;
+  spec: string | null;
+  qty: number;
+  unit: string;
+  grade: string | null;
+  note: string | null;
 }
 
 type Tab = "필수" | "선택" | "불필요" | "참고";
@@ -89,7 +105,14 @@ export default function MaintenancePlan() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [field, setField] = useState("전기");
+  /** 목록을 거르는 분야. "전체"면 안 거른다 */
+  const [field, setField] = useState("전체");
+  /**
+   * 업로드할 계획 파일의 분야. 보기 필터와 일부러 분리했다 —
+   * "전체"로 보다가 파일을 올리면 분야가 안 붙은 채 저장돼, 그 뒤로 분야 필터에
+   * 영원히 안 걸리는 함정이 생긴다.
+   */
+  const [uploadField, setUploadField] = useState("전기");
   const [tab, setTab] = useState<Tab>("필수");
   const [q, setQ] = useState("");
   /** 연도별 판정(수량산출서용) ↔ 전체 설비 장기 현황(30년 추적용) ↔ 확정 내역서(이력 반영) */
@@ -100,18 +123,26 @@ export default function MaintenancePlan() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /** 항목별로 고친 단위 — 기본 EA */
   const [units, setUnits] = useState<Record<string, string>>({});
+  /** 확정 저장 결과 안내 */
+  const [confirmed, setConfirmed] = useState<{ count: number; year: number } | null>(null);
 
-  const load = useCallback(async (year?: number) => {
-    setLoading(true);
-    const url = year ? `/api/overhaul/plan?year=${year}` : "/api/overhaul/plan";
-    const json = await (await fetch(url)).json();
-    if (json.ok) setData(json);
-    else setError(json.error);
-    setLoading(false);
-  }, []);
+  const load = useCallback(
+    async (year?: number, viewField?: string) => {
+      setLoading(true);
+      const sp = new URLSearchParams();
+      if (year) sp.set("year", String(year));
+      sp.set("field", viewField ?? field);
+      const json = await (await fetch(`/api/overhaul/plan?${sp}`)).json();
+      if (json.ok) setData(json);
+      else setError(json.error);
+      setLoading(false);
+    },
+    [field],
+  );
 
   useEffect(() => {
     void load();
+    // load는 field가 바뀔 때마다 새로 만들어지므로, 분야를 바꾸면 목록이 다시 온다
   }, [load]);
 
   // 연도가 바뀌면 필수 항목을 기본 선택으로 채운다 (O/H만)
@@ -134,11 +165,11 @@ export default function MaintenancePlan() {
         return;
       }
       setError(null);
-      setBusy(`${excel[0].name} 분석 중…`);
+      setBusy(`${excel.map((f) => f.name).join(", ")} 분석 중…`);
       try {
         const fd = new FormData();
         for (const f of excel) fd.append("file", f);
-        fd.append("field", field);
+        fd.append("field", uploadField);
         const json = await (
           await fetch("/api/overhaul/plan/upload", { method: "POST", body: fd })
         ).json();
@@ -150,7 +181,7 @@ export default function MaintenancePlan() {
         setBusy(null);
       }
     },
-    [field, load, data?.targetYear],
+    [uploadField, load, data?.targetYear],
   );
 
   const removeSource = useCallback(
@@ -167,6 +198,7 @@ export default function MaintenancePlan() {
   const visible = useMemo(() => {
     const kw = q.trim().toLowerCase();
     return rows.filter((r) => {
+      if (field !== "전체" && r.field !== field) return false;
       // "참고" 탭 = O/H가 아닌 것들 (경상정비·용역 등). 내역서에는 안 들어간다
       if (tab === "참고") {
         if (r.isOverhaul) return false;
@@ -180,7 +212,7 @@ export default function MaintenancePlan() {
       }
       return true;
     });
-  }, [rows, tab, q]);
+  }, [rows, tab, q, field]);
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -206,33 +238,21 @@ export default function MaintenancePlan() {
   /** 선택된 항목을 원본 순서대로 — 엑셀 출력·저장에 함께 쓴다 */
   const chosen = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);
 
-  const exportExcel = useCallback(() => {
+  /**
+   * 수량산출서 확정 — 저장하고, 저장된 항목으로 엑셀을 뽑는다.
+   *
+   * 저장과 엑셀 출력을 한 동작으로 묶은 이유: 엑셀 각 행에 실어 보내는 "항목ID"는
+   * 저장하고 나서야 생긴다. 저장 없이 뽑은 파일은 그 표식이 없어서, 시공사가
+   * 되돌려줬을 때 어느 항목인지 이어붙일 수 없다.
+   */
+  const confirmAndExport = useCallback(async () => {
     if (!data || !chosen.length) return;
+    const statementField = field !== "전체" ? field : (chosen[0].field ?? null);
     const title = `${data.targetYear}년도 정기점검보수공사`;
-    exportDesignStatement({
-      title,
-      items: chosen.map((r) => ({
-        category: r.category,
-        name: r.name,
-        spec: r.spec,
-        qty: 1,
-        unit: units[r.id] ?? "EA",
-        grade: r.plannedGrade,
-        note: [
-          r.tag_no && r.tag_no !== "-" ? r.tag_no : null,
-          r.judge.classification === "선택" ? "선택 판단" : null,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-      })),
-      fileName: `수량산출서_${data.targetYear}_${field}.xlsx`,
-    });
-  }, [data, chosen, units, field]);
 
-  const saveStatement = useCallback(async () => {
-    if (!data || !chosen.length) return;
-    setBusy("수량산출서 저장 중…");
+    setBusy("수량산출서 확정 중…");
     setError(null);
+    setConfirmed(null);
     try {
       const json = await (
         await fetch("/api/overhaul/plan/statement", {
@@ -240,8 +260,8 @@ export default function MaintenancePlan() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             targetYear: data.targetYear,
-            field,
-            title: `${data.targetYear}년도 정기점검보수공사`,
+            field: statementField,
+            title,
             items: chosen.map((r) => ({
               planId: r.id,
               category: r.category,
@@ -257,6 +277,23 @@ export default function MaintenancePlan() {
         })
       ).json();
       if (!json.ok) throw new Error(json.error ?? "저장에 실패했습니다.");
+
+      const saved: SavedStatementItem[] = json.items ?? [];
+      exportDesignStatement({
+        title,
+        items: saved.map((it) => ({
+          category: it.category,
+          name: it.name,
+          spec: it.spec,
+          qty: it.qty,
+          unit: it.unit,
+          grade: it.grade,
+          note: it.note,
+          itemId: it.id,
+        })),
+        fileName: `수량산출서_${data.targetYear}_${statementField ?? "전체"}.xlsx`,
+      });
+      setConfirmed({ count: saved.length, year: data.targetYear });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -288,21 +325,33 @@ export default function MaintenancePlan() {
             <Icon name="event_repeat" className="text-base text-primary" />
             중장기 유지보수 관리계획
           </h2>
-          <div className="flex items-center gap-2">
-            <span className="text-label-caps uppercase text-on-surface-variant">분야</span>
-            {["기계", "전기", "제어"].map((f) => (
-              <button
-                key={f}
-                onClick={() => setField(f)}
-                className={`px-3 py-1.5 rounded-full text-sm font-bold transition-colors ${
-                  field === f
-                    ? "bg-primary text-on-primary"
-                    : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                }`}
-              >
-                {f}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-label-caps uppercase text-on-surface-variant">분야 보기</span>
+            {["전체", "기계", "전기", "제어"].map((f) => {
+              const empty =
+                f !== "전체" &&
+                (data?.availableFields?.length ?? 0) > 0 &&
+                !data!.availableFields.includes(f);
+              return (
+                <button
+                  key={f}
+                  onClick={() => {
+                    setField(f);
+                    setSelected(new Set());
+                  }}
+                  title={empty ? "이 분야로 등록된 계획이 없습니다" : undefined}
+                  className={`px-3 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                    field === f
+                      ? "bg-primary text-on-primary"
+                      : empty
+                        ? "bg-surface-container-high text-on-surface-variant/40"
+                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                  }`}
+                >
+                  {f}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -329,7 +378,33 @@ export default function MaintenancePlan() {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : null}
+
+        {/* 등록 영역 — 이미 올린 계획이 있어도 계속 열어 둔다.
+            분야마다 파일이 따로 오므로(기계·전기·제어) 한 번 올리고 닫히면 안 된다. */}
+        <div className={hasPlan ? "mt-4 pt-4 border-t border-border-subtle" : ""}>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="text-label-caps uppercase text-on-surface-variant">
+              등록할 파일의 분야
+            </span>
+            {["기계", "전기", "제어"].map((f) => (
+              <button
+                key={f}
+                onClick={() => setUploadField(f)}
+                className={`px-3 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                  uploadField === f
+                    ? "bg-primary text-on-primary"
+                    : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+            <span className="text-xs text-on-surface-variant">
+              올리는 파일의 설비가 전부 이 분야로 저장됩니다.
+            </span>
+          </div>
+
           <div
             onClick={() => inputRef.current?.click()}
             onDragOver={(e) => e.preventDefault()}
@@ -337,24 +412,30 @@ export default function MaintenancePlan() {
               e.preventDefault();
               upload(Array.from(e.dataTransfer.files));
             }}
-            className="cursor-pointer py-10 px-6 flex flex-col items-center text-center border-2 border-dashed border-outline-variant rounded-xl hover:border-primary hover:bg-primary/5 transition-colors"
+            className="cursor-pointer py-8 px-6 flex flex-col items-center text-center border-2 border-dashed border-outline-variant rounded-xl hover:border-primary hover:bg-primary/5 transition-colors"
           >
             <Icon
               name={busy ? "hourglass_top" : "upload_file"}
               className="text-3xl text-on-surface-variant mb-2"
             />
             <p className="text-title-sm text-on-surface">
-              {busy ?? "중장기 유지보수 관리계획 엑셀을 넣으세요"}
+              {busy ??
+                (hasPlan
+                  ? `${uploadField} 관리계획 엑셀을 추가로 넣으세요`
+                  : "중장기 유지보수 관리계획 엑셀을 넣으세요")}
             </p>
             <p className="text-sm text-on-surface-variant mt-1">
-              한 번만 등록하면 됩니다. 매년 다시 넣을 필요 없습니다.
+              분야별로 한 번씩만 등록하면 됩니다. 매년 다시 넣을 필요 없습니다. · 여러 개 한
+              번에 가능
             </p>
           </div>
-        )}
+        </div>
+
         <input
           ref={inputRef}
           type="file"
           accept=".xlsx,.xlsm,.xls"
+          multiple
           hidden
           onChange={(e) => {
             upload(Array.from(e.target.files ?? []));
@@ -638,18 +719,33 @@ export default function MaintenancePlan() {
                   나갑니다. 시공사가 그 칸을 채워 보내면 업로드 분석 화면에 넣어 공정관리를
                   시작하세요.
                 </p>
+                <p className="text-sm text-on-surface-variant mt-1.5">
+                  맨 끝 <b>항목ID</b> 열은 지우지 말라고 안내하세요. 그 열이 남아 있어야
+                  되돌아온 파일이 이 내역서와 정확히 이어지고, 준공 후 이력 반영이 자동으로
+                  맞춰집니다.
+                </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="ghost" onClick={saveStatement} disabled={!selected.size || !!busy}>
-                  <Icon name="save" className="text-base" />
-                  이력 저장
-                </Button>
-                <Button onClick={exportExcel} disabled={!selected.size}>
+                <Button onClick={confirmAndExport} disabled={!selected.size || !!busy}>
                   <Icon name="table_view" className="text-base" />
-                  수량산출서 엑셀
+                  {busy ? "만드는 중…" : "확정하고 엑셀 내보내기"}
                 </Button>
               </div>
             </div>
+
+            {confirmed && (
+              <p className="text-sm text-status-success font-bold flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border-subtle">
+                <Icon name="check_circle" className="text-base" />
+                {confirmed.year}년도 수량산출서 {confirmed.count}건을 확정하고 엑셀로
+                내보냈습니다.
+                <button
+                  onClick={() => setView("내역서")}
+                  className="underline decoration-status-success/40"
+                >
+                  확정 내역서 보기
+                </button>
+              </p>
+            )}
           </Card>
           </>
           )}

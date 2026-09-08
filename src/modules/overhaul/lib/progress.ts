@@ -103,22 +103,9 @@ export function taskStatus(task: ProgressTask): "완료" | "진행중" | "대기
   return "대기";
 }
 
-/**
- * 지연 위험 공정: 계획 대비 실적이 임계치 이상 뒤처진 미완료 작업.
- *
- * 여기서 쓰는 expected는 기간 경과 비율(선형)이다. 엑셀 예정일 기반의 더 정밀한
- * 판정은 schedule.ts(공정표)를 이식할 때 들어온다.
- */
-export function delayRiskTasks<T extends ProgressTask>(
-  tasks: T[],
-  expected: number,
-  threshold = 15,
-): T[] {
-  return tasks.filter((t) => {
-    const p = taskProgress(t);
-    return p < 100 && expected - p >= threshold;
-  });
-}
+// 지연 위험 판정은 여기 없다. schedule.ts의 scheduleDelayTasks가 유일한 구현이다.
+// (예전엔 "기간 경과 비율" 기준 함수가 여기에도 있었지만 아무도 부르지 않았고,
+//  임계치가 두 곳에 흩어져 한쪽만 고치는 사고가 나기 쉬웠다)
 
 export function fieldColor(field: string | null): "primary" | "success" | "error" | "info" {
   if (field === "기계") return "primary";

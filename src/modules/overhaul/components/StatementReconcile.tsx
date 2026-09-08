@@ -7,8 +7,11 @@ import { Card, Icon, Button } from "@/shared/components/ui";
  * 준공 후 "이력 반영" — 확정했던 수량산출서를 실제 결과와 맞춰보고 보수계획의
  * 과거 이력(maintenance_record)으로 넘긴다.
  *
- * overhaul_task와 이름으로만 참고 매칭해서 완료 여부를 "제안"할 뿐, 확정은 항상
- * 사람이 한다 — 계약이 바뀌어 안 한 것과 시스템이 못 찾은 것을 구분할 수 없기 때문.
+ * 공정관리 작업을 찾는 방법이 두 가지이고, 화면에서 구분해서 보여준다.
+ *   연결 — 수량산출서에 실어 보낸 "항목ID"가 되돌아와 정확히 이어진 것. 믿을 수 있다.
+ *   추정 — 항목ID가 없어 이름 유사도로 찾은 후보. 눈으로 확인해야 한다.
+ * 어느 쪽이든 확정은 항상 사람이 한다 — 계약이 바뀌어 안 한 것과 시스템이 못 찾은
+ * 것을 시스템은 구분할 수 없기 때문이다.
  */
 
 type Outcome = "done" | "skipped" | "pending";
@@ -23,6 +26,10 @@ interface Candidate {
   suggestedTaskName: string | null;
   suggestedPlanQty: number | null;
   suggestedDoneQty: number | null;
+  /** linked = 항목ID로 확정 · guess = 이름 유사도 추정 · none = 못 찾음 */
+  matchKind: "linked" | "guess" | "none";
+  planStart: string | null;
+  planEnd: string | null;
   suggestedOutcome: "done" | "skipped" | null;
   existingStatus: "done" | "skipped" | null;
 }
@@ -61,6 +68,8 @@ export default function StatementReconcile({
   >([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** 항목ID로 정확히 이어진 항목 수 — 안내 문구를 이 값에 따라 바꾼다 */
+  const [linkedCount, setLinkedCount] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -73,6 +82,7 @@ export default function StatementReconcile({
           return;
         }
         setCandidates(json.candidates);
+        setLinkedCount(json.linkedCount ?? 0);
         const initDecisions = new Map<number, Outcome>();
         const initGrades = new Map<number, string>();
         for (const c of json.candidates as Candidate[]) {
@@ -179,9 +189,25 @@ export default function StatementReconcile({
         </button>
       </div>
       <p className="text-sm text-on-surface-variant mb-4">
-        각 항목을 <b>완료 · 안 함 · 보류</b> 중 하나로 확인하세요. 제안은 공정관리 실적 이름을
-        참고해 시스템이 짐작한 것일 뿐이니, 실제로 확인한 대로 눌러 주세요. 보류로 두면 이번엔
-        반영하지 않고 다음에 다시 확인할 수 있습니다.
+        각 항목을 <b>완료 · 안 함 · 보류</b> 중 하나로 확인하세요. 보류로 두면 이번엔 반영하지
+        않고 다음에 다시 확인할 수 있습니다.
+        {candidates && (
+          <span className="block mt-1">
+            {linkedCount > 0 ? (
+              <>
+                <b className="text-status-success">{linkedCount}건</b>은 수량산출서의 항목ID가
+                되돌아와 정확히 이어졌습니다(<b>연결</b>). 나머지는 이름으로 짐작한
+                것이니(<b>추정</b>) 눈으로 확인하세요.
+              </>
+            ) : (
+              <>
+                되돌아온 파일에 항목ID가 없어 전부 이름으로 짐작했습니다(<b>추정</b>). 다음
+                회차에는 수량산출서 엑셀의 맨 끝 <b>항목ID</b> 열을 지우지 말라고 시공사에
+                안내하면 이 확인이 자동으로 맞춰집니다.
+              </>
+            )}
+          </span>
+        )}
         {statement.reconciled_at && (
           <span className="block mt-1 text-status-warning">
             이미 {statement.reconciled_at.slice(0, 10)}에 반영된 내역서입니다 — 다시 반영하면 값을
@@ -210,10 +236,30 @@ export default function StatementReconcile({
                     {c.spec ?? "—"}
                     {c.suggestedTaskName && (
                       <>
-                        {" · 참고: "}
+                        {" · "}
+                        <span
+                          className={`font-bold ${
+                            c.matchKind === "linked" ? "text-status-success" : "text-status-warning"
+                          }`}
+                          title={
+                            c.matchKind === "linked"
+                              ? "수량산출서의 항목ID가 되돌아와 정확히 이어진 작업입니다"
+                              : "이름이 비슷한 작업을 찾은 것입니다 — 확인이 필요합니다"
+                          }
+                        >
+                          {c.matchKind === "linked" ? "연결" : "추정"}
+                        </span>
+                        {": "}
                         <span className="font-mono-data">{c.suggestedTaskName}</span>
                         {c.suggestedPlanQty != null && (
                           <> ({c.suggestedDoneQty ?? 0}/{c.suggestedPlanQty})</>
+                        )}
+                        {c.planStart && (
+                          <span className="font-mono-data">
+                            {" · "}
+                            {c.planStart.slice(5)}
+                            {c.planEnd ? `~${c.planEnd.slice(5)}` : ""}
+                          </span>
                         )}
                       </>
                     )}

@@ -39,10 +39,13 @@ export const NAV_GROUPS: NavGroup[] = [
       // ── ① 계약 전: 이번 오버홀에서 무엇을 할지 정하는 단계 ──────────────
       { href: "/overhaul/plan", label: "보수계획", icon: "event_note", section: "계약 전 — 보수계획 수립" },
       // ── ② 계약 후: 체결 후 실제로 진행·기록하는 단계 ────────────────────
+      { href: "/overhaul/project", label: "회차 관리", icon: "engineering", section: "계약 후 — 공정관리" },
       { href: "/overhaul", label: "대시보드", icon: "dashboard", exact: true, section: "계약 후 — 공정관리" },
       { href: "/overhaul/upload", label: "업로드 분석", icon: "analytics", section: "계약 후 — 공정관리" },
       { href: "/overhaul/tasks", label: "작업 관리", icon: "format_list_bulleted", section: "계약 후 — 공정관리" },
       { href: "/overhaul/schedule", label: "공정표", icon: "calendar_view_week", section: "계약 후 — 공정관리" },
+      // 분해 전·후 사진은 실적 입력 화면에서 날짜별로 함께 다룬다.
+      // 별도 사진 화면은 두지 않는다 (실적과 떨어져 있으면 두 곳을 오가야 한다).
       { href: "/overhaul/entry", label: "실적 입력", icon: "edit_note", section: "계약 후 — 공정관리" },
       { href: "/overhaul/reports", label: "보고서", icon: "summarize", section: "계약 후 — 공정관리" },
     ],

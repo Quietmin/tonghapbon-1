@@ -5,12 +5,17 @@
 //
 //   0행: 공사명 : 2026년도 양산지사 정기점검보수공사
 //   1행: 수 량 산 출 서
-//   2행: 명 칭 | 규 격 | 수량 | 단위 | 작업 시작일 | 작업 종료일 | 등  급 | 비 고
+//   2행: 명 칭 | 규 격 | 수량 | 단위 | 작업 시작일 | 작업 종료일 | 등  급 | 비 고 | 항목ID
 //   3행~: 대분류 머리글(Ⅰ. 발전설비) → 그 그룹 항목들 → 다음 대분류 …
 //
 // 등급(A/B/C)은 명칭에 섞지 않고 별도 컬럼으로 뺀다 — 명칭은 순수 설비명만 담는다.
 // 작업 시작일·종료일은 비워서 내보낸다. 시공사가 이 칸을 채워 되돌려주면
 // 그 파일을 업로드 분석 화면에 넣어 공정관리로 이어진다.
+//
+// 맨 끝 "항목ID"는 design_statement_item.id다. 시공사가 손대지 않고 그대로
+// 되돌려주면 파서가 이 값을 읽어, 되돌아온 작업이 내역서의 어느 항목인지 정확히
+// 안다(이름 유사도로 추측하지 않는다). 지우고 보내와도 동작은 한다 — 그때는
+// 준공 후 이력 반영이 이름 유사도 제안으로 돌아간다.
 import * as XLSX from "xlsx";
 
 export interface StatementExportItem {
@@ -23,6 +28,8 @@ export interface StatementExportItem {
   /** A/B/C — 있으면 별도 "등급" 컬럼에 들어간다 */
   grade?: string | null;
   note: string | null;
+  /** design_statement_item.id — 되돌아왔을 때 이 항목이라고 알아보기 위한 표식 */
+  itemId?: number | null;
 }
 
 /** 아라비아 숫자를 로마숫자로 — 원본 내역서가 대분류에 Ⅰ, Ⅱ, Ⅲ … 를 쓴다 */
@@ -58,7 +65,7 @@ export function exportDesignStatement(params: {
   const aoa: (string | number)[][] = [
     [`공사명 : ${title}`],
     ["수 량 산 출 서"],
-    ["명 칭", "규 격", "수량", "단위", "작업 시작일", "작업 종료일", "등  급", "비 고"],
+    ["명 칭", "규 격", "수량", "단위", "작업 시작일", "작업 종료일", "등  급", "비 고", "항목ID"],
   ];
 
   // 대분류 순서를 항목 순서 그대로 유지하면서 그룹핑
@@ -83,6 +90,7 @@ export function exportDesignStatement(params: {
         "", // 작업 종료일 — 시공사가 채운다
         it.grade ? `${it.grade}급` : "",
         it.note ?? "",
+        it.itemId ?? "",
       ]);
     });
   });
@@ -97,11 +105,12 @@ export function exportDesignStatement(params: {
     { wch: 13 }, // 작업 종료일
     { wch: 9 },  // 등급
     { wch: 20 }, // 비고
+    { wch: 9 },  // 항목ID — 되돌아올 때의 표식. 지우지 않도록 안내한다
   ];
   // 공사명·제목 행은 표 너비만큼 병합
   ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
   ];
 
   const wb = XLSX.utils.book_new();

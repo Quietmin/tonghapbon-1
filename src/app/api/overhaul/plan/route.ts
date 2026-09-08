@@ -4,16 +4,20 @@ import {
   summarize,
   listPlanSources,
   listAvailableYears,
+  listPlanFields,
   deletePlanSource,
 } from "@/modules/overhaul/lib/maintenanceRepo";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET ?year=2026 → 그 연도 기준 보수 대상 판정 결과 전체 + 요약
+ * GET ?year=2026&field=전기 → 그 연도·분야의 보수 대상 판정 결과 + 요약
  *
  * 판정은 저장된 등급을 그대로 읽는 게 아니라 매번 계산한다.
  * (실적이 추가되면 별도 작업 없이 판정이 갱신되도록)
+ *
+ * field를 생략하거나 "전체"로 주면 분야를 가리지 않는다. 기계·전기·제어 계획을
+ * 함께 등록했을 때 목록이 섞이면 안 되므로, 화면은 보통 분야를 지정해서 부른다.
  */
 export async function GET(req: Request) {
   try {
@@ -29,13 +33,18 @@ export async function GET(req: Request) {
           ? thisYear
           : (years[years.length - 1] ?? thisYear);
 
-    const rows = await listJudgedPlans(targetYear);
+    const fieldRaw = (sp.get("field") ?? "").trim();
+    const field = fieldRaw && fieldRaw !== "전체" ? fieldRaw : null;
+
+    const rows = await listJudgedPlans(targetYear, field);
     const sources = await listPlanSources();
 
     return NextResponse.json({
       ok: true,
       targetYear,
+      field,
       availableYears: years,
+      availableFields: await listPlanFields(),
       sources,
       summary: summarize(rows),
       rows,

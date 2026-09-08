@@ -23,6 +23,23 @@ export async function POST(req: Request) {
     if (!taskId || !date) {
       return NextResponse.json({ ok: false, error: "taskId·date가 필요합니다." }, { status: 400 });
     }
+    // 사진은 보낸 것만 반영한다. photos 키가 없으면 저장된 사진을 그대로 둔다 —
+    // 화면이 이미지 원본을 들고 있지 않아서, 안 그러면 메모만 고쳐도 사진이 날아간다.
+    const photos = body.photos
+      ? {
+          keepIds: Array.isArray(body.photos.keepIds) ? body.photos.keepIds.map(Number) : [],
+          add: Array.isArray(body.photos.add)
+            ? body.photos.add
+                .filter((a: unknown): a is { slot: string; dataUrl: string } =>
+                  !!a && typeof (a as { dataUrl?: unknown }).dataUrl === "string")
+                .map((a: { slot: string; dataUrl: string }) => ({
+                  slot: a.slot === "after" ? ("after" as const) : ("before" as const),
+                  dataUrl: a.dataUrl,
+                }))
+            : [],
+        }
+      : undefined;
+
     await upsertEntry({
       taskId,
       date,
@@ -30,8 +47,7 @@ export async function POST(req: Request) {
       workDetail: body.workDetail,
       delayReason: body.delayReason,
       nextPlan: body.nextPlan,
-      photoBefore: body.photoBefore,
-      photoAfter: body.photoAfter,
+      ...(photos ? { photos } : {}),
     });
     const task = await getTask(taskId);
     const entries = await listEntries(taskId);

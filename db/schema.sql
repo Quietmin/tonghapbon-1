@@ -175,7 +175,8 @@ create trigger overhaul_task_set_updated_at before update on overhaul_task
 
 -- 실적 입력 — 날짜별로 독립 저장하고, 항목별 정비 이력 타임라인으로 되짚어 본다.
 -- done_qty는 그날의 증가분이 아니라 "그날까지의 누적 완료수량"이다.
--- overhaul_task.done_qty(공정률 계산에 쓰임)는 이 중 최댓값으로 갱신된다.
+-- overhaul_task.done_qty(공정률 계산에 쓰임)는 이 중 '가장 최근 날짜'의 값으로 갱신된다
+-- (최댓값이 아니다 — 그래야 오입력을 정정할 수 있다. repo.recomputeTaskDoneQty 참고)
 create table if not exists overhaul_entry (
   id            uuid primary key default gen_random_uuid(),
   task_id       uuid not null references overhaul_task(id) on delete cascade,
@@ -185,10 +186,8 @@ create table if not exists overhaul_entry (
   delay_reason  text,
   -- 익일 계획 / 조치계획
   next_plan     text,
-  -- 개발 단계라 사진은 base64로 그대로 저장한다. 실제 저장소를 붙이면
-  -- 파일 경로 문자열(.data/uploads/overhaul-photos/…)로 바뀔 자리다.
-  photo_before  text,
-  photo_after   text,
+  -- 사진은 overhaul_entry_photo에 따로 담는다 (아래 참고).
+  -- 예전에는 여기 photo_before/photo_after 컬럼 두 개로 한 장씩만 담았다.
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   unique (task_id, entry_date)
@@ -202,6 +201,49 @@ create index if not exists overhaul_entry_task_idx on overhaul_entry (task_id, e
 drop trigger if exists overhaul_entry_set_updated_at on overhaul_entry;
 create trigger overhaul_entry_set_updated_at before update on overhaul_entry
   for each row execute function set_updated_at();
+
+
+-- 분해 전·후 사진. 한 날짜에 여러 장을 넣을 수 있어야 하므로 별도 테이블이다.
+-- (예전에는 overhaul_entry.photo_before/photo_after 컬럼 두 개여서 각 한 장뿐이었다)
+--
+-- 사진은 업로드 전에 브라우저에서 긴 변 1600px·JPEG로 줄여서 올린다
+-- (src/modules/overhaul/lib/imageCompress.ts). 원본은 보관하지 않는다는 전제이므로
+-- 줄인 결과를 base64 data URL로 그대로 담는다. 실제 파일 저장소를 붙이면
+-- data 컬럼이 경로 문자열로 바뀔 자리다.
+create table if not exists overhaul_entry_photo (
+  id         bigint generated always as identity primary key,
+  entry_id   uuid not null references overhaul_entry(id) on delete cascade,
+  /** before = 분해 전 · after = 분해 후 */
+  slot       text not null,
+  /** 같은 slot 안에서의 표시 순서 (1부터) */
+  seq        integer not null default 1,
+  /** data:image/jpeg;base64,... */
+  data       text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists overhaul_entry_photo_entry_idx
+  on overhaul_entry_photo (entry_id, slot, seq);
+
+-- 예전 방식(컬럼 2개)으로 저장된 사진을 새 테이블로 옮기고 컬럼을 없앤다.
+-- 컬럼이 이미 사라졌으면 아무 일도 하지 않으므로 여러 번 실행해도 안전하다.
+-- (두 곳에 사진을 두면 어느 쪽이 진짜인지 알 수 없어 반드시 한쪽만 남긴다)
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+     where table_name = 'overhaul_entry' and column_name = 'photo_before'
+  ) then
+    insert into overhaul_entry_photo (entry_id, slot, seq, data)
+    select id, 'before', 1, photo_before from overhaul_entry where photo_before is not null;
+
+    insert into overhaul_entry_photo (entry_id, slot, seq, data)
+    select id, 'after', 1, photo_after from overhaul_entry where photo_after is not null;
+
+    alter table overhaul_entry drop column photo_before;
+    alter table overhaul_entry drop column photo_after;
+  end if;
+end $$;
 
 
 -- ============================================================================
@@ -526,12 +568,29 @@ alter table design_statement_item add column if not exists grade text;
 create index if not exists design_statement_item_stmt_idx on design_statement_item (statement_id, category, seq);
 
 
+-- ── 계획 ↔ 실행을 잇는 고리 ────────────────────────────────────────────────
+-- 수량산출서를 엑셀로 뽑을 때 맨 끝에 "항목ID" 컬럼(= design_statement_item.id)을
+-- 함께 내보낸다. 시공사가 일정을 채워 되돌려준 그 파일을 업로드 분석에 넣으면
+-- 파서가 이 값을 읽어 아래 컬럼에 넣는다. 그래서 이름 유사도로 추측하지 않고
+-- "이 작업은 그 내역서 몇 번째 항목"이라고 정확히 말할 수 있다.
+--
+-- 항목ID 컬럼이 지워진 파일(수기 작성 내역서 등)이면 그냥 null이 되고, 준공 후
+-- 이력 반영은 예전처럼 이름 유사도 제안으로 넘어간다 — 선택적 고리다.
+-- overhaul_task보다 design_statement_item이 뒤에 정의되므로 여기서 alter로 붙인다.
+alter table overhaul_task
+  add column if not exists statement_item_id bigint
+    references design_statement_item(id) on delete set null;
+
+create index if not exists overhaul_task_statement_item_idx
+  on overhaul_task (statement_item_id);
+
+
 -- ============================================================================
 -- 첨부파일에 대하여
 --
 -- 파일 자체는 DB에 넣지 않는다. 아래 컬럼들이 파일 위치만 문자열로 들고 있다.
 --   failure_attachment.storage_path   고장이력 첨부
---   overhaul_entry.photo_before/after 분해 전·후 사진
+--   overhaul_entry_photo.data         분해 전·후 사진 (지금은 줄인 base64를 직접 담는다)
 --   document.storage_path             준공도서 PDF
 --
 -- 지금은 프로젝트 안 .data/uploads/ 에 저장한다(로컬 개발). 나중에 파일 저장소를
