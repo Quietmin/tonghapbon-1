@@ -3,6 +3,7 @@ import "./globals.css";
 import Sidebar from "@/shared/components/Sidebar";
 import Header from "@/shared/components/Header";
 import MobileNav from "@/shared/components/MobileNav";
+import DdasomiChatbot from "@/modules/overhaul/components/chatbot/DdasomiChatbot";
 
 export const metadata: Metadata = {
   title: "Plant Ops Hub — 공정·고장이력·정비문서 통합",
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </main>
           <MobileNav />
         </div>
+        <DdasomiChatbot />
       </body>
     </html>
   );
