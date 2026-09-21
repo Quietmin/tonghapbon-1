@@ -122,7 +122,7 @@ export default function ChatbotWindow({
       {/* 대화 영역 */}
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         {messages.map((m, i) => (
-          <ChatMessage key={i} message={m} onPick={onAsk} />
+          <ChatMessage key={i} message={m} onPick={onAsk} isLatest={i === messages.length - 1 && m.role === "assistant"} />
         ))}
         {messages.length === 1 && !pending && (
           <div className="flex flex-wrap gap-2 pl-[42px]">
