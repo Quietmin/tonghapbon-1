@@ -1,4 +1,4 @@
-// 따소미 챗봇 응답 결정 로직 — DdasomiChatbot.tsx의 상태 관리에서 분리해 순수 함수로 테스트 가능하게 유지한다.
+// 따소미 챗봇 응답 결정 로직 — UI(ChatbotDock 등)의 상태 관리에서 분리해 순수 함수로 테스트 가능하게 유지한다.
 //
 // 원본: AI-Do-Sample/src/lib/ddasomiChat.js (그대로)
 import { answerQuestion, type AnswerKind } from "./chatbotRules";

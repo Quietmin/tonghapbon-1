@@ -12,11 +12,14 @@ import {
   useState,
 } from "react";
 import { Icon } from "./ui";
-import { getDdasomiReply } from "@/modules/overhaul/lib/ddasomiChat";
+import { getDdasomiReply, type DdasomiReply } from "@/modules/overhaul/lib/ddasomiChat";
 import { askDdasomi } from "@/modules/overhaul/lib/chatbotAI";
 import type { ChatbotSnapshot } from "@/modules/overhaul/lib/chatbotSnapshot";
 import DdasomiLoading from "@/modules/overhaul/components/chatbot/DdasomiLoading";
 import "@/modules/overhaul/components/chatbot/ddasomi.css";
+
+/** 빈 화면·질문창 아래에 항상 보여주는 예시 질문 — 오버홀/고장이력 도메인을 둘 다 보여준다 */
+const QUICK_QUESTIONS = ["전체 공정률 알려줘", "지연 위험 작업 알려줘", "최근 고장이력 보여줘", "설비별 고장 현황 알려줘"];
 
 /**
  * 정비 챗봇 도크 — 메뉴가 아니라 모든 화면 위에 떠 있는 창.
@@ -98,6 +101,8 @@ interface Msg {
   id: number;
   role: "user" | "bot";
   text: string;
+  kind?: DdasomiReply["kind"];
+  suggestions?: string[];
 }
 
 let msgSeq = 0;
@@ -153,8 +158,8 @@ export default function ChatbotDock() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [msgs]);
 
-  async function send() {
-    const q = input.trim();
+  /** 입력창 텍스트뿐 아니라 퀵 질문·제안 버튼 클릭에서도 재사용한다 */
+  async function sendText(q: string) {
     if (!q || pending) return;
     setInput("");
     setMsgs((prev) => [...prev, { id: (msgSeq += 1), role: "user", text: q }]);
@@ -167,7 +172,14 @@ export default function ChatbotDock() {
 
     const reply = await getDdasomiReply(q, snapshot, askDdasomi);
     setPending(false);
-    setMsgs((prev) => [...prev, { id: (msgSeq += 1), role: "bot", text: reply.text }]);
+    setMsgs((prev) => [
+      ...prev,
+      { id: (msgSeq += 1), role: "bot", text: reply.text, kind: reply.kind, suggestions: reply.suggestions },
+    ]);
+  }
+
+  function send() {
+    sendText(input.trim());
   }
 
   if (state === "bubble") {
@@ -238,26 +250,71 @@ export default function ChatbotDock() {
             <span className="ddasomi-face-crop w-16 h-16 mx-auto block">
               <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img" />
             </span>
-            <p className="text-sm font-bold text-on-surface mt-2">무엇을 도와드릴까요?</p>
+            <p className="text-sm font-bold text-on-surface mt-2">안녕하세요! 따소미예요 👋</p>
             <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-              전체 공정률·지연 위험 작업·설비별 진행률 같은 오버홀 공정 현황을 물어보세요.
+              플랜트 운영과 정비 관련해서 궁금한 점을 물어보세요.
               <br />
-              <strong>준공도서·벤더프린트 검색은 아직 연결 전입니다.</strong>
+              오버홀 공정 현황과 고장이력 정보를 함께 확인해드릴게요.
+              <br />
+              <strong>준공도서·벤더프린트 검색, 고장이력 데이터 연동은 아직 준비 중입니다.</strong>
             </p>
+            <div className="flex flex-wrap justify-center gap-2 mt-3">
+              {QUICK_QUESTIONS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => sendText(q)}
+                  className="px-3 py-1.5 rounded-full bg-surface-container-low text-xs font-semibold text-primary border border-border-subtle hover:bg-surface-container-high transition-colors"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          msgs.map((m) => (
-            <div
-              key={m.id}
-              className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
-                m.role === "user"
-                  ? "self-end bg-primary text-on-primary rounded-br-sm"
-                  : "self-start bg-surface-container-high text-on-surface rounded-bl-sm"
-              }`}
-            >
-              {m.text}
-            </div>
-          ))
+          msgs.map((m, i) => {
+            const isLatestBot = m.role === "bot" && i === msgs.length - 1;
+            if (m.role === "user") {
+              return (
+                <div
+                  key={m.id}
+                  className="max-w-[85%] self-end px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line bg-primary text-on-primary rounded-br-sm"
+                >
+                  {m.text}
+                </div>
+              );
+            }
+            return (
+              <div key={m.id} className="max-w-[85%] self-start flex items-start gap-2">
+                <span className={`ddasomi-msg-avatar w-11 h-11 shrink-0 mt-0.5 ${isLatestBot ? "ddasomi-lookaround-anim" : ""}`}>
+                  <img src="/ddasomi-search.png" alt="" className="ddasomi-msg-avatar__img" />
+                </span>
+                <div className="flex flex-col gap-1 min-w-0">
+                  <div
+                    className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line rounded-bl-sm ${
+                      m.kind === "refused" ? "bg-error-container text-on-error-container" : "bg-surface-container-high text-on-surface"
+                    }`}
+                  >
+                    {m.text}
+                  </div>
+                  {Array.isArray(m.suggestions) && m.suggestions.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {m.suggestions.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => sendText(s)}
+                          className="px-3 py-1.5 rounded-full bg-surface-container text-xs font-semibold text-primary border border-border-subtle hover:bg-surface-container-highest transition-colors"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })
         )}
         {pending && <DdasomiLoading />}
       </div>
