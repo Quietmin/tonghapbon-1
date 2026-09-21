@@ -56,6 +56,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/failure", label: "고장관리 홈", icon: "dashboard", exact: true },
       { href: "/failure/new", label: "고장보고서 작성", icon: "edit_note" },
       { href: "/failure/archive", label: "고장보고서 조회", icon: "inventory_2" },
+      { href: "/failure/history/new", label: "수기 등록", icon: "note_add" },
     ],
   },
   {
