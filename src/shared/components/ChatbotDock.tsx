@@ -12,15 +12,19 @@ import {
   useState,
 } from "react";
 import { Icon } from "./ui";
+import { getDdasomiReply } from "@/modules/overhaul/lib/ddasomiChat";
+import { askDdasomi } from "@/modules/overhaul/lib/chatbotAI";
+import type { ChatbotSnapshot } from "@/modules/overhaul/lib/chatbotSnapshot";
+import DdasomiLoading from "@/modules/overhaul/components/chatbot/DdasomiLoading";
+import "@/modules/overhaul/components/chatbot/ddasomi.css";
 
 /**
  * 정비 챗봇 도크 — 메뉴가 아니라 모든 화면 위에 떠 있는 창.
  *
- * 상태는 3단계다.
+ * 상태는 2단계다.
  *   open   : 패널이 열린 상태
- *   bubble : 우하단 동그란 버튼만 (기본값)
- *   hidden : 완전히 치운 상태. 화면 오른쪽 모서리의 얇은 손잡이와 헤더의
- *            챗봇 버튼으로만 다시 부른다.
+ *   bubble : 우하단 동그란 버튼만 (기본값). 닫기(X)도 여기로 돌아온다 —
+ *            화면 밖으로 완전히 숨기는 단계를 따로 두면 다시 찾기 어렵다.
  *
  * 상태는 localStorage 에 남겨 화면을 옮기거나 새로고침해도 유지한다. 첫 렌더는
  * 서버와 같아야 하므로(하이드레이션 불일치 방지) 항상 bubble 로 시작하고,
@@ -29,7 +33,7 @@ import { Icon } from "./ui";
  * PDF/인쇄 안전: 문서 출력은 html2canvas 가 A4 페이지 ref 만 캡처하므로(pdf.ts)
  * 이 도크는 PDF 에 찍히지 않는다. 브라우저 인쇄에서도 빠지도록 print:hidden 을 건다.
  */
-export type DockState = "open" | "bubble" | "hidden";
+export type DockState = "open" | "bubble";
 
 const STORAGE_KEY = "chatbot-dock-state";
 
@@ -59,7 +63,7 @@ export function ChatbotDockProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === "open" || saved === "bubble" || saved === "hidden") setRawState(saved);
+      if (saved === "open" || saved === "bubble") setRawState(saved);
     } catch {
       /* 저장소를 못 읽어도 기본값으로 그냥 동작한다 */
     }
@@ -98,44 +102,72 @@ interface Msg {
 
 let msgSeq = 0;
 
+/** 실패(네트워크 오류 등)해도 null — 호출부가 이전 snapshot이나 emptySnapshot으로 대체한다 */
+async function fetchSnapshot(): Promise<ChatbotSnapshot | null> {
+  try {
+    const res = await fetch("/api/overhaul/chatbot/snapshot");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.ok ? data.snapshot : null;
+  } catch {
+    return null;
+  }
+}
+
+function emptySnapshot(): ChatbotSnapshot {
+  return {
+    queriedAt: new Date().toISOString(),
+    dataSource: "empty",
+    planBaselineDate: new Date().toISOString().slice(0, 10),
+    lastEntryDate: null,
+    project: null,
+    counts: { total: 0, done: 0, inProgress: 0, waiting: 0 },
+    canCompute: false,
+    overall: null,
+    plannedOverall: null,
+    byField: null,
+    byEquipment: null,
+    delayRiskCount: null,
+    delayRiskTasks: null,
+    scheduleInfo: null,
+    anomalies: [],
+    hasAnomalies: false,
+  };
+}
+
 export default function ChatbotDock() {
   const { state, setState } = useChatbotDock();
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [pending, setPending] = useState(false);
+  const snapshotRef = useRef<ChatbotSnapshot | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // 패널을 열 때 최신 데이터를 미리 받아둔다 — 첫 질문에서도 바로 답할 수 있게.
+  useEffect(() => {
+    if (state === "open") fetchSnapshot().then((s) => { if (s) snapshotRef.current = s; });
+  }, [state]);
 
   // 새 말풍선이 붙으면 항상 마지막 줄이 보이게
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [msgs]);
 
-  function send() {
+  async function send() {
     const q = input.trim();
-    if (!q) return;
+    if (!q || pending) return;
     setInput("");
-    setMsgs((prev) => [
-      ...prev,
-      { id: (msgSeq += 1), role: "user", text: q },
-      {
-        id: (msgSeq += 1),
-        role: "bot",
-        // 검색 엔진이 아직 없다. 답을 지어내지 않고 상태를 그대로 알린다.
-        text: "아직 준공도서 검색이 연결되지 않았습니다. 검색 기능이 붙으면 이 자리에 근거 문서와 원문 발췌가 그대로 표시됩니다.",
-      },
-    ]);
-  }
+    setMsgs((prev) => [...prev, { id: (msgSeq += 1), role: "user", text: q }]);
+    setPending(true);
 
-  if (state === "hidden") {
-    return (
-      <button
-        type="button"
-        onClick={() => setState("bubble")}
-        aria-label="정비 챗봇 다시 보기"
-        title="정비 챗봇 다시 보기"
-        // 완전히 숨겼을 때 남는 유일한 자국 — 화면 오른쪽 모서리의 얇은 손잡이
-        className="print:hidden fixed right-0 top-1/2 -translate-y-1/2 z-[200] w-3 h-16 rounded-l-lg bg-primary/70 hover:bg-primary hover:w-5 transition-all"
-      />
-    );
+    // 질문마다 최신 데이터를 다시 읽는다. 실패하면 이전에 받아둔 snapshot, 그것도 없으면 emptySnapshot.
+    const fresh = await fetchSnapshot();
+    if (fresh) snapshotRef.current = fresh;
+    const snapshot = snapshotRef.current ?? emptySnapshot();
+
+    const reply = await getDdasomiReply(q, snapshot, askDdasomi);
+    setPending(false);
+    setMsgs((prev) => [...prev, { id: (msgSeq += 1), role: "bot", text: reply.text }]);
   }
 
   if (state === "bubble") {
@@ -143,11 +175,13 @@ export default function ChatbotDock() {
       <button
         type="button"
         onClick={() => setState("open")}
-        aria-label="정비 챗봇 열기"
+        aria-label="정비 챗봇 열기 (따소미)"
         // 모바일은 하단탭(h-16) 위로 올린다
-        className="print:hidden fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[200] w-14 h-14 rounded-full bg-primary text-on-primary shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
+        className="print:hidden fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[200] w-14 h-14 rounded-full bg-primary shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center overflow-hidden"
       >
-        <Icon name="smart_toy" className="text-2xl" />
+        <span className="ddasomi-face-crop w-full h-full">
+          <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img ddasomi-idle-anim" />
+        </span>
       </button>
     );
   }
@@ -165,8 +199,10 @@ export default function ChatbotDock() {
       ].join(" ")}
     >
       <header className="flex items-center gap-2 px-4 h-12 border-b border-border-subtle shrink-0">
-        <Icon name="smart_toy" className="text-primary text-lg" />
-        <span className="text-title-sm text-on-surface flex-1 truncate">정비 챗봇</span>
+        <span className="ddasomi-face-crop w-7 h-7 shrink-0">
+          <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img" />
+        </span>
+        <span className="text-title-sm text-on-surface flex-1 truncate">정비 챗봇 (따소미)</span>
 
         <Link
           href="/chatbot"
@@ -187,9 +223,9 @@ export default function ChatbotDock() {
         </button>
         <button
           type="button"
-          onClick={() => setState("hidden")}
-          aria-label="숨기기"
-          title="숨기기 (오른쪽 모서리 손잡이나 헤더 버튼으로 다시 열 수 있습니다)"
+          onClick={() => setState("bubble")}
+          aria-label="닫기"
+          title="닫기"
           className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
         >
           <Icon name="close" className="text-base" />
@@ -199,19 +235,21 @@ export default function ChatbotDock() {
       <div ref={listRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
         {msgs.length === 0 ? (
           <div className="m-auto text-center px-2">
-            <Icon name="smart_toy" className="text-4xl text-on-surface-variant" />
-            <p className="text-sm font-bold text-on-surface mt-2">무엇을 찾아 드릴까요?</p>
+            <span className="ddasomi-face-crop w-16 h-16 mx-auto block">
+              <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img" />
+            </span>
+            <p className="text-sm font-bold text-on-surface mt-2">무엇을 도와드릴까요?</p>
             <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-              태그명이나 고장 증상을 넣으면 준공도서·벤더프린트에서 근거 문서를 찾아 줍니다.
+              전체 공정률·지연 위험 작업·설비별 진행률 같은 오버홀 공정 현황을 물어보세요.
               <br />
-              <strong>검색 기능은 아직 연결 전입니다.</strong>
+              <strong>준공도서·벤더프린트 검색은 아직 연결 전입니다.</strong>
             </p>
           </div>
         ) : (
           msgs.map((m) => (
             <div
               key={m.id}
-              className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+              className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
                 m.role === "user"
                   ? "self-end bg-primary text-on-primary rounded-br-sm"
                   : "self-start bg-surface-container-high text-on-surface rounded-bl-sm"
@@ -221,6 +259,7 @@ export default function ChatbotDock() {
             </div>
           ))
         )}
+        {pending && <DdasomiLoading />}
       </div>
 
       <div className="p-3 border-t border-border-subtle flex items-center gap-2 shrink-0">
@@ -230,15 +269,17 @@ export default function ChatbotDock() {
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}
-          placeholder="예: 1호기 급수펌프 진동"
+          placeholder="예: 전체 공정률 알려줘"
           aria-label="챗봇에게 물어보기"
-          className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+          disabled={pending}
+          className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary disabled:opacity-60"
         />
         <button
           type="button"
           onClick={send}
           aria-label="보내기"
-          className="w-10 h-10 shrink-0 rounded-xl bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition"
+          disabled={pending}
+          className="w-10 h-10 shrink-0 rounded-xl bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition disabled:opacity-60"
         >
           <Icon name="send" className="text-lg" />
         </button>

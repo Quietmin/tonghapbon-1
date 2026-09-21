@@ -1,0 +1,82 @@
+/* 따소미 플로팅 챗봇 전용 애니메이션 — 다른 화면에는 영향 없음. prefers-reduced-motion에서는 최소화. */
+
+/* 로딩 중 — 돋보기 든 따소미가 여기저기 살펴보는 느낌 (1.8초 주기) */
+@keyframes ddasomi-search-wiggle {
+  0% {
+    transform: translateX(0) rotate(0deg) scale(1);
+  }
+  25% {
+    transform: translateX(-6px) rotate(-4deg) scale(1);
+  }
+  50% {
+    transform: translateX(4px) rotate(2deg) scale(1.04);
+  }
+  75% {
+    transform: translateX(6px) rotate(4deg) scale(1);
+  }
+  100% {
+    transform: translateX(0) rotate(0deg) scale(1);
+  }
+}
+.ddasomi-search-anim {
+  animation: ddasomi-search-wiggle 1.8s ease-in-out infinite;
+}
+
+/* 대기 중인 플로팅 버튼 — 6.5초에 한 번 정도만 짧게 존재감을 준다 (대부분은 정지) */
+@keyframes ddasomi-idle-gesture {
+  0%,
+  82% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  88% {
+    transform: translateY(-5px) scale(1.06) rotate(-3deg);
+  }
+  94% {
+    transform: translateY(0) scale(1.02) rotate(3deg);
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+.ddasomi-idle-anim {
+  animation: ddasomi-idle-gesture 6.5s ease-in-out infinite;
+}
+
+/* 따소미 얼굴 클로즈업 크롭 — 전신 이미지(ddasomi-default.png)를 새로 만들지 않고, 얼굴이 화면을
+   채우도록 확대·이동만 CSS로 처리한다. wrapper에 정해진 크기(w-11/w-9/w-8 등)만 주면 되고, 비율은
+   %라서 크기가 달라져도 같은 얼굴 위치를 유지한다 — 버튼(44px) 외 다른 곳에 재사용해도 그대로 맞는다. */
+.ddasomi-face-crop {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+}
+.ddasomi-face-crop__img {
+  position: absolute;
+  width: 180%;
+  height: 180%;
+  max-width: none;
+  left: -40%;
+  top: -11%;
+}
+
+/* 챗봇 창 열기/닫기 */
+.ddasomi-window {
+  transition: opacity 240ms ease, transform 240ms ease;
+  transform: translateY(15px) scale(0.97);
+  opacity: 0;
+}
+.ddasomi-window--open {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ddasomi-search-anim,
+  .ddasomi-idle-anim {
+    animation: none !important;
+  }
+  .ddasomi-window {
+    transition: opacity 120ms linear !important;
+    transform: none !important;
+  }
+}
