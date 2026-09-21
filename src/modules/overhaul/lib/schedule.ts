@@ -33,6 +33,9 @@ interface Phase {
 }
 
 // 작업 유형별 배치 구간 (전체 기간 대비 시작~종료 비율) — PRD 8.3
+//
+// 주의: 이 숫자들은 통합 이전 원본 앱에서 그대로 이어받았고 산출 근거가 남아 있지
+// 않다. PRD 8.3에 "검증 필요"로 명시해 두었다. 고칠 일이 생기면 PRD도 함께 고칠 것.
 const PHASES: Phase[] = [
   { key: "준비", label: "준비·가설·반입", re: /(준비|가설|반입|설치|양생|가설재)/, span: [0.0, 0.2] },
   { key: "분해", label: "분해·개방", re: /(분해|개방|해체|탈거|인출|철거)/, span: [0.05, 0.32] },
@@ -174,7 +177,10 @@ export function plannedProgressOn(sch: TaskSchedule, dateStr: string): number {
   return Math.round((diffDays(sch.plannedStart, d) / span) * 1000) / 10;
 }
 
-/** 계획 대비 지연 여부 (미완료 & 실적이 계획보다 임계치 이상 뒤처짐) */
+/**
+ * 계획 대비 지연 여부 (미완료 & 실적이 계획보다 임계치 이상 뒤처짐) — PRD 8.5
+ * 임계치는 이 파일에만 둔다. progress.ts에 있던 중복 구현은 제거했다.
+ */
 export function isBehind(
   task: ScheduleTask & ProgressTask,
   project: ScheduleProject,

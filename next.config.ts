@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
+  // 워크스페이스 루트를 이 폴더로 못박는다.
+  //
+  // 사용자 홈(C:\Users\User)에 package-lock.json 이 하나 굴러다녀서, Next 가
+  // 거기를 루트로 잡고 모든 모듈 이름을 홈 기준 상대경로로 만들었다. 그러면
+  // 이름에 "바탕 화면"이 섞이는데, Turbopack 이 그 이름을 바이트 단위로 자르다가
+  // 한글 중간에서 끊겨 빌드가 통째로 죽는다(ident.rs char boundary 패닉).
+  // 루트를 고정하면 이름이 "src_modules_..." 로만 만들어져 한글이 끼지 않는다.
+  turbopack: { root: path.resolve(import.meta.dirname) },
   // legacy/ 안의 원본 3개 앱은 통합 앱 빌드 대상이 아니다 (참고용 동결 코드).
   outputFileTracingExcludes: {
     "*": ["./legacy/**"],

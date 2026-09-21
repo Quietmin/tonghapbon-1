@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "모듈 이식 라이프사이클 — 스텁에서 완료본까지",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1069,
+      630
+    ],
+    "views": [
+      {
+        "id": "main-rail",
+        "label": "정상 다섯 단계",
+        "focus": [
+          "stub",
+          "porting",
+          "merged",
+          "verify",
+          "done"
+        ],
+        "note": "스텁 화면 하나가 완료본에 반영되기까지의 순서."
+      },
+      {
+        "id": "waits",
+        "label": "멈추는 지점",
+        "focus": [
+          "merged",
+          "conflictWait",
+          "verify"
+        ],
+        "note": "shared 충돌로 병합이 보류되는 비종료 상태."
+      },
+      {
+        "id": "recovery",
+        "label": "되돌림 경로",
+        "focus": [
+          "verify",
+          "rework",
+          "porting"
+        ],
+        "note": "검증에 걸리면 개발 단계로 돌아간다."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "start": {
+          "label": "시작"
+        },
+        "active": {
+          "label": "진행 중"
+        },
+        "waiting": {
+          "label": "보류"
+        },
+        "decision": {
+          "label": "검증"
+        },
+        "success": {
+          "label": "완료"
+        },
+        "failure": {
+          "label": "되돌림"
+        },
+        "neutral": {
+          "label": "동결"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "이식 단계"
+    },
+    {
+      "id": "side",
+      "label": "보류 · 되돌림"
+    },
+    {
+      "id": "terminal",
+      "label": "이식 후"
+    }
+  ],
+  "states": [
+    {
+      "id": "stub",
+      "type": "start",
+      "label": "스텁 상태",
+      "sublabel": "ModuleStub 화면",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "시작",
+      "width": 112
+    },
+    {
+      "id": "porting",
+      "type": "active",
+      "label": "이식 개발",
+      "sublabel": "src/modules",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "담당자",
+      "width": 112
+    },
+    {
+      "id": "merged",
+      "type": "active",
+      "label": "브랜치 병합",
+      "sublabel": "main-dev-branch",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "통합",
+      "width": 112
+    },
+    {
+      "id": "verify",
+      "type": "decision",
+      "label": "검증 게이트",
+      "sublabel": "빌드 · 동작",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "통과 필요",
+      "width": 112
+    },
+    {
+      "id": "done",
+      "type": "success",
+      "label": "완료본 반영",
+      "sublabel": "personal/main",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "tag": "완료",
+      "width": 112
+    },
+    {
+      "id": "conflictWait",
+      "type": "waiting",
+      "label": "충돌 대기",
+      "sublabel": "shared 수동 병합",
+      "lane": "side",
+      "col": 0,
+      "tag": "비종료",
+      "width": 112
+    },
+    {
+      "id": "rework",
+      "type": "failure",
+      "label": "재작업",
+      "sublabel": "검증에서 걸림",
+      "lane": "side",
+      "col": 0,
+      "tag": "복구 가능",
+      "width": 112,
+      "yOffset": 78
+    },
+    {
+      "id": "frozen",
+      "type": "neutral",
+      "label": "legacy 동결",
+      "sublabel": "더 이상 개발 안 함",
+      "lane": "terminal",
+      "col": 2,
+      "tag": "참고용",
+      "width": 112
+    }
+  ],
+  "transitions": [
+    {
+      "id": "assign",
+      "from": "stub",
+      "to": "porting"
+    },
+    {
+      "id": "push",
+      "from": "porting",
+      "to": "merged",
+      "label": "push",
+      "route": "straight"
+    },
+    {
+      "id": "to-verify",
+      "from": "merged",
+      "to": "verify",
+      "route": "straight"
+    },
+    {
+      "id": "pass",
+      "from": "verify",
+      "to": "done",
+      "label": "통과",
+      "variant": "emphasis"
+    },
+    {
+      "id": "conflict",
+      "from": "merged",
+      "to": "conflictWait",
+      "label": "충돌",
+      "variant": "security",
+      "labelDy": 24,
+      "labelDx": -30
+    },
+    {
+      "id": "resolved",
+      "from": "conflictWait",
+      "to": "merged",
+      "label": "재시도",
+      "variant": "dashed",
+      "labelDx": 34
+    },
+    {
+      "id": "fail",
+      "from": "verify",
+      "to": "rework",
+      "label": "실패",
+      "variant": "security"
+    },
+    {
+      "id": "reflow",
+      "from": "rework",
+      "to": "porting",
+      "label": "재이식",
+      "variant": "emphasis"
+    },
+    {
+      "id": "freeze",
+      "from": "done",
+      "to": "frozen",
+      "label": "원본 동결",
+      "variant": "dashed",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "다섯 단계",
+      "items": [
+        "스텁 → 이식 → 병합 → 검증 → 완료본",
+        "검증을 통과해야 반영된다"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "멈추지만 끝나지 않음",
+      "items": [
+        "shared 충돌은 병합 보류",
+        "검증 실패는 되돌림일 뿐"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "현재 위치 (2026-09-07)",
+      "items": [
+        "오버홀·문서생성 — 병합까지 완료",
+        "고장이력·챗봇·설비 — 스텁"
+      ]
+    }
+  ]
+}

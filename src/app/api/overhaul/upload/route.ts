@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { analyzeWorkbook } from "@/modules/overhaul/lib/excelParser";
-import { getOrCreateProject, saveAnalysis } from "@/modules/overhaul/lib/repo";
+import { saveAnalysis } from "@/modules/overhaul/lib/repo";
+import { resolveProjectFromRequest } from "@/modules/overhaul/lib/activeProject";
 
 export const dynamic = "force-dynamic";
 // 64개 시트짜리 내역서는 파싱에 시간이 걸린다.
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     const fieldHint = fieldHintRaw && fieldHintRaw !== "자동" ? fieldHintRaw : null;
     const dryRun = String(form.get("dryRun") ?? "") === "1";
 
-    const project = await getOrCreateProject();
+    const project = await resolveProjectFromRequest(req);
     const results = [];
 
     for (const file of files) {
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
       if (fieldHint) for (const t of analysis.tasks) t.field = fieldHint;
 
       let sourceId: string | null = null;
+      let linkedStatementItems = 0;
       if (!dryRun) {
         const saved = await saveAnalysis({
           projectId: project.id,
@@ -45,10 +47,14 @@ export async function POST(req: Request) {
           tasks: analysis.tasks,
         });
         sourceId = saved.sourceId;
+        linkedStatementItems = saved.linkedStatementItems;
       }
 
       results.push({
         sourceId,
+        linkedStatementItems,
+        // 항목ID 컬럼을 달고 온 행 수 — 수량산출서와 이어붙일 수 있는 항목
+        statementLinkedCount: analysis.tasks.filter((t) => t.statementItemId != null).length,
         fileName: analysis.fileName,
         sheetCount: analysis.sheetCount,
         totalRows: analysis.totalRows,

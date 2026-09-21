@@ -7,10 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "node scripts/apply-schema.mjs"
+    "db:migrate": "node scripts/apply-schema.mjs",
+    "check:overhaul": "node scripts/check-overhaul-sql.mjs && node --experimental-strip-types scripts/check-statement-roundtrip.mts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
+    "@supabase/supabase-js": "^2.47.10",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "next": "16.2.10",
     "openai": "^7.20.0",
     "pdf-parse": "^2.4.5",
