@@ -412,7 +412,7 @@ export default function MaintenanceMatrix() {
       <EmptyState
         icon="event_repeat"
         title="아직 등록된 관리계획이 없습니다"
-        desc="'중장기 유지보수 관리계획' 탭에서 엑셀을 먼저 등록하세요."
+        desc="'보수계획' 화면에서 설비별 중장기 유지보수 관리계획 엑셀을 먼저 등록하세요. 등록하면 그 설비들이 여기 연도 축에 늘어섭니다."
       />
     );
   }
@@ -553,7 +553,11 @@ export default function MaintenanceMatrix() {
                   <th className="py-3 pl-card-padding pr-3 sticky left-0 bg-surface-container-lowest z-10 min-w-[220px]">
                     대분류 / 설비명
                   </th>
+                  <th className="py-3 px-3 min-w-[90px]">기기번호</th>
+                  <th className="py-3 px-3 min-w-[90px]">제작사</th>
+                  <th className="py-3 px-3 min-w-[160px]">사양</th>
                   <th className="py-3 px-3 min-w-[90px]">주기</th>
+                  <th className="py-3 px-3 min-w-[90px]">준공년도</th>
                   <th className="py-3 px-3 min-w-[150px]">다음 예정 · 상태</th>
                   <th className="py-3 px-3 min-w-[80px]">관리</th>
                   {data.years.map((y) => (
@@ -587,11 +591,6 @@ export default function MaintenanceMatrix() {
                             {r.field}
                           </span>
                         )}
-                        {r.tag_no && r.tag_no !== "-" && (
-                          <span className="font-mono-data text-[11px] text-on-surface-variant">
-                            {r.tag_no}
-                          </span>
-                        )}
                         {!r.isActive && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-error/10 text-error">
                             사용중지
@@ -605,8 +604,22 @@ export default function MaintenanceMatrix() {
                         {r.category ?? "—"}
                       </p>
                     </td>
+                    <td className="py-2 px-3 text-xs whitespace-nowrap font-mono-data text-on-surface-variant">
+                      {r.tag_no && r.tag_no !== "-" ? r.tag_no : "—"}
+                    </td>
+                    <td className="py-2 px-3 text-xs whitespace-nowrap text-on-surface-variant">
+                      {r.maker || "—"}
+                    </td>
+                    <td className="py-2 px-3 text-xs text-on-surface-variant">
+                      <span className="block truncate max-w-[200px]" title={r.spec ?? undefined}>
+                        {r.spec || "—"}
+                      </span>
+                    </td>
                     <td className="py-2 px-3 text-sm whitespace-nowrap">
                       <span className="font-mono-data">{r.cycle_raw || "—"}</span>
+                    </td>
+                    <td className="py-2 px-3 text-xs whitespace-nowrap text-on-surface-variant">
+                      {r.completion || "—"}
                     </td>
                     <td className="py-2 px-3 text-xs whitespace-nowrap">
                       <div className="flex items-center gap-1.5">

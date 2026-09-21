@@ -37,6 +37,15 @@ await step("overhaul_task.statement_item_id 컬럼 존재", async () => {
   );
   if (!r.rows.length) throw new Error("컬럼이 없다");
 });
+await step("overhaul_entry_photo 테이블 존재 · 옛 사진 컬럼은 사라졌다", async () => {
+  const t = await db.query(
+    `select 1 from information_schema.tables where table_name='overhaul_entry_photo'`);
+  if (!t.rows.length) throw new Error("사진 테이블이 없다");
+  const c = await db.query(
+    `select column_name from information_schema.columns
+      where table_name='overhaul_entry' and column_name in ('photo_before','photo_after')`);
+  if (c.rows.length) throw new Error("옛 사진 컬럼이 남아 있다: " + c.rows.map(r => r.column_name).join(","));
+});
 
 // ── 최소한의 시드: 회차 1건, 내역서 1건+항목 1건, 작업 1건, 실적 1건 ──────
 console.log("\n[2] 시드 데이터");
@@ -82,10 +91,17 @@ await step("회차 · 계획 · 내역서 · 작업 · 실적 생성", async () 
     )
   ).rows[0].id;
 
+  const entryId = (
+    await db.query(
+      `insert into overhaul_entry (task_id, entry_date, done_qty, work_detail)
+       values ($1, '2026-01-06', 10, '작업함') returning id`,
+      [taskId],
+    )
+  ).rows[0].id;
   await db.query(
-    `insert into overhaul_entry (task_id, entry_date, done_qty, work_detail, photo_before)
-     values ($1, '2026-01-06', 10, '작업함', 'data:image/png;base64,AAAA')`,
-    [taskId],
+    `insert into overhaul_entry_photo (entry_id, slot, seq, data)
+     values ($1,'before',1,'data:image/png;base64,AAAA')`,
+    [entryId],
   );
 });
 
@@ -126,53 +142,83 @@ await step("listTaskOptions (q + limit)", () =>
     [projectId, "발전", 300],
   ));
 
-await step("listAllEntriesForProject (사진은 표시만)", async () => {
+await step("listAllEntriesForProject (사진은 참조만)", async () => {
   const r = await db.query(
     `select o.id, o.task_id, o.entry_date::text, o.done_qty::float8 as done_qty,
             o.work_detail, o.delay_reason, o.next_plan,
-            case when o.photo_before is null then null else '1' end as photo_before,
-            case when o.photo_after  is null then null else '1' end as photo_after
+            coalesce((
+              select json_agg(json_build_object('id', p.id, 'slot', p.slot, 'seq', p.seq)
+                              order by p.slot, p.seq, p.id)
+                from overhaul_entry_photo p where p.entry_id = o.id
+            ), '[]'::json) as photos
        from overhaul_entry o
        join overhaul_task t on t.id = o.task_id
       where t.project_id = $1
       order by o.task_id, o.entry_date desc`,
     [projectId],
   );
-  if (r.rows[0].photo_before !== "1") throw new Error("사진 있음 표시가 안 된다");
+  const photos = r.rows[0].photos;
+  if (!Array.isArray(photos) || photos.length !== 1) throw new Error("사진 참조가 안 나온다: " + JSON.stringify(photos));
+  if (photos[0].slot !== "before") throw new Error("slot이 틀리다");
+  if (JSON.stringify(photos[0]).includes("base64")) throw new Error("이미지 데이터가 섞여 나온다");
 });
 
-await step("listPhotoEntries 집계", async () => {
-  const r = await db.query(
-    `select count(*)::int as n,
-            count(distinct o.task_id)::int as tasks,
-            (sum((o.photo_before is not null)::int) + sum((o.photo_after is not null)::int))::int as photos
-       from overhaul_entry o
-       join overhaul_task t on t.id = o.task_id
-      where t.project_id = $1
-        and (o.photo_before is not null or o.photo_after is not null)`,
-    [projectId],
-  );
-  if (r.rows[0].photos !== 1) throw new Error(`사진 수가 틀리다: ${r.rows[0].photos}`);
+await step("사진 여러 장 · 순서 · 삭제", async () => {
+  const e = (await db.query(`select id from overhaul_entry where task_id = $1`, [taskId])).rows[0].id;
+  // 같은 slot에 여러 장
+  for (const n of [2, 3]) {
+    await db.query(
+      `insert into overhaul_entry_photo (entry_id, slot, seq, data) values ($1,'before',$2,$3)`,
+      [e, n, `data:image/png;base64,B${n}`]);
+  }
+  await db.query(
+    `insert into overhaul_entry_photo (entry_id, slot, seq, data) values ($1,'after',1,'data:image/png;base64,A1')`,
+    [e]);
+
+  const all = await db.query(
+    `select id, slot, seq from overhaul_entry_photo where entry_id = $1 order by slot, seq`, [e]);
+  if (all.rows.length !== 4) throw new Error(`4장이어야 하는데 ${all.rows.length}장`);
+  if (all.rows.filter(r => r.slot === "before").length !== 3) throw new Error("분해 전이 3장이 아니다");
+
+  // keepIds 방식: 남길 것만 지목하면 나머지가 지워진다
+  const keep = all.rows.filter(r => r.slot === "before").slice(0, 1).map(r => r.id);
+  await db.query(
+    `delete from overhaul_entry_photo where entry_id = $1 and id <> all($2::bigint[])`, [e, keep]);
+  const left = await db.query(`select id from overhaul_entry_photo where entry_id = $1`, [e]);
+  if (left.rows.length !== 1) throw new Error(`1장 남아야 하는데 ${left.rows.length}장`);
+
+  // 빈 배열이면 전부 지워진다
+  await db.query(
+    `delete from overhaul_entry_photo where entry_id = $1 and id <> all($2::bigint[])`, [e, []]);
+  const none = await db.query(`select id from overhaul_entry_photo where entry_id = $1`, [e]);
+  if (none.rows.length !== 0) throw new Error("전부 지워지지 않았다");
+
+  // 되돌려 놓는다 (뒤 검증이 쓴다)
+  await db.query(
+    `insert into overhaul_entry_photo (entry_id, slot, seq, data) values ($1,'before',1,'data:image/png;base64,AAAA')`,
+    [e]);
 });
 
-await step("listPhotoEntries 목록", () =>
-  db.query(
-    `select o.task_id, t.name as task_name, t.equipment_type, t.field,
-            o.entry_date::text,
-            (o.photo_before is not null) as has_before,
-            (o.photo_after  is not null) as has_after,
-            o.work_detail
-       from overhaul_entry o
-       join overhaul_task t on t.id = o.task_id
-      where t.project_id = $1
-        and (o.photo_before is not null or o.photo_after is not null)
-      order by o.entry_date desc, t.name limit 24 offset 0`,
-    [projectId],
-  ));
+await step("getPhotoById", async () => {
+  const id = (await db.query(`select id from overhaul_entry_photo limit 1`)).rows[0].id;
+  const r = await db.query(`select data from overhaul_entry_photo where id = $1`, [id]);
+  if (!r.rows[0].data.startsWith("data:image/")) throw new Error("사진을 못 꺼낸다");
+});
 
-await step("getEntryPhoto", () =>
-  db.query(`select photo_before as photo from overhaul_entry where task_id = $1 and entry_date = $2`,
-    [taskId, "2026-01-06"]));
+await step("실적을 지우면 사진도 함께 지워진다", async () => {
+  const before = (await db.query(`select count(*)::int as n from overhaul_entry_photo`)).rows[0].n;
+  if (before === 0) throw new Error("검증할 사진이 없다");
+  await db.query(`delete from overhaul_entry where task_id = $1 and entry_date = '2026-01-06'`, [taskId]);
+  const after = (await db.query(`select count(*)::int as n from overhaul_entry_photo`)).rows[0].n;
+  if (after !== 0) throw new Error(`사진이 남았다: ${after}장`);
+  // 되돌려 놓는다
+  const e = (await db.query(
+    `insert into overhaul_entry (task_id, entry_date, done_qty) values ($1,'2026-01-06',10) returning id`,
+    [taskId])).rows[0].id;
+  await db.query(
+    `insert into overhaul_entry_photo (entry_id, slot, seq, data) values ($1,'before',1,'data:image/png;base64,AAAA')`,
+    [e]);
+});
 
 await step("listJudgedPlans (분야 필터)", async () => {
   const r = await db.query(
@@ -320,25 +366,26 @@ await step("사진 유지 — 메모만 고쳐도 사진이 남는다", async ()
     `insert into overhaul_task (project_id, name, unit, plan_qty) values ($1,'t','EA',10) returning id`,
     [pid])).rows[0].id;
 
-  const save = (qty, memo, touchBefore, before) => db.query(
-    `insert into overhaul_entry (task_id, entry_date, done_qty, work_detail, photo_before)
-     values ($1,'2026-02-01',$2,$3,$4)
+  // 실적 저장 (사진 지시 없음 → 사진에 손대지 않는다)
+  const upsert = (qty, memo) => db.query(
+    `insert into overhaul_entry (task_id, entry_date, done_qty, work_detail)
+     values ($1,'2026-02-01',$2,$3)
      on conflict (task_id, entry_date) do update
-       set done_qty = excluded.done_qty,
-           work_detail = excluded.work_detail,
-           photo_before = case when $5 then excluded.photo_before
-                               else overhaul_entry.photo_before end`,
-    [tid, qty, memo, before, touchBefore]);
+       set done_qty = excluded.done_qty, work_detail = excluded.work_detail
+     returning id`, [tid, qty, memo]);
 
-  await save(5, "1차", true, "data:image/jpeg;base64,AAA");   // 사진과 함께 저장
-  await save(7, "메모만 수정", false, null);                    // 사진은 안 보냄 → 유지되어야 함
-  const r = await db.query(`select photo_before, work_detail from overhaul_entry where task_id = $1`, [tid]);
-  if (!r.rows[0].photo_before) throw new Error("사진이 날아갔다");
-  if (r.rows[0].work_detail !== "메모만 수정") throw new Error("메모가 안 바뀌었다");
+  const e = (await upsert(5, "1차")).rows[0].id;
+  await db.query(
+    `insert into overhaul_entry_photo (entry_id, slot, seq, data)
+     values ($1,'before',1,'data:image/jpeg;base64,AAA'), ($1,'before',2,'data:image/jpeg;base64,BBB')`,
+    [e]);
 
-  await save(7, "사진 삭제", true, null);                       // 명시적으로 null → 지워야 함
-  const r2 = await db.query(`select photo_before from overhaul_entry where task_id = $1`, [tid]);
-  if (r2.rows[0].photo_before !== null) throw new Error("사진이 안 지워졌다");
+  await upsert(7, "메모만 수정");   // 사진 지시를 안 보낸 상황
+  const kept = await db.query(`select count(*)::int as n from overhaul_entry_photo where entry_id = $1`, [e]);
+  if (kept.rows[0].n !== 2) throw new Error(`사진이 날아갔다: ${kept.rows[0].n}장`);
+  const memo = await db.query(`select work_detail from overhaul_entry where id = $1`, [e]);
+  if (memo.rows[0].work_detail !== "메모만 수정") throw new Error("메모가 안 바뀌었다");
+
   await db.query(`delete from overhaul_project where id = $1`, [pid]);
 });
 

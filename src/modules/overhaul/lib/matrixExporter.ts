@@ -31,6 +31,7 @@ export interface MatrixExportRow {
   spec: string | null;
   field: string | null;
   method: string | null;
+  completion: string | null;
   cycle_raw: string | null;
   isActive: boolean;
   lastDoneYear: number | null;
@@ -60,6 +61,7 @@ const FIXED_HEADERS = [
   "분야",
   "정밀점검주기",
   "시행방법",
+  "준공년도",
   "사용여부",
   "마지막 보수",
   "다음 예정",
@@ -92,6 +94,7 @@ export function exportMaintenanceMatrix(params: {
       r.field ?? "",
       r.cycle_raw ?? "",
       r.method ?? "",
+      r.completion ?? "",
       r.isActive ? "사용" : "중지",
       r.lastDoneYear ?? "",
       r.judge.nextDueYear ?? "",
@@ -112,6 +115,7 @@ export function exportMaintenanceMatrix(params: {
     { wch: 6 },  // 분야
     { wch: 12 }, // 정밀점검주기
     { wch: 8 },  // 시행방법
+    { wch: 11 }, // 준공년도
     { wch: 7 },  // 사용여부
     { wch: 9 },  // 마지막 보수
     { wch: 9 },  // 다음 예정

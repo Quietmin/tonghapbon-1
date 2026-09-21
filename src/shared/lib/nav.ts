@@ -38,6 +38,9 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       // ── ① 계약 전: 이번 오버홀에서 무엇을 할지 정하는 단계 ──────────────
       { href: "/overhaul/plan", label: "보수계획", icon: "event_note", section: "계약 전 — 보수계획 수립" },
+      // 설비별 연도 축 매트릭스 — "언제 어떤 장비를 점검했는지"를 한 장으로 본다.
+      // 회차와 무관하게 설비의 전 이력을 보는 화면이라 계약 전 구역에 둔다.
+      { href: "/overhaul/matrix", label: "전체 현황", icon: "table_view", section: "계약 전 — 보수계획 수립" },
       // ── ② 계약 후: 체결 후 실제로 진행·기록하는 단계 ────────────────────
       { href: "/overhaul/project", label: "회차 관리", icon: "engineering", section: "계약 후 — 공정관리" },
       { href: "/overhaul", label: "대시보드", icon: "dashboard", exact: true, section: "계약 후 — 공정관리" },

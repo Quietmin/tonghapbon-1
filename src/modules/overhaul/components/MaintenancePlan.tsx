@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, Icon, Button, EmptyState, StatusChip } from "@/shared/components/ui";
 import { exportDesignStatement } from "../lib/statementExporter";
-import MaintenanceMatrix from "./MaintenanceMatrix";
 import StatementArchive from "./StatementArchive";
 
 /**
@@ -115,8 +114,12 @@ export default function MaintenancePlan() {
   const [uploadField, setUploadField] = useState("전기");
   const [tab, setTab] = useState<Tab>("필수");
   const [q, setQ] = useState("");
-  /** 연도별 판정(수량산출서용) ↔ 전체 설비 장기 현황(30년 추적용) ↔ 확정 내역서(이력 반영) */
-  const [view, setView] = useState<"판정" | "현황" | "내역서">("판정");
+  /**
+   * 연도별 판정(수량산출서용) ↔ 확정 내역서(이력 반영).
+   * 설비 전체의 장기 현황은 별도 화면(/overhaul/matrix)으로 옮겼다 —
+   * 여기 탭 안에 묻혀 있어서 있는 줄도 모르고 지나쳤다.
+   */
+  const [view, setView] = useState<"판정" | "내역서">("판정");
   const inputRef = useRef<HTMLInputElement>(null);
 
   /** 사용자가 확정한 대상 (plan id) */
@@ -455,12 +458,11 @@ export default function MaintenancePlan() {
 
       {!hasPlan ? null : (
         <>
-          {/* 판정(수량산출서용) ↔ 전체 현황(30년 추적용) ↔ 확정 내역서(이력 반영) */}
+          {/* 판정(수량산출서용) ↔ 확정 내역서(이력 반영) */}
           <div className="flex gap-1 p-1 bg-surface-container-high rounded-xl w-full lg:w-fit">
             {(
               [
                 { key: "판정" as const, label: "연도별 판정", icon: "fact_check" },
-                { key: "현황" as const, label: "전체 현황 (장기 추적)", icon: "timeline" },
                 { key: "내역서" as const, label: "확정 내역서 · 이력 반영", icon: "checklist" },
               ] as const
             ).map((t) => (
@@ -479,9 +481,7 @@ export default function MaintenancePlan() {
             ))}
           </div>
 
-          {view === "현황" ? (
-            <MaintenanceMatrix />
-          ) : view === "내역서" ? (
+          {view === "내역서" ? (
             <StatementArchive />
           ) : (
           <>

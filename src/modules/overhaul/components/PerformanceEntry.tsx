@@ -181,7 +181,6 @@ function PhotoGroup({
 }
 
 function HistoryTimeline({
-  photoVersion,
   entries,
   unit,
   planQty,
@@ -189,8 +188,6 @@ function HistoryTimeline({
   onPick,
   onDelete,
 }: {
-  /** 사진을 덮어썼을 때 썸네일 캐시를 비우기 위한 값 */
-  photoVersion: number;
   entries: OverhaulEntry[];
   unit: string;
   planQty: number;
@@ -265,8 +262,11 @@ function HistoryTimeline({
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {(e.has_photo_before || e.has_photo_after) && (
-                        <Icon name="photo_library" className="text-sm text-on-surface-variant" />
+                      {e.photos.length > 0 && (
+                        <span className="text-xs text-on-surface-variant flex items-center gap-0.5">
+                          <Icon name="photo_library" className="text-sm" />
+                          {e.photos.length}
+                        </span>
                       )}
                       {delayed && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-error/10 text-status-error">
@@ -303,28 +303,22 @@ function HistoryTimeline({
                       {e.next_plan && <p className="text-on-surface-variant">익일계획: {e.next_plan}</p>}
                     </div>
                   )}
-                  {(e.has_photo_before || e.has_photo_after) && (
-                    <div className="flex gap-2 mt-2">
-                      {/* 사진은 목록 응답에 없다 — 썸네일이 한 장씩 받아 온다
-                          (eslint-disable: 외부 최적화 없이 API가 그대로 내려주는 이미지) */}
-                      {e.has_photo_before && (
+                  {e.photos.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {/* 사진은 목록 응답에 없다 — 썸네일이 id로 한 장씩 받아 온다 */}
+                      {e.photos.map((ph) => (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={savedPhotoUrl(e.task_id, e.entry_date, "before", photoVersion)}
-                          alt="분해 전"
+                          key={ph.id}
+                          src={savedPhotoUrl(ph.id)}
+                          alt={ph.slot === "before" ? "분해 전" : "분해 후"}
+                          title={ph.slot === "before" ? "분해 전" : "분해 후"}
                           loading="lazy"
-                          className="w-16 h-12 object-cover rounded-lg"
+                          className={`w-16 h-12 object-cover rounded-lg border-2 ${
+                            ph.slot === "before" ? "border-primary/40" : "border-status-success/40"
+                          }`}
                         />
-                      )}
-                      {e.has_photo_after && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={savedPhotoUrl(e.task_id, e.entry_date, "after", photoVersion)}
-                          alt="분해 후"
-                          loading="lazy"
-                          className="w-16 h-12 object-cover rounded-lg"
-                        />
-                      )}
+                      ))}
                     </div>
                   )}
                 </button>
@@ -364,6 +358,14 @@ function priorCumulativeOf(entries: OverhaulEntry[], dateStr: string): number {
   return prev.length ? prev[0].done_qty : 0;
 }
 
+/** 저장된 사진 참조를 폼이 쓰는 목록으로 */
+function toItems(entry: OverhaulEntry, slot: "before" | "after"): PhotoItem[] {
+  return entry.photos
+    .filter((p) => p.slot === slot)
+    .sort((a, b) => a.seq - b.seq || a.id - b.id)
+    .map((p) => ({ key: `p${p.id}`, id: p.id }));
+}
+
 /** 날짜에 해당하는 폼 구성 — 기록이 있으면 로드, 없으면 빈 폼(누적은 직전일 기준) */
 function buildFormOf(entries: OverhaulEntry[], dateStr: string): FormState {
   const ex = entries.find((e) => e.entry_date === dateStr);
@@ -376,8 +378,8 @@ function buildFormOf(entries: OverhaulEntry[], dateStr: string): FormState {
       notes: ex.work_detail ?? "",
       delayReason: ex.delay_reason ?? "지연 없음",
       plan: ex.next_plan ?? "",
-      before: ex.has_photo_before ? { kind: "kept" } : { kind: "empty" },
-      after: ex.has_photo_after ? { kind: "kept" } : { kind: "empty" },
+      before: toItems(ex, "before"),
+      after: toItems(ex, "after"),
       existing: true,
     };
   }
@@ -388,8 +390,8 @@ function buildFormOf(entries: OverhaulEntry[], dateStr: string): FormState {
     notes: "",
     delayReason: "지연 없음",
     plan: "",
-    before: { kind: "empty" },
-    after: { kind: "empty" },
+    before: [],
+    after: [],
     existing: false,
   };
 }
@@ -409,8 +411,6 @@ export default function PerformanceEntry() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  /** 사진을 덮어썼을 때 <img> 캐시를 비우기 위한 값 */
-  const [photoVersion, setPhotoVersion] = useState(0);
 
   const selectedId = sp.get("task");
 
@@ -495,20 +495,22 @@ export default function PerformanceEntry() {
     [form, priorCumulative, task],
   );
 
-  /**
-   * 사진 칸 하나를 저장 본문으로 옮긴다.
-   *   kept  → 키를 아예 안 넣는다 (서버가 저장된 사진을 그대로 둔다)
-   *   new   → 줄인 data URL
-   *   그 외 → null (지운다)
-   */
-  const photoField = (key: string, st: PhotoSlotState) => {
-    if (st.kind === "kept") return {};
-    return { [key]: st.kind === "new" ? st.dataUrl : null };
-  };
-
   const submit = useCallback(async () => {
     if (!task || !form) return;
     setSaveError(null);
+
+    // 새 사진 용량을 미리 재서, 요청 본문 한계에 걸려 통째로 실패하는 걸 막는다.
+    // 이미 저장된 사진은 id만 보내므로 여기 안 잡힌다 → 나눠 저장하면 항상 된다.
+    const newBytes = [...form.before, ...form.after]
+      .filter((x) => x.dataUrl)
+      .reduce((n, x) => n + x.dataUrl!.length, 0);
+    if (newBytes > MAX_NEW_BYTES) {
+      setSaveError(
+        "한 번에 올릴 사진이 너무 많습니다. 몇 장을 빼고 저장한 뒤, 나머지를 추가해 다시 저장하세요.",
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/overhaul/entries", {
@@ -521,8 +523,16 @@ export default function PerformanceEntry() {
           workDetail: form.notes,
           delayReason: form.delayReason,
           nextPlan: form.plan,
-          ...photoField("photoBefore", form.before),
-          ...photoField("photoAfter", form.after),
+          photos: {
+            // 남길 기존 사진은 id로만 지목한다 (화면이 이미지 데이터를 안 들고 있다)
+            keepIds: [...form.before, ...form.after]
+              .map((x) => x.id)
+              .filter((v): v is number => typeof v === "number"),
+            add: [
+              ...form.before.filter((x) => x.dataUrl).map((x) => ({ slot: "before", dataUrl: x.dataUrl! })),
+              ...form.after.filter((x) => x.dataUrl).map((x) => ({ slot: "after", dataUrl: x.dataUrl! })),
+            ],
+          },
         }),
       });
       const json = await res.json();
@@ -536,16 +546,18 @@ export default function PerformanceEntry() {
       }
       setTask(json.task);
       setEntries(json.entries);
-      // 방금 바꾼 사진이 저장됐으니 이제 "저장된 사진"으로 본다.
-      // photoVersion을 올려야 <img>가 캐시된 옛 사진을 다시 쓰지 않는다.
-      setPhotoVersion((v) => v + 1);
+      // 새로 올린 사진이 이제 id를 가졌으니, 서버가 돌려준 목록으로 폼을 다시 맞춘다.
+      // (안 하면 다시 저장할 때 같은 사진을 또 올린다)
+      const fresh: OverhaulEntry | undefined = json.entries?.find(
+        (x: OverhaulEntry) => x.entry_date === form.date,
+      );
       setForm((f) =>
         f
           ? {
               ...f,
               existing: true,
-              before: f.before.kind === "new" ? { kind: "kept" } : f.before.kind === "cleared" ? { kind: "empty" } : f.before,
-              after: f.after.kind === "new" ? { kind: "kept" } : f.after.kind === "cleared" ? { kind: "empty" } : f.after,
+              before: fresh ? toItems(fresh, "before") : [],
+              after: fresh ? toItems(fresh, "after") : [],
             }
           : f,
       );
@@ -729,24 +741,22 @@ export default function PerformanceEntry() {
           <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
             분해 전 / 후 사진
             <span className="ml-2 text-xs font-normal text-on-surface-variant">
-              고르면 자동으로 줄여서 올립니다 — 미리 크기를 조절할 필요 없습니다
+              칸마다 여러 장 넣을 수 있습니다 · 고르면 자동으로 줄여서 올립니다
             </span>
           </label>
           <div className="flex gap-4 mt-2">
-            <PhotoSlot
+            <PhotoGroup
               label="분해 전 (BEFORE)"
-              state={form.before}
-              savedSrc={savedPhotoUrl(task.id, form.date, "before", photoVersion)}
+              items={form.before}
               onChange={(v) => {
                 setForm({ ...form, before: v });
                 setSaved(false);
               }}
               onError={setSaveError}
             />
-            <PhotoSlot
+            <PhotoGroup
               label="분해 후 (AFTER)"
-              state={form.after}
-              savedSrc={savedPhotoUrl(task.id, form.date, "after", photoVersion)}
+              items={form.after}
               onChange={(v) => {
                 setForm({ ...form, after: v });
                 setSaved(false);
@@ -790,7 +800,6 @@ export default function PerformanceEntry() {
 
       {/* 정비 이력 타임라인 */}
       <HistoryTimeline
-        photoVersion={photoVersion}
         entries={entries}
         unit={task.unit ?? ""}
         planQty={task.plan_qty}
