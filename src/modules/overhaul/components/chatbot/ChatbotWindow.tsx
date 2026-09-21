@@ -12,7 +12,7 @@ import type { ChatbotSnapshot } from "@/modules/overhaul/lib/chatbotSnapshot";
 // 최초 로딩 중엔 null일 수 있다 — 그 구간만 "데이터 없음" 라벨로 대체한다.
 const DATA_SOURCE_LABEL: Record<string, string> = { uploaded: "업로드 데이터", empty: "데이터 없음" };
 
-const QUICK_QUESTIONS = ["전체 공정률 알려줘", "기계 분야 진행률은?", "지연 위험 작업 알려줘", "설비별 공정률 알려줘"];
+const QUICK_QUESTIONS = ["전체 공정률 알려줘", "지연 위험 작업 알려줘", "최근 고장이력 보여줘", "설비별 고장 현황 알려줘"];
 
 const OPEN_ANIM_MS = 240;
 
@@ -78,7 +78,7 @@ export default function ChatbotWindow({
   return (
     <div
       role="dialog"
-      aria-label="따소미 공정 챗봇"
+      aria-label="따소미 플랜트 챗봇"
       aria-hidden={!open}
       className={`fixed z-[70] top-20 left-3 right-3 bottom-20 md:top-auto md:left-auto md:right-6 md:bottom-24 md:w-[400px] md:h-[620px] md:max-h-[calc(100vh-120px)] flex flex-col glass-card no-lift rounded-[24px] overflow-hidden ddasomi-window ${
         animateIn ? "ddasomi-window--open" : ""
@@ -90,7 +90,7 @@ export default function ChatbotWindow({
           <img src="/ddasomi-default.png" alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-bold text-on-surface leading-tight truncate">따소미</p>
-            <p className="text-[11px] text-on-surface-variant leading-tight truncate">오버홀 공정 도우미</p>
+            <p className="text-[11px] text-on-surface-variant leading-tight truncate">플랜트 통합 도우미</p>
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -157,7 +157,7 @@ export default function ChatbotWindow({
           onKeyDown={onKeyDown}
           disabled={pending}
           rows={1}
-          placeholder="공정 현황을 물어보세요..."
+          placeholder="플랜트 관련 질문을 입력하세요..."
           className="flex-1 resize-none max-h-24 px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-border-subtle text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-60"
         />
         <button

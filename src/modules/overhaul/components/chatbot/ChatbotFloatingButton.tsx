@@ -7,7 +7,7 @@ export default function ChatbotFloatingButton({ open, onToggle }: { open: boolea
     <button
       type="button"
       onClick={onToggle}
-      aria-label={open ? "따소미 공정 챗봇 닫기" : "따소미 공정 챗봇 열기"}
+      aria-label={open ? "따소미 플랜트 챗봇 닫기" : "따소미 플랜트 챗봇 열기"}
       aria-expanded={open}
       className={`fixed z-[70] right-4 bottom-20 md:right-6 md:bottom-6 flex items-center gap-2 pl-1.5 pr-4 py-1.5 rounded-full glass-card no-lift transition-opacity duration-200 ${
         open ? "opacity-0 pointer-events-none" : "opacity-100"

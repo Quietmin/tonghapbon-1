@@ -15,7 +15,7 @@ export interface DdasomiMessage extends DdasomiReply {
 const WELCOME: DdasomiMessage = {
   role: "assistant",
   kind: "answer",
-  text: "안녕하세요! 따소미예요 👋\n\n오버홀 공정 현황이 궁금하신가요?\n\n전체 공정률, 분야별 진행 상황,\n지연 작업 등을 물어보세요.",
+  text: "안녕하세요! 따소미예요 👋\n플랜트 운영과 정비 관련해서 궁금한 점을 물어보세요.\n오버홀 공정 현황과 고장이력 정보를 함께 확인해드릴게요.",
 };
 
 async function fetchSnapshot(): Promise<ChatbotSnapshot | null> {
