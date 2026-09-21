@@ -17,6 +17,20 @@ export function formatDateTime(local: string): string {
   return timePart ? `${text} ${timePart.slice(0, 5)}` : text;
 }
 
+/**
+ * 지금 시각을 datetime-local 이 받는 "YYYY-MM-DDTHH:mm" 으로.
+ *
+ * toISOString() 을 쓰면 안 된다 — 그건 UTC 라 한국에서 9시간 어긋난 값이 찍힌다.
+ * datetime-local 은 지역시각을 그대로 받으므로 지역 기준 각 자리를 직접 맞춘다.
+ */
+export function nowForDateTimeLocal(at: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${at.getFullYear()}-${p(at.getMonth() + 1)}-${p(at.getDate())}` +
+    `T${p(at.getHours())}:${p(at.getMinutes())}`
+  );
+}
+
 /** 두 datetime-local 값의 차이를 분으로. 값이 모자라거나 순서가 거꾸로면 null. (원본과 동일) */
 export function spanMinutes(from: string, to: string): number | null {
   if (!from || !to) return null;

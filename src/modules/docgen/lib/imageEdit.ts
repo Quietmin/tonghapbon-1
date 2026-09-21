@@ -73,9 +73,10 @@ export async function flattenRotation(
 
   const widthScale = width / cw;
   const rotatedUrl = await canvasToObjectUrl(canvas);
+  // ...s 로 통째로 복사한 뒤 바뀐 것만 덮는다 — 필드를 하나씩 나열하면 text 처럼
+  // 나중에 늘어난 값을 빠뜨려, 회전 후 표기한 글자가 조용히 사라진다. (원본 주석)
   const rotatedStrokes = strokes.map((s) => ({
-    tool: s.tool,
-    color: s.color,
+    ...s,
     width: s.width * widthScale,
     points: s.points.map((p) => rotateNormPoint(p, deg)),
   }));
@@ -97,6 +98,22 @@ export function drawStrokes(
   for (const stroke of strokes) {
     const pts = stroke.points;
     if (pts.length === 0) continue;
+
+    if (stroke.tool === "text") {
+      // 선을 긋는 도구들과 달리 경로(path)가 아니라 글자를 찍는다 — 어떤 사진
+      // 배경 위에서도 읽히도록 흰 테두리를 두른 뒤 그 위에 글자색을 채운다. (원본과 동일)
+      const fontPx = Math.max(12, stroke.width * w);
+      ctx.globalAlpha = 1;
+      ctx.font = `bold ${fontPx}px sans-serif`;
+      ctx.textBaseline = "top";
+      ctx.lineWidth = Math.max(2, fontPx * 0.18);
+      ctx.strokeStyle = "#ffffff";
+      ctx.strokeText(stroke.text ?? "", pts[0].x * w, pts[0].y * h);
+      ctx.fillStyle = stroke.color;
+      ctx.fillText(stroke.text ?? "", pts[0].x * w, pts[0].y * h);
+      continue;
+    }
+
     ctx.globalAlpha = stroke.tool === "highlighter" ? 0.35 : 1;
     ctx.strokeStyle = stroke.color;
     ctx.lineWidth = Math.max(1, stroke.width * w);
@@ -119,6 +136,19 @@ export function drawStrokes(
       if (stroke.tool === "line") {
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
+        ctx.stroke();
+      } else if (stroke.tool === "arrow") {
+        // 몸통을 긋고 끝점에 화살촉 두 선을 붙인다. 촉 길이는 이미지 너비에
+        // 비례시켜(최소 10px) 사진 해상도가 달라도 비슷한 크기로 보이게 한다. (원본과 동일)
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const headLen = Math.max(10, w * 0.035);
+        const headAngle = Math.PI / 7;
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle - headAngle), y2 - headLen * Math.sin(angle - headAngle));
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle + headAngle), y2 - headLen * Math.sin(angle + headAngle));
         ctx.stroke();
       } else if (stroke.tool === "rect") {
         ctx.rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
@@ -189,9 +219,9 @@ export async function cropImage(
   ctx.drawImage(img, px, py, pw, ph, 0, 0, pw, ph);
 
   const croppedUrl = await canvasToObjectUrl(canvas);
+  // 회전과 같은 이유로 ...s 통째 복사 — text 를 빠뜨리면 자르기 후 글자가 사라진다
   const remapped = strokes.map((s) => ({
-    tool: s.tool,
-    color: s.color,
+    ...s,
     width: s.width / rect.w,
     points: s.points.map((p) => ({
       x: (p.x - rect.x) / rect.w,

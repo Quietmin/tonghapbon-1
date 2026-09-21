@@ -53,9 +53,13 @@
    overflow-wrap:anywhere — break-word 는 "줄바꿈만" relax 하고 칸 너비 계산(그리드의
    min-content)에는 반영되지 않아, 공백 없는 긴 어절 하나가 있으면 그 어절 폭만큼
    칸이 넓어질 수 있다. anywhere 는 칸 너비 계산에도 반영되어 칸이 넓어지지 않는다. */
+/* 양쪽정렬(justify) — 원본과 같은 기준이다. 가운데 정렬이던 때는 줄마다 폭이 달라
+   첫 글자가 들쭉날쭉했는데, 왼쪽 끝을 맞추면 줄이 넘어가든 엔터로 줄을 바꾸든 첫
+   글자가 같은 열에서 시작한다. 오른쪽 끝은 justify 가 어절 간격을 늘려 맞춘다.
+   (원본 주석) 고장 보고서의 .fr-photo-cap 도 같은 기준을 쓴다. */
 .desc-text {
   width: 100%; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere;
-  font-size: 14px; font-weight: 700; line-height: 1.5; text-align: center;
+  font-size: 14px; font-weight: 700; line-height: 1.5; text-align: justify;
 }
 /* 텍스트 항목은 사진 칸/설명 칸으로 나누지 않고 칸 하나를 통째로 쓴다.
    위쪽 여백은 좌상단 순번 배지(2mm+6mm)를 피하려고 넉넉히 잡았다. (원본 주석) */
@@ -132,8 +136,14 @@
 .fr-photo-box img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
 /* 줄이 여러 개인 설명도 세로 가운데를 지키도록 세로 방향으로 쌓는다 (원본 주석) */
 .fr-photo-cap {
-  border-top: 1px solid #000; min-height: 12mm; padding: 1.5mm 2mm;
-  font-size: 10px; font-weight: 600; line-height: 1.4; text-align: center;
+  /* 바닥값은 "글 한 줄"이다 — 1.4em(= line-height 한 줄) + 위아래 패딩 3mm.
+     예전에는 12mm 로 고정해 두어, 한 줄짜리 설명이나 빈 칸에도 두 줄 가까운 높이가
+     잡혀 사진 칸을 그만큼 잡아먹었다. em 으로 두면 font-size 를 바꿔도 같이 따라온다.
+     여기보다 길어지면 fitPageLayout 이 실제 글 높이를 재서 늘려 준다. */
+  /* 정렬 기준은 .desc-text(사진대장·매뉴얼)와 같은 양쪽정렬이다 — 원본과 동일.
+     두 문서의 사진 설명이 서로 다른 기준으로 찍히면 같은 앱에서 나온 문서로 보이지 않는다. */
+  border-top: 1px solid #000; min-height: calc(1.4em + 3mm); padding: 1.5mm 2mm;
+  font-size: 10px; font-weight: 600; line-height: 1.4; text-align: justify;
   display: flex; flex-direction: column; align-items: stretch; justify-content: center;
   white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; box-sizing: border-box;
   overflow: hidden;

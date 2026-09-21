@@ -14,10 +14,21 @@ import { composePreview, readImageFile } from "../lib/imageEdit";
 import { isDocgenSupabaseConfigured } from "../lib/supabase";
 import { saveToArchive, type SaveMeta } from "../lib/archive";
 import { isTextItem, type DocItem, type PhotoItem } from "../lib/types";
+import {
+  clearDraft,
+  formatSavedAt,
+  isDraftEnabled,
+  loadDraft,
+  peekDraft,
+  saveDraft,
+  type DraftMeta,
+  type DraftPayload,
+} from "../lib/draft";
 import { exportPagesToPdf, renderPagesToBlob } from "../lib/pdf";
 import { A4Page, FaultA4Page, chunkFaultPages, chunkPages } from "./A4Preview";
 import { PageBanner } from "./Letterhead";
 import PhotoEditorModal, { type PhotoEditorResult } from "./PhotoEditorModal";
+import AutoTextarea from "./AutoTextarea";
 
 /**
  * 3개 모드(사진대장·매뉴얼·고장 보고서)가 공유하는 편집기.
@@ -28,6 +39,21 @@ let seq = 0;
 function nextId() {
   seq += 1;
   return `item-${seq}`;
+}
+
+/** Gmail 작성 화면 주소 (원본 gmailComposeUrl 과 동일) */
+function gmailComposeUrl(subject: string, body: string): string {
+  return `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(
+    subject,
+  )}&body=${encodeURIComponent(body)}`;
+}
+
+function mailBodyFor(pdfFileName: string): string {
+  return (
+    `PDF 파일(${pdfFileName})이 이 기기에 다운로드되었습니다.\n` +
+    "Gmail 작성 화면 하단의 첨부파일 아이콘을 눌러 방금 다운로드된 파일을 직접 첨부해 주세요.\n" +
+    "(브라우저 보안 정책상 외부 웹사이트가 Gmail 에 파일을 자동으로 첨부할 수는 없습니다.)"
+  );
 }
 
 export interface DocEditorProps {
@@ -50,6 +76,12 @@ export interface DocEditorProps {
    * 호출부(각 모드 page.tsx)가 자기 입력값을 documents 컬럼명으로 넘겨준다.
    */
   saveMeta?: Omit<SaveMeta, "doc_type" | "file_name" | "title" | "page_count" | "photo_count">;
+  /**
+   * 임시저장을 되살릴 때, 저장해 둔 머리말 값을 부모에게 돌려준다.
+   * 지사·분야·발생일시 같은 값은 각 모드 컴포넌트가 들고 있어서 DocEditor 가
+   * 직접 되돌릴 수 없다. 넘기지 않으면 머리말은 복원되지 않고 사진·설명만 살아난다.
+   */
+  onRestoreMeta?: (meta: Record<string, unknown>) => void;
 }
 
 export default function DocEditor({
@@ -60,6 +92,7 @@ export default function DocEditor({
   faultSummary,
   allowTextItems = false,
   saveMeta,
+  onRestoreMeta,
 }: DocEditorProps) {
   const [fileName, setFileName] = useState("");
   const [author, setAuthor] = useState("");
@@ -76,6 +109,123 @@ export default function DocEditor({
 
   const archiveEnabled = isDocgenSupabaseConfigured();
   const label = MODE_LABELS[mode];
+
+  /** 이 종류로 저장해 둔 임시본이 있으면 그 요약 — 상단 안내줄에 쓴다 */
+  const [draftMeta, setDraftMeta] = useState<DraftMeta | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+  // saveMeta 는 부모가 렌더마다 새 객체로 넘긴다 — 의존성에 넣으면 무한 루프가 되므로
+  // 최신 값만 ref 로 들고 있다가 저장할 때 읽는다.
+  const saveMetaRef = useRef(saveMeta);
+  saveMetaRef.current = saveMeta;
+
+  // 들어올 때 한 번만 확인한다. 이어서 쓸지는 사용자가 고른다 — 조용히 되살리면
+  // 새 문서를 쓰려던 사람이 남의 내용 위에 덮어쓰게 된다.
+  useEffect(() => {
+    if (!isDraftEnabled()) return;
+    let cancelled = false;
+    void peekDraft(mode).then((m) => {
+      if (!cancelled) setDraftMeta(m);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
+  async function handleSaveDraft() {
+    if (!isDraftEnabled()) {
+      setError("이 브라우저에서는 임시저장을 사용할 수 없습니다.");
+      return;
+    }
+    setDraftBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const payload: DraftPayload = {
+        savedAt: new Date().toISOString(),
+        mode,
+        fileName,
+        author,
+        meta: (saveMetaRef.current ?? {}) as Record<string, unknown>,
+        items: items.map((it) =>
+          isTextItem(it)
+            ? { kind: "text" as const, id: it.id, body: it.body }
+            : {
+                kind: "photo" as const,
+                id: it.id,
+                // blob URL 은 새로고침하면 죽는다 — 원본 File 을 그대로 넣는다
+                file: it.file,
+                width: it.width,
+                height: it.height,
+                strokes: it.strokes,
+                desc: it.desc,
+                rotation: it.rotation,
+              },
+        ),
+      };
+      await saveDraft(payload);
+      setDraftMeta({
+        savedAt: payload.savedAt,
+        mode,
+        fileName,
+        photoCount: payload.items.filter((i) => i.kind === "photo").length,
+      });
+      setNotice("임시저장했습니다. 창을 닫아도 이어서 작성할 수 있습니다.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "임시저장에 실패했습니다.");
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  async function handleRestoreDraft() {
+    setDraftBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const payload = await loadDraft(mode);
+      if (!payload) {
+        setError("임시저장된 내용을 찾지 못했습니다.");
+        setDraftMeta(null);
+        return;
+      }
+      // 저장해 둔 File 로 blob URL 을 다시 만든다(예전 URL 은 이미 죽었다)
+      const restored: DocItem[] = await Promise.all(
+        payload.items.map(async (it): Promise<DocItem> => {
+          if (it.kind === "text") return { id: it.id, kind: "text", body: it.body };
+          const { url, width, height } = await readImageFile(it.file);
+          return {
+            id: it.id,
+            file: it.file,
+            url,
+            // 저장 당시 크기가 아니라 방금 읽은 실제 크기를 믿는다
+            width: width || it.width,
+            height: height || it.height,
+            strokes: it.strokes ?? [],
+            // null 로 두면 재합성 이펙트가 마킹을 다시 구워 준다
+            previewUrl: (it.strokes?.length ?? 0) > 0 ? null : url,
+            desc: it.desc,
+            rotation: it.rotation ?? 0,
+          };
+        }),
+      );
+      setFileName(payload.fileName ?? "");
+      setAuthor(payload.author ?? "");
+      setItems(restored);
+      onRestoreMeta?.(payload.meta ?? {});
+      setDraftMeta(null);
+      setNotice("임시저장한 내용을 불러왔습니다.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "임시저장을 불러오지 못했습니다.");
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  async function handleDiscardDraft() {
+    if (!window.confirm("임시저장한 내용을 지울까요? 되돌릴 수 없습니다.")) return;
+    await clearDraft(mode);
+    setDraftMeta(null);
+  }
 
   // object URL 은 브라우저가 자동으로 놓아주지 않는다 — 화면을 떠날 때 직접 해제한다.
   // previewUrl 은 url 과 별개의 blob 일 수 있다(마킹 합성본)— 있으면 그것도 같이 놓는다.
@@ -138,6 +288,52 @@ export default function DocEditor({
       })
       .catch(() => setError("사진을 불러오지 못했습니다. 다시 시도해 주세요."));
   }, []);
+
+  /**
+   * 사진 교체 — 설명·순서는 그대로 두고 그림만 바꾼다 (원본 replaceFileInput 대응).
+   * 잘못 찍은 사진 한 장 때문에 지웠다 다시 넣으면 순번과 설명을 다시 맞춰야 한다.
+   * 마킹(strokes)은 새 사진과 좌표가 맞지 않으므로 비운다.
+   */
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
+  const replaceTargetIdRef = useRef<string | null>(null);
+
+  function pickReplacement(id: string) {
+    replaceTargetIdRef.current = id;
+    replaceFileInputRef.current?.click();
+  }
+
+  function handleReplaceFile(file: File | undefined) {
+    const id = replaceTargetIdRef.current;
+    replaceTargetIdRef.current = null;
+    if (!id || !file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("이미지 파일만 넣을 수 있습니다.");
+      return;
+    }
+    setError(null);
+    readImageFile(file)
+      .then(({ url, width, height }) => {
+        setItems((prev) =>
+          prev.map((it) => {
+            if (it.id !== id || isTextItem(it)) return it;
+            // 예전 사진의 blob URL 은 여기서 놓아준다 — 안 놓으면 그대로 샌다
+            URL.revokeObjectURL(it.url);
+            if (it.previewUrl && it.previewUrl !== it.url) URL.revokeObjectURL(it.previewUrl);
+            return {
+              ...it,
+              file,
+              url,
+              width,
+              height,
+              strokes: [],
+              previewUrl: url,
+              rotation: 0,
+            };
+          }),
+        );
+      })
+      .catch(() => setError("사진을 불러오지 못했습니다. 다시 시도해 주세요."));
+  }
 
   function updateDesc(id: string, desc: string) {
     setItems((prev) => prev.map((it) => (it.id === id && !("kind" in it) ? { ...it, desc } : it)));
@@ -248,33 +444,51 @@ export default function DocEditor({
     setItems((prev) => [...prev, { id: nextId(), kind: "text", body: "" }]);
   }
 
-  async function handleExport() {
+  /** 출력 전 공통 검사 — 통과하면 파일명(제목)을 준다 */
+  function validateForOutput(): string | null {
     setError(null);
     setNotice(null);
     if (!fileName.trim()) {
       setError("파일명을 입력해 주세요.");
-      return;
+      return null;
     }
     if (items.length === 0) {
       setError("사진을 한 장 이상 추가해 주세요.");
-      return;
+      return null;
     }
+    return fileName.trim();
+  }
 
+  /**
+   * PDF 를 만들어 내려받고, 보관함에도 저장한다.
+   * mailWindow 가 있으면(= [메일로 전송]) 다운로드가 끝난 뒤 그 탭을 Gmail 작성
+   * 화면으로 돌린다. 창은 클릭 핸들러에서 *미리* 열어 두고 넘겨야 한다 —
+   * await 뒤에 window.open 을 부르면 브라우저가 팝업으로 보고 막는다.
+   */
+  async function runExport(title: string, mailWindow: Window | null) {
     setBusy(true);
     const pages = pageRefs.current.filter((el): el is HTMLDivElement => el !== null);
-    const title = fileName.trim();
 
     try {
       // 다운로드가 우선이다 — 보관함 저장이 실패해도 사용자는 PDF 를 손에 넣어야 한다.
       await exportPagesToPdf(pages, title);
     } catch (e) {
       setError(e instanceof Error ? e.message : "PDF 출력에 실패했습니다.");
+      mailWindow?.close();
       setBusy(false);
       return;
     }
 
+    if (mailWindow) {
+      mailWindow.location.href = gmailComposeUrl(title, mailBodyFor(`${title}.pdf`));
+    }
+
     if (!archiveEnabled) {
-      setNotice("PDF 를 내려받았습니다. (보관함 미설정 — 저장은 건너뜀)");
+      setNotice(
+        mailWindow
+          ? "PDF 를 내려받았습니다. 열린 Gmail 화면에서 첨부파일로 추가해 주세요."
+          : "PDF 를 내려받았습니다. (보관함 미설정 — 저장은 건너뜀)",
+      );
       setBusy(false);
       return;
     }
@@ -291,7 +505,11 @@ export default function DocEditor({
         page_count: pages.length,
         photo_count: photoCount,
       });
-      setNotice("PDF 를 내려받고 보관함에도 저장했습니다.");
+      setNotice(
+        mailWindow
+          ? "PDF 를 내려받고 보관함에도 저장했습니다. 열린 Gmail 화면에서 첨부파일로 추가해 주세요."
+          : "PDF 를 내려받고 보관함에도 저장했습니다.",
+      );
     } catch (e) {
       // 저장 실패를 조용히 넘기면 "저장된 줄 알았는데 없다"가 된다 — 반드시 알린다.
       const msg = e instanceof Error ? e.message : "보관함 저장에 실패했습니다.";
@@ -299,6 +517,29 @@ export default function DocEditor({
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleExport() {
+    const title = validateForOutput();
+    if (title) void runExport(title, null);
+  }
+
+  /**
+   * 메일로 전송 — PDF 다운로드와 Gmail 작성 화면 열기를 한 번에 (원본 generateMail).
+   * 브라우저 보안상 외부 사이트가 Gmail 에 파일을 자동 첨부할 수는 없어서,
+   * 받는 사람이 직접 첨부하도록 본문에 안내를 넣는다. (원본과 동일)
+   */
+  function handleMail() {
+    const title = validateForOutput();
+    if (!title) return;
+    // PDF 를 만들기 전에(= 사용자 클릭과 같은 흐름에서) 빈 탭을 먼저 연다.
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(
+        '<p style="font-family:sans-serif;padding:24px;color:#374151;">PDF를 준비하고 있습니다. 잠시만 기다려 주세요…</p>',
+      );
+    }
+    void runExport(title, win);
   }
 
   // 고장 보고서의 "2. 관련 사진"은 사진 격자라 텍스트 칸을 놓을 자리가 없다.
@@ -316,6 +557,34 @@ export default function DocEditor({
           {MAX_PHOTOS}장.
         </p>
       </section>
+
+      {/* ---- 이어서 작성 안내 ----
+          조용히 되살리지 않고 물어본다 — 새로 쓰려던 사람이 예전 내용 위에
+          덮어쓰는 일을 막아야 한다. (원본의 "이어서 작성하시겠습니까?" 대응) */}
+      {draftMeta && (
+        <Card className="p-card-padding" lift={false}>
+          <div className="flex flex-wrap items-center gap-3">
+            <Icon name="history" className="text-primary text-2xl" />
+            <div className="flex-1 min-w-48">
+              <p className="text-title-sm text-on-surface">이어서 작성하시겠습니까?</p>
+              <p className="text-sm text-on-surface-variant mt-0.5">
+                {formatSavedAt(draftMeta.savedAt)} 에 임시저장
+                {draftMeta.fileName ? ` · ${draftMeta.fileName}` : ""} · 사진{" "}
+                {draftMeta.photoCount}장
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => void handleRestoreDraft()} disabled={draftBusy}>
+                <Icon name="restore" className="text-lg" />
+                이어서 작성
+              </Button>
+              <Button variant="ghost" onClick={() => void handleDiscardDraft()} disabled={draftBusy}>
+                새로 시작
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* ---- 머리말 ---- */}
       <Card className="p-card-padding">
@@ -404,6 +673,17 @@ export default function DocEditor({
               e.target.value = "";
             }}
           />
+          {/* 사진 교체용 — 어느 칸을 바꿀지는 replaceTargetIdRef 가 들고 있다 */}
+          <input
+            ref={replaceFileInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              handleReplaceFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
         </div>
 
         {error && (
@@ -443,6 +723,14 @@ export default function DocEditor({
                         </button>
                         <button
                           type="button"
+                          onClick={() => pickReplacement(item.id)}
+                          title="사진 변경 (설명·순서는 그대로)"
+                          className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                        >
+                          <Icon name="swap_horiz" className="text-base" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => rotate(item.id)}
                           title="90도 회전"
                           className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
@@ -475,12 +763,12 @@ export default function DocEditor({
                 </div>
 
                 {"kind" in item ? (
-                  <textarea
+                  <AutoTextarea
                     value={item.body}
-                    onChange={(e) => updateText(item.id, e.target.value)}
-                    rows={5}
+                    onChange={(v) => updateText(item.id, v)}
+                    minRows={3}
                     placeholder="칸 하나를 통째로 쓰는 텍스트입니다."
-                    className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none resize-y"
+                    className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none"
                   />
                 ) : (
                   <>
@@ -495,12 +783,12 @@ export default function DocEditor({
                         }}
                       />
                     </div>
-                    <textarea
+                    <AutoTextarea
                       value={item.desc}
-                      onChange={(e) => updateDesc(item.id, e.target.value)}
-                      rows={2}
+                      onChange={(v) => updateDesc(item.id, v)}
+                      minRows={1}
                       placeholder="사진 설명"
-                      className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none resize-y"
+                      className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none"
                     />
                   </>
                 )}
@@ -515,6 +803,19 @@ export default function DocEditor({
         <Button onClick={handleExport} disabled={busy || items.length === 0}>
           <Icon name="picture_as_pdf" className="text-lg" />
           {busy ? "만들고 있습니다…" : "PDF 출력"}
+        </Button>
+        <Button variant="ghost" onClick={handleMail} disabled={busy || items.length === 0}>
+          <Icon name="mail" className="text-lg" />
+          메일로 전송
+        </Button>
+        {/* 새로고침하면 작성 중이던 내용이 사라지므로, 잠깐 자리를 비울 때 눌러 둔다 */}
+        <Button
+          variant="ghost"
+          onClick={() => void handleSaveDraft()}
+          disabled={draftBusy || items.length === 0}
+        >
+          <Icon name="save" className="text-lg" />
+          {draftBusy ? "저장 중…" : "임시저장"}
         </Button>
         <span className="text-sm text-on-surface-variant">
           A4 {pages.length}페이지 · 사진 {photos.length}장
