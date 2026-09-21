@@ -1,0 +1,306 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Plant Ops Hub — 데이터 흐름",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1068,
+      610
+    ],
+    "views": [
+      {
+        "id": "plan-line",
+        "label": "보수계획 라인",
+        "focus": [
+          "planXlsx",
+          "judge",
+          "planDb",
+          "taskDb"
+        ],
+        "note": "계약 전 중장기 계획에서 올해 대상을 골라내는 경로."
+      },
+      {
+        "id": "task-line",
+        "label": "공정관리 라인",
+        "focus": [
+          "stmtXlsx",
+          "taskParse",
+          "taskDb",
+          "progress",
+          "report"
+        ],
+        "note": "계약 후 설계내역서가 공정률과 보고서로 이어지는 경로."
+      },
+      {
+        "id": "docgen-line",
+        "label": "문서생성 라인",
+        "focus": [
+          "photos",
+          "imgEdit",
+          "docStore",
+          "pdf"
+        ],
+        "note": "다른 세 라인과 저장소부터 갈라지는 독립 경로."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "default": {
+          "label": "일반 흐름"
+        },
+        "emphasis": {
+          "label": "주 데이터 경로"
+        },
+        "security": {
+          "label": "계획 → 공정 반영"
+        },
+        "dashed": {
+          "label": "문서 · 부가 경로"
+        },
+        "database": {
+          "label": "저장소"
+        }
+      }
+    }
+  },
+  "stages": [
+    {
+      "label": "원본 입력"
+    },
+    {
+      "label": "파싱 · 판정"
+    },
+    {
+      "label": "저장"
+    },
+    {
+      "label": "집계"
+    },
+    {
+      "label": "산출물"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "planXlsx",
+      "type": "frontend",
+      "label": "중장기 보수계획",
+      "sublabel": "엑셀 업로드",
+      "stage": 0,
+      "row": 0,
+      "tag": "계약 전"
+    },
+    {
+      "id": "stmtXlsx",
+      "type": "frontend",
+      "label": "설계내역서",
+      "sublabel": "엑셀 업로드",
+      "stage": 0,
+      "row": 2,
+      "tag": "계약 후"
+    },
+    {
+      "id": "photos",
+      "type": "frontend",
+      "label": "현장 사진",
+      "sublabel": "촬영 이미지",
+      "stage": 0,
+      "row": 3,
+      "tag": "문서생성"
+    },
+    {
+      "id": "judge",
+      "type": "security",
+      "label": "대상연도 판정",
+      "sublabel": "maintenanceJudge.ts",
+      "stage": 1,
+      "row": 0,
+      "tag": "등급 · 주기"
+    },
+    {
+      "id": "taskParse",
+      "type": "cloud",
+      "label": "작업항목 추출",
+      "sublabel": "excelParser.ts",
+      "stage": 1,
+      "row": 2,
+      "tag": "물량"
+    },
+    {
+      "id": "imgEdit",
+      "type": "cloud",
+      "label": "자르기 · 마킹",
+      "sublabel": "imageEdit.ts",
+      "stage": 1,
+      "row": 3
+    },
+    {
+      "id": "planDb",
+      "type": "database",
+      "label": "maintenance_plan",
+      "sublabel": "30년 장기추적",
+      "stage": 2,
+      "row": 0,
+      "tag": "Postgres"
+    },
+    {
+      "id": "taskDb",
+      "type": "database",
+      "label": "overhaul_task",
+      "sublabel": "물량 · 공정",
+      "stage": 2,
+      "row": 2,
+      "tag": "Postgres"
+    },
+    {
+      "id": "docStore",
+      "type": "database",
+      "label": "docgen 보관함",
+      "sublabel": "docgen_ 테이블 · Storage",
+      "stage": 2,
+      "row": 3,
+      "tag": "별도 경로"
+    },
+    {
+      "id": "progress",
+      "type": "backend",
+      "label": "공정률 · 지연 집계",
+      "sublabel": "progress.ts · 실적 누적",
+      "stage": 3,
+      "row": 1,
+      "tag": "물량 기준",
+      "width": 150
+    },
+    {
+      "id": "report",
+      "type": "backend",
+      "label": "보고서 · 엑셀 산출물",
+      "sublabel": "report.ts · matrixExporter.ts",
+      "stage": 4,
+      "row": 1,
+      "tag": "일일 · 경영 · 수량산출서",
+      "width": 150
+    },
+    {
+      "id": "pdf",
+      "type": "backend",
+      "label": "A4 문서 PDF",
+      "sublabel": "사진대장 · 매뉴얼 · 고장보고서",
+      "stage": 4,
+      "row": 3,
+      "tag": "jspdf",
+      "width": 150
+    }
+  ],
+  "flows": [
+    {
+      "id": "plan-parse",
+      "from": "planXlsx",
+      "to": "judge",
+      "label": "계획 행 파싱",
+      "classification": "엑셀 원본",
+      "variant": "emphasis"
+    },
+    {
+      "id": "plan-store",
+      "from": "judge",
+      "to": "planDb",
+      "label": "올해 대상 판정",
+      "classification": "판정 결과",
+      "variant": "emphasis"
+    },
+    {
+      "id": "stmt-parse",
+      "from": "stmtXlsx",
+      "to": "taskParse",
+      "label": "항목 · 물량 추출",
+      "classification": "엑셀 원본",
+      "variant": "emphasis"
+    },
+    {
+      "id": "task-store",
+      "from": "taskParse",
+      "to": "taskDb",
+      "label": "작업항목 적재",
+      "classification": "정규화",
+      "variant": "emphasis"
+    },
+    {
+      "id": "photo-edit",
+      "from": "photos",
+      "to": "imgEdit",
+      "label": "원본 이미지",
+      "classification": "바이너리"
+    },
+    {
+      "id": "photo-store",
+      "from": "imgEdit",
+      "to": "docStore",
+      "label": "편집본 업로드",
+      "classification": "이미지",
+      "variant": "dashed"
+    },
+    {
+      "id": "plan-to-task",
+      "from": "planDb",
+      "to": "taskDb",
+      "label": "설계내역서 대상 반영",
+      "classification": "계약 전 → 후",
+      "variant": "security",
+      "labelDy": 24
+    },
+    {
+      "id": "task-aggregate",
+      "from": "taskDb",
+      "to": "progress",
+      "label": "물량 · 실적 조회",
+      "classification": "집계 입력",
+      "variant": "emphasis"
+    },
+    {
+      "id": "progress-report",
+      "from": "progress",
+      "to": "report",
+      "label": "공정률 · 지연",
+      "classification": "산출",
+      "variant": "emphasis",
+      "labelDy": -46
+    },
+    {
+      "id": "archive-pdf",
+      "from": "docStore",
+      "to": "pdf",
+      "label": "보관함 조회 · 재편집",
+      "classification": "문서 자산",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "세 갈래 입력",
+      "items": [
+        "중장기 보수계획 엑셀 — 계약 전에 올해 대상을 고른다",
+        "설계내역서 엑셀 — 계약 후 작업항목과 물량이 나온다"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "물량이 기준이다",
+      "items": [
+        "공정률은 건수가 아니라 물량 누적으로 계산한다",
+        "overhaul_entry의 날짜별 실적이 집계 입력이 된다"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "갈라지는 지점",
+      "items": [
+        "문서생성만 별도 Supabase 경로로 끝까지 갈라져 있다",
+        "고장이력·챗봇 데이터는 아직 이 흐름에 들어오지 않는다"
+      ]
+    }
+  ]
+}

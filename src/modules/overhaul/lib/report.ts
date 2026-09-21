@@ -89,14 +89,15 @@ export function buildReportData(
   for (const t of tasks) {
     const list = entriesByTask.get(t.id) ?? []; // entry_date 내림차순
     const latest = list[0] ?? null;
-    if (latest?.photo_before) withBefore++;
-    if (latest?.photo_after) withAfter++;
+    if (latest?.photos?.some((p) => p.slot === "before")) withBefore++;
+    if (latest?.photos?.some((p) => p.slot === "after")) withAfter++;
 
     const todaysEntry = list.find((e) => e.entry_date === todayStr);
     if (todaysEntry) {
-      const prior = list
-        .filter((e) => e.entry_date < todayStr)
-        .reduce((max, e) => Math.max(max, e.done_qty), 0);
+      // 직전 누적 = 오늘보다 앞선 기록 중 "가장 최근 날짜"의 값.
+      // list는 entry_date 내림차순이라 먼저 걸리는 게 가장 최근이다.
+      // (최댓값이 아니다 — repo.recomputeTaskDoneQty와 기준을 맞춘다)
+      const prior = list.find((e) => e.entry_date < todayStr)?.done_qty ?? 0;
       const doneToday = Math.max(0, todaysEntry.done_qty - prior);
       if (doneToday > 0) {
         todayResults.push({

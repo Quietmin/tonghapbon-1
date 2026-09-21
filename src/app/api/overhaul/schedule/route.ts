@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getOrCreateProject, listAllTasks, listEntryRanges } from "@/modules/overhaul/lib/repo";
+import { listAllTasks, listEntryRanges } from "@/modules/overhaul/lib/repo";
+import { resolveProjectFromRequest } from "@/modules/overhaul/lib/activeProject";
 import { taskProgress } from "@/modules/overhaul/lib/progress";
 import {
   taskSchedule,
@@ -14,9 +15,9 @@ export const dynamic = "force-dynamic";
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const today = () => new Date().toISOString().slice(0, 10);
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const project = await getOrCreateProject();
+    const project = await resolveProjectFromRequest(req);
     const tasks = await listAllTasks(project.id);
     const ranges = await listEntryRanges(project.id);
     const rangeByTask = new Map(ranges.map((r) => [r.task_id, r]));

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, Button, Icon, StatusChip, FieldChip, ProgressBar, EmptyState } from "@/shared/components/ui";
 import { taskProgress, taskStatus } from "../lib/progress";
+import { compressImage, formatBytes } from "../lib/imageCompress";
 import type { OverhaulTask, OverhaulEntry } from "../lib/repo";
 
 /**
@@ -23,6 +24,23 @@ interface TaskOption {
   equipment_type: string | null;
 }
 
+/**
+ * 사진 한 장. 이미 저장된 것(id)과 방금 고른 것(dataUrl)이 한 목록에 섞인다.
+ *
+ * 화면은 저장된 사진의 이미지 데이터를 들고 있지 않다 — 목록 응답에서 뺐기 때문이다.
+ * 그래서 "남길 사진"은 id로만 지목하고, 저장할 때 서버에 id 목록 + 새 사진만 보낸다.
+ */
+interface PhotoItem {
+  /** React key (저장된 건 "p12", 새 건 "n3" 꼴) */
+  key: string;
+  /** 저장된 사진이면 그 id */
+  id?: number;
+  /** 방금 골라 줄인 사진 (data URL) */
+  dataUrl?: string;
+  /** "4.2MB → 310KB" 안내 (새 사진만) */
+  note?: string;
+}
+
 interface FormState {
   date: string;
   doneToday: string;
@@ -30,67 +48,134 @@ interface FormState {
   notes: string;
   delayReason: string;
   plan: string;
-  before: string | null;
-  after: string | null;
+  before: PhotoItem[];
+  after: PhotoItem[];
   existing: boolean;
 }
 
-function readAsDataURL(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+/** 저장된 사진 주소. id가 곧 그 사진이라(덮어쓰지 않는다) 캐시 무효화가 필요 없다 */
+const savedPhotoUrl = (id: number) => `/api/overhaul/photos/one?id=${id}`;
+const thumbOf = (it: PhotoItem) => it.dataUrl ?? savedPhotoUrl(it.id!);
 
-function PhotoSlot({
+/** 한 슬롯 최대 장수 — 한 번에 저장할 요청 크기를 감당할 만큼만 */
+const MAX_PER_SLOT = 8;
+/** 새 사진을 한 번에 보낼 수 있는 총량. 넘으면 먼저 저장하라고 안내한다 */
+const MAX_NEW_BYTES = 3_500_000;
+
+/**
+ * 사진 묶음 한 칸 (분해 전 또는 분해 후).
+ *
+ * 여러 장을 넣을 수 있다. 고른 사진은 올리기 전에 브라우저에서 줄인다
+ * (imageCompress.ts) — 폰 사진을 그대로 보내면 요청 본문 한계에 걸려 저장이 통째로
+ * 실패하기 때문이다. 사용자는 아무것도 안 해도 되고, 얼마나 줄었는지만 알려 준다.
+ */
+function PhotoGroup({
   label,
-  value,
+  items,
   onChange,
+  onError,
 }: {
   label: string;
-  value: string | null;
-  onChange: (v: string | null) => void;
+  items: PhotoItem[];
+  onChange: (next: PhotoItem[]) => void;
+  onError: (msg: string | null) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const [working, setWorking] = useState<string | null>(null);
+
+  const pick = async (files: File[]) => {
+    onError(null);
+    const room = MAX_PER_SLOT - items.length;
+    if (room <= 0) {
+      onError(`${label}은 최대 ${MAX_PER_SLOT}장까지 넣을 수 있습니다.`);
+      return;
+    }
+    const take = files.slice(0, room);
+    if (files.length > room) {
+      onError(`${label}은 최대 ${MAX_PER_SLOT}장까지라 ${room}장만 넣었습니다.`);
+    }
+
+    const added: PhotoItem[] = [];
+    for (let i = 0; i < take.length; i++) {
+      setWorking(take.length > 1 ? `사진 줄이는 중… (${i + 1}/${take.length})` : "사진 줄이는 중…");
+      try {
+        const out = await compressImage(take[i]);
+        added.push({
+          key: `n${Date.now()}-${i}`,
+          dataUrl: out.dataUrl,
+          note: `${formatBytes(out.originalBytes)} → ${formatBytes(out.bytes)}`,
+        });
+      } catch (e) {
+        onError(e instanceof Error ? e.message : String(e));
+        break;
+      }
+    }
+    setWorking(null);
+    if (added.length) onChange([...items, ...added]);
+  };
+
+  const remove = (key: string) => onChange(items.filter((x) => x.key !== key));
+
   return (
-    <div className="flex-1">
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="text-xs font-bold text-on-surface">{label}</span>
+        <span className="text-[11px] text-on-surface-variant">
+          {items.length}/{MAX_PER_SLOT}장
+        </span>
+      </div>
+
       <input
         ref={ref}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (file) onChange(await readAsDataURL(file));
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (files.length) void pick(files);
         }}
       />
-      <button
-        type="button"
-        onClick={() => ref.current?.click()}
-        className="w-full aspect-[4/3] rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low hover:border-primary hover:bg-primary/5 transition-colors flex flex-col items-center justify-center gap-1 overflow-hidden relative group"
-      >
-        {value ? (
-          <>
-            {/* base64 데이터 URL — 개발 단계라 파일 저장소 없이 DB에 직접 담는다 */}
-            <img src={value} alt={label} className="absolute inset-0 w-full h-full object-cover" />
-            <span className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center text-white opacity-0 group-hover:opacity-100">
-              <Icon name="cached" /> 교체
+
+      <div className="grid grid-cols-3 gap-2">
+        {items.map((it) => (
+          <div key={it.key} className="relative group aspect-[4/3] rounded-lg overflow-hidden bg-surface-container-low">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={thumbOf(it)} alt={label} loading="lazy" className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={() => remove(it.key)}
+              title="이 사진 빼기"
+              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-error transition-colors"
+            >
+              <Icon name="close" className="text-sm" />
+            </button>
+            {it.note && (
+              <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-[9px] text-center py-0.5">
+                {it.note}
+              </span>
+            )}
+          </div>
+        ))}
+
+        {items.length < MAX_PER_SLOT && (
+          <button
+            type="button"
+            disabled={!!working}
+            onClick={() => ref.current?.click()}
+            className="aspect-[4/3] rounded-lg border-2 border-dashed border-outline-variant bg-surface-container-low hover:border-primary hover:bg-primary/5 transition-colors flex flex-col items-center justify-center gap-0.5 disabled:opacity-60"
+          >
+            <Icon
+              name={working ? "hourglass_top" : "add_a_photo"}
+              className="text-xl text-on-surface-variant"
+            />
+            <span className="text-[10px] font-semibold text-on-surface-variant px-1 text-center leading-tight">
+              {working ?? "사진 추가"}
             </span>
-          </>
-        ) : (
-          <>
-            <Icon name="photo_camera" className="text-2xl text-on-surface-variant" />
-            <span className="text-xs font-semibold text-on-surface-variant">{label}</span>
-          </>
+          </button>
         )}
-      </button>
-      {value && (
-        <button onClick={() => onChange(null)} className="text-xs text-error mt-1.5 hover:underline">
-          사진 삭제
-        </button>
-      )}
+      </div>
     </div>
   );
 }
@@ -177,8 +262,11 @@ function HistoryTimeline({
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {(e.photo_before || e.photo_after) && (
-                        <Icon name="photo_library" className="text-sm text-on-surface-variant" />
+                      {e.photos.length > 0 && (
+                        <span className="text-xs text-on-surface-variant flex items-center gap-0.5">
+                          <Icon name="photo_library" className="text-sm" />
+                          {e.photos.length}
+                        </span>
                       )}
                       {delayed && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-error/10 text-status-error">
@@ -215,14 +303,22 @@ function HistoryTimeline({
                       {e.next_plan && <p className="text-on-surface-variant">익일계획: {e.next_plan}</p>}
                     </div>
                   )}
-                  {(e.photo_before || e.photo_after) && (
-                    <div className="flex gap-2 mt-2">
-                      {e.photo_before && (
-                        <img src={e.photo_before} alt="분해 전" className="w-16 h-12 object-cover rounded-lg" />
-                      )}
-                      {e.photo_after && (
-                        <img src={e.photo_after} alt="분해 후" className="w-16 h-12 object-cover rounded-lg" />
-                      )}
+                  {e.photos.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {/* 사진은 목록 응답에 없다 — 썸네일이 id로 한 장씩 받아 온다 */}
+                      {e.photos.map((ph) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={ph.id}
+                          src={savedPhotoUrl(ph.id)}
+                          alt={ph.slot === "before" ? "분해 전" : "분해 후"}
+                          title={ph.slot === "before" ? "분해 전" : "분해 후"}
+                          loading="lazy"
+                          className={`w-16 h-12 object-cover rounded-lg border-2 ${
+                            ph.slot === "before" ? "border-primary/40" : "border-status-success/40"
+                          }`}
+                        />
+                      ))}
                     </div>
                   )}
                 </button>
@@ -246,10 +342,28 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** 특정 날짜 이전까지의 누적 (새 날짜 실적의 기준값). entries를 인자로 받는 순수함수라 클로저 지연 문제가 없다. */
+/**
+ * 그 날짜 직전에 보고한 누적 (새 날짜 실적의 기준값).
+ *
+ * 과거 기록 중 "가장 최근 날짜"의 값을 쓴다. 최댓값이 아니다 —
+ * 앞선 날짜의 오입력을 정정해도 기준값이 계속 부풀어 있으면 안 되기 때문이다.
+ * (서버의 recomputeTaskDoneQty와 같은 기준이어야 화면과 DB가 어긋나지 않는다)
+ *
+ * entries를 인자로 받는 순수함수라 클로저 지연 문제가 없다.
+ */
 function priorCumulativeOf(entries: OverhaulEntry[], dateStr: string): number {
-  const prev = entries.filter((e) => e.entry_date < dateStr);
-  return prev.length ? Math.max(...prev.map((e) => e.done_qty)) : 0;
+  const prev = entries
+    .filter((e) => e.entry_date < dateStr)
+    .sort((a, b) => (a.entry_date < b.entry_date ? 1 : -1));
+  return prev.length ? prev[0].done_qty : 0;
+}
+
+/** 저장된 사진 참조를 폼이 쓰는 목록으로 */
+function toItems(entry: OverhaulEntry, slot: "before" | "after"): PhotoItem[] {
+  return entry.photos
+    .filter((p) => p.slot === slot)
+    .sort((a, b) => a.seq - b.seq || a.id - b.id)
+    .map((p) => ({ key: `p${p.id}`, id: p.id }));
 }
 
 /** 날짜에 해당하는 폼 구성 — 기록이 있으면 로드, 없으면 빈 폼(누적은 직전일 기준) */
@@ -264,8 +378,8 @@ function buildFormOf(entries: OverhaulEntry[], dateStr: string): FormState {
       notes: ex.work_detail ?? "",
       delayReason: ex.delay_reason ?? "지연 없음",
       plan: ex.next_plan ?? "",
-      before: ex.photo_before,
-      after: ex.photo_after,
+      before: toItems(ex, "before"),
+      after: toItems(ex, "after"),
       existing: true,
     };
   }
@@ -276,8 +390,8 @@ function buildFormOf(entries: OverhaulEntry[], dateStr: string): FormState {
     notes: "",
     delayReason: "지연 없음",
     plan: "",
-    before: null,
-    after: null,
+    before: [],
+    after: [],
     existing: false,
   };
 }
@@ -287,24 +401,46 @@ export default function PerformanceEntry() {
   const sp = useSearchParams();
 
   const [options, setOptions] = useState<TaskOption[] | null>(null);
+  /** 작업 목록 검색어 — 목록에 상한이 있어 수천 건이면 좁혀서 찾아야 한다 */
+  const [optionQuery, setOptionQuery] = useState("");
+  const [optionsTruncated, setOptionsTruncated] = useState(false);
   const [task, setTask] = useState<OverhaulTask | null>(null);
   const [entries, setEntries] = useState<OverhaulEntry[]>([]);
   const [form, setForm] = useState<FormState | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const selectedId = sp.get("task");
 
   const priorCumulative = useCallback((dateStr: string) => priorCumulativeOf(entries, dateStr), [entries]);
   const buildForm = useCallback((dateStr: string) => buildFormOf(entries, dateStr), [entries]);
 
-  // 작업 목록 로드 (최초 1회)
+  // 작업 목록 로드. 검색어가 바뀌면 다시 읽는다.
+  // 선택된 작업은 검색 결과 밖이어도 서버가 끼워 넣어 준다(include) —
+  // 안 그러면 선택칸이 빈 것처럼 보인다.
   useEffect(() => {
-    void (async () => {
-      const json = await (await fetch("/api/overhaul/task-options")).json();
-      if (json.ok) setOptions(json.options);
-    })();
-  }, []);
+    let alive = true;
+    const t = setTimeout(
+      () => {
+        void (async () => {
+          const sp = new URLSearchParams();
+          if (optionQuery.trim()) sp.set("q", optionQuery.trim());
+          if (selectedId) sp.set("include", selectedId);
+          const json = await (await fetch(`/api/overhaul/task-options?${sp}`)).json();
+          if (!alive || !json.ok) return;
+          setOptions(json.options);
+          setOptionsTruncated(!!json.truncated);
+        })();
+      },
+      optionQuery ? 250 : 0,
+    );
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [optionQuery, selectedId]);
 
   // 선택된 작업이 없으면 첫 항목으로 이동
   useEffect(() => {
@@ -361,8 +497,23 @@ export default function PerformanceEntry() {
 
   const submit = useCallback(async () => {
     if (!task || !form) return;
-    const json = await (
-      await fetch("/api/overhaul/entries", {
+    setSaveError(null);
+
+    // 새 사진 용량을 미리 재서, 요청 본문 한계에 걸려 통째로 실패하는 걸 막는다.
+    // 이미 저장된 사진은 id만 보내므로 여기 안 잡힌다 → 나눠 저장하면 항상 된다.
+    const newBytes = [...form.before, ...form.after]
+      .filter((x) => x.dataUrl)
+      .reduce((n, x) => n + x.dataUrl!.length, 0);
+    if (newBytes > MAX_NEW_BYTES) {
+      setSaveError(
+        "한 번에 올릴 사진이 너무 많습니다. 몇 장을 빼고 저장한 뒤, 나머지를 추가해 다시 저장하세요.",
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/overhaul/entries", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -372,16 +523,49 @@ export default function PerformanceEntry() {
           workDetail: form.notes,
           delayReason: form.delayReason,
           nextPlan: form.plan,
-          photoBefore: form.before,
-          photoAfter: form.after,
+          photos: {
+            // 남길 기존 사진은 id로만 지목한다 (화면이 이미지 데이터를 안 들고 있다)
+            keepIds: [...form.before, ...form.after]
+              .map((x) => x.id)
+              .filter((v): v is number => typeof v === "number"),
+            add: [
+              ...form.before.filter((x) => x.dataUrl).map((x) => ({ slot: "before", dataUrl: x.dataUrl! })),
+              ...form.after.filter((x) => x.dataUrl).map((x) => ({ slot: "after", dataUrl: x.dataUrl! })),
+            ],
+          },
         }),
-      })
-    ).json();
-    if (json.ok) {
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(
+          json.error ??
+            (res.status === 413
+              ? "사진이 너무 커서 저장하지 못했습니다. 사진을 다시 골라 주세요."
+              : "저장에 실패했습니다."),
+        );
+      }
       setTask(json.task);
       setEntries(json.entries);
-      setForm((f) => (f ? { ...f, existing: true } : f));
+      // 새로 올린 사진이 이제 id를 가졌으니, 서버가 돌려준 목록으로 폼을 다시 맞춘다.
+      // (안 하면 다시 저장할 때 같은 사진을 또 올린다)
+      const fresh: OverhaulEntry | undefined = json.entries?.find(
+        (x: OverhaulEntry) => x.entry_date === form.date,
+      );
+      setForm((f) =>
+        f
+          ? {
+              ...f,
+              existing: true,
+              before: fresh ? toItems(fresh, "before") : [],
+              after: fresh ? toItems(fresh, "after") : [],
+            }
+          : f,
+      );
       setSaved(true);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
     }
   }, [task, form]);
 
@@ -433,17 +617,33 @@ export default function PerformanceEntry() {
             일자별로 실적·사진을 기록하면 그날 기록으로 저장됩니다. 다른 날짜를 선택하면 그 날짜의 기록을 불러옵니다.
           </p>
         </div>
-        <select
-          value={task.id}
-          onChange={(e) => router.push(`/overhaul/entry?task=${e.target.value}`)}
-          className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary max-w-full md:max-w-xs truncate"
-        >
-          {options.map((t) => (
-            <option key={t.id} value={t.id}>
-              [{t.equipment_type ?? "기타"}] {t.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-1.5 w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 border border-transparent focus-within:border-primary transition-colors md:max-w-xs">
+            <Icon name="search" className="text-on-surface-variant text-base" />
+            <input
+              value={optionQuery}
+              onChange={(e) => setOptionQuery(e.target.value)}
+              placeholder="작업 찾기"
+              className="flex-1 min-w-0 bg-transparent outline-none text-sm"
+            />
+          </div>
+          <select
+            value={task.id}
+            onChange={(e) => router.push(`/overhaul/entry?task=${e.target.value}`)}
+            className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary w-full md:max-w-xs truncate"
+          >
+            {options.map((t) => (
+              <option key={t.id} value={t.id}>
+                [{t.equipment_type ?? "기타"}] {t.name}
+              </option>
+            ))}
+          </select>
+          {optionsTruncated && (
+            <p className="text-[11px] text-on-surface-variant md:max-w-xs">
+              작업이 많아 목록을 일부만 보여줍니다 — 위에서 검색해 좁히세요.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* 작업 헤더 */}
@@ -540,16 +740,40 @@ export default function PerformanceEntry() {
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
             분해 전 / 후 사진
+            <span className="ml-2 text-xs font-normal text-on-surface-variant">
+              칸마다 여러 장 넣을 수 있습니다 · 고르면 자동으로 줄여서 올립니다
+            </span>
           </label>
           <div className="flex gap-4 mt-2">
-            <PhotoSlot label="분해 전 (BEFORE)" value={form.before} onChange={(v) => setForm({ ...form, before: v })} />
-            <PhotoSlot label="분해 후 (AFTER)" value={form.after} onChange={(v) => setForm({ ...form, after: v })} />
+            <PhotoGroup
+              label="분해 전 (BEFORE)"
+              items={form.before}
+              onChange={(v) => {
+                setForm({ ...form, before: v });
+                setSaved(false);
+              }}
+              onError={setSaveError}
+            />
+            <PhotoGroup
+              label="분해 후 (AFTER)"
+              items={form.after}
+              onChange={(v) => {
+                setForm({ ...form, after: v });
+                setSaved(false);
+              }}
+              onError={setSaveError}
+            />
           </div>
         </div>
 
         <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
           <p className="text-sm min-h-[20px]">
-            {saved && (
+            {saveError && (
+              <span className="text-error flex items-center gap-1.5">
+                <Icon name="error" className="text-base" /> {saveError}
+              </span>
+            )}
+            {!saveError && saved && (
               <span className="text-status-success flex items-center gap-1.5">
                 <Icon name="check_circle" className="text-base" fill /> {form.date} 실적이 저장되었습니다.
               </span>
@@ -567,8 +791,9 @@ export default function PerformanceEntry() {
               </span>
             )}
           </p>
-          <Button onClick={submit}>
-            <Icon name="save" className="text-base" /> {form.existing ? "이 날짜 수정 저장" : "이 날짜로 저장"}
+          <Button onClick={submit} disabled={saving}>
+            <Icon name="save" className="text-base" />{" "}
+            {saving ? "저장 중…" : form.existing ? "이 날짜 수정 저장" : "이 날짜로 저장"}
           </Button>
         </div>
       </Card>

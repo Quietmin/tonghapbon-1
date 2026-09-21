@@ -11,6 +11,8 @@
 --   2) 오버홀 공정관리     overhaul_project / overhaul_source / overhaul_task / overhaul_entry
 --   3) 고장이력 관리       failure_history / failure_attachment
 --   4) 정비 챗봇           document / document_chunk / chat_message
+--   5) 중장기 보수계획     maintenance_plan / maintenance_plan_grade / maintenance_record
+--                          design_statement / design_statement_item
 --
 -- 인증이 없는 개발 단계 구성이라 접근 제어(RLS)를 넣지 않았다. 운영 전환 시 필요하다.
 -- ============================================================================
@@ -102,11 +104,20 @@ create table if not exists overhaul_project (
   name         text not null,
   plant        text,
   unit         text,
+  -- 지사 — 유지보수 업무는 지사별로 독립 운영되므로 회차가 지사에 속한다.
+  -- 화면은 지사를 먼저 고르고(oh_branch 쿠키), 그 지사의 회차만 본다.
+  branch       text,
   start_date   date,   -- 계약 시작일
   end_date     date,   -- 준공 예정일
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+
+-- 기존 테이블에도 반영 (idempotent). 지사 개념 도입 전에 쌓인 행은 양산지사 것이다
+-- (이 시스템을 먼저 쓰기 시작한 지사 — docgen의 DEFAULT_BRANCH와 같은 근거).
+alter table overhaul_project add column if not exists branch text;
+update overhaul_project set branch = '양산지사' where branch is null;
+create index if not exists overhaul_project_branch_idx on overhaul_project (branch);
 
 drop trigger if exists overhaul_project_set_updated_at on overhaul_project;
 create trigger overhaul_project_set_updated_at before update on overhaul_project
@@ -173,7 +184,8 @@ create trigger overhaul_task_set_updated_at before update on overhaul_task
 
 -- 실적 입력 — 날짜별로 독립 저장하고, 항목별 정비 이력 타임라인으로 되짚어 본다.
 -- done_qty는 그날의 증가분이 아니라 "그날까지의 누적 완료수량"이다.
--- overhaul_task.done_qty(공정률 계산에 쓰임)는 이 중 최댓값으로 갱신된다.
+-- overhaul_task.done_qty(공정률 계산에 쓰임)는 이 중 '가장 최근 날짜'의 값으로 갱신된다
+-- (최댓값이 아니다 — 그래야 오입력을 정정할 수 있다. repo.recomputeTaskDoneQty 참고)
 create table if not exists overhaul_entry (
   id            uuid primary key default gen_random_uuid(),
   task_id       uuid not null references overhaul_task(id) on delete cascade,
@@ -183,10 +195,8 @@ create table if not exists overhaul_entry (
   delay_reason  text,
   -- 익일 계획 / 조치계획
   next_plan     text,
-  -- 개발 단계라 사진은 base64로 그대로 저장한다. 실제 저장소를 붙이면
-  -- 파일 경로 문자열(.data/uploads/overhaul-photos/…)로 바뀔 자리다.
-  photo_before  text,
-  photo_after   text,
+  -- 사진은 overhaul_entry_photo에 따로 담는다 (아래 참고).
+  -- 예전에는 여기 photo_before/photo_after 컬럼 두 개로 한 장씩만 담았다.
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   unique (task_id, entry_date)
@@ -200,6 +210,49 @@ create index if not exists overhaul_entry_task_idx on overhaul_entry (task_id, e
 drop trigger if exists overhaul_entry_set_updated_at on overhaul_entry;
 create trigger overhaul_entry_set_updated_at before update on overhaul_entry
   for each row execute function set_updated_at();
+
+
+-- 분해 전·후 사진. 한 날짜에 여러 장을 넣을 수 있어야 하므로 별도 테이블이다.
+-- (예전에는 overhaul_entry.photo_before/photo_after 컬럼 두 개여서 각 한 장뿐이었다)
+--
+-- 사진은 업로드 전에 브라우저에서 긴 변 1600px·JPEG로 줄여서 올린다
+-- (src/modules/overhaul/lib/imageCompress.ts). 원본은 보관하지 않는다는 전제이므로
+-- 줄인 결과를 base64 data URL로 그대로 담는다. 실제 파일 저장소를 붙이면
+-- data 컬럼이 경로 문자열로 바뀔 자리다.
+create table if not exists overhaul_entry_photo (
+  id         bigint generated always as identity primary key,
+  entry_id   uuid not null references overhaul_entry(id) on delete cascade,
+  /** before = 분해 전 · after = 분해 후 */
+  slot       text not null,
+  /** 같은 slot 안에서의 표시 순서 (1부터) */
+  seq        integer not null default 1,
+  /** data:image/jpeg;base64,... */
+  data       text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists overhaul_entry_photo_entry_idx
+  on overhaul_entry_photo (entry_id, slot, seq);
+
+-- 예전 방식(컬럼 2개)으로 저장된 사진을 새 테이블로 옮기고 컬럼을 없앤다.
+-- 컬럼이 이미 사라졌으면 아무 일도 하지 않으므로 여러 번 실행해도 안전하다.
+-- (두 곳에 사진을 두면 어느 쪽이 진짜인지 알 수 없어 반드시 한쪽만 남긴다)
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+     where table_name = 'overhaul_entry' and column_name = 'photo_before'
+  ) then
+    insert into overhaul_entry_photo (entry_id, slot, seq, data)
+    select id, 'before', 1, photo_before from overhaul_entry where photo_before is not null;
+
+    insert into overhaul_entry_photo (entry_id, slot, seq, data)
+    select id, 'after', 1, photo_after from overhaul_entry where photo_after is not null;
+
+    alter table overhaul_entry drop column photo_before;
+    alter table overhaul_entry drop column photo_after;
+  end if;
+end $$;
 
 
 -- ============================================================================
@@ -353,11 +406,216 @@ create index if not exists chat_message_created_idx on chat_message (created_at 
 
 
 -- ============================================================================
+-- 5) 중장기 보수계획
+--
+-- 오버홀은 두 단계로 나뉜다.
+--   ① 계획: 설비별 점검주기를 근거로 "올해 무엇을 보수해야 하는지" 판정하고
+--           수량산출서를 뽑는다 (이 섹션)
+--   ② 실행: 계약 후 설계내역서를 받아 공정을 관리한다 (위 2번 섹션)
+--
+-- 핵심은 판정을 사람이 매년 엑셀에 손으로 적는 게 아니라, 시스템이
+--   다음 보수 예정연도 = 마지막 보수연도 + 정밀점검주기
+-- 로 계산한다는 것이다. 그래서 오버홀이 끝나고 maintenance_record에 실적을
+-- 남기면 다음 회차 판정이 자동으로 갱신된다.
+-- ============================================================================
+
+-- 업로드한 중장기 보수계획 파일 1개 = source 1건 (파일 단위 되돌리기용)
+create table if not exists maintenance_plan_source (
+  id           uuid primary key default gen_random_uuid(),
+  file_name    text not null,
+  -- 기계 / 전기 / 제어 — 파일이 담당하는 분야
+  field        text,
+  -- 지사 — 보수계획도 지사별로 따로 세운다 (overhaul_project.branch와 같은 개념)
+  branch       text,
+  sheet_count  integer not null default 0,
+  item_count   integer not null default 0,
+  uploaded_at  timestamptz not null default now()
+);
+
+alter table maintenance_plan_source add column if not exists branch text;
+update maintenance_plan_source set branch = '양산지사' where branch is null;
+
+-- 설비별 보수계획 1행 = 태그넘버로 개별 관리되는 설비 하나 (수량은 항상 1)
+create table if not exists maintenance_plan (
+  id            uuid primary key default gen_random_uuid(),
+  source_id     uuid references maintenance_plan_source(id) on delete cascade,
+  equipment_id  uuid references equipment(id) on delete set null,
+
+  -- 원본 엑셀의 식별 정보
+  category      text,          -- 설비구분 대분류 (1. 발전설비, 2. 송수전설비 …)
+  sub_category  text,          -- 설비구분 세부 (부속기기 등)
+  name          text not null, -- 기기명
+  tag_no        text,          -- 기기번호 (Tag No.)
+  maker         text,          -- 제작사
+  spec          text,          -- 사양 → 수량산출서의 Range로 나간다
+  field         text,          -- 기계 / 전기 / 제어
+  -- 지사 — 설비·판정·매트릭스가 모두 이 값으로 갈린다. source의 branch를 행마다
+  -- 중복 보관한다: 손으로 추가한 설비(source_id null)도 지사를 가져야 하고,
+  -- 조회마다 source를 join하지 않기 위해서다.
+  branch        text,
+
+  -- 판정의 근거가 되는 값들
+  /** 정밀점검주기 원문 ("2년", "5년±6월", "실내: 3년 주기, 실외: 2년 주기", "필요시") */
+  cycle_raw     text,
+  /** 파싱된 주기(년). 애매하거나 없으면 null */
+  cycle_years   integer,
+  /** fixed | ambiguous | asneeded | none — ambiguous면 사용자가 판단해야 한다 */
+  cycle_kind    text not null default 'none',
+  /** ambiguous일 때 후보 주기들 (예: [3,2]) */
+  cycle_options integer[],
+  /** 예방점검주기 (주간/월간/분기/연간) — 판정에는 쓰지 않고 참고용 */
+  patrol_cycle  text,
+  /** 시행방법 (O/H, 경상정비, UPS용역 …). O/H만 수량산출서에 들어간다 */
+  method        text,
+  completion    text,          -- 준공년도 원문 ("23년 준공")
+
+  /** 최초 업로드 시 엑셀의 A등급 이력에서 역산한 마지막 보수연도 */
+  last_done_year integer,
+
+  /**
+   * 사용중지(폐기·교체) 여부. 지우지 않는다 — 지우면 그 설비의 30년 보수 이력이
+   * 함께 사라진다. 사용중지된 설비는 기본 목록·판정에서 빠지고, 과거 이력만 남는다.
+   */
+  is_active     boolean not null default true,
+
+  sheet_name    text,
+  row_index     integer,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+-- 이미 만들어진 테이블에도 반영 (idempotent)
+alter table maintenance_plan add column if not exists is_active boolean not null default true;
+alter table maintenance_plan add column if not exists branch text;
+update maintenance_plan set branch = '양산지사' where branch is null;
+
+create index if not exists maintenance_plan_source_idx on maintenance_plan (source_id);
+create index if not exists maintenance_plan_branch_idx on maintenance_plan (branch);
+create index if not exists maintenance_plan_field_idx  on maintenance_plan (field);
+create index if not exists maintenance_plan_method_idx on maintenance_plan (method);
+create index if not exists maintenance_plan_equip_idx  on maintenance_plan (equipment_id);
+create index if not exists maintenance_plan_active_idx on maintenance_plan (is_active);
+create index if not exists maintenance_plan_name_trgm  on maintenance_plan using gin (name gin_trgm_ops);
+
+drop trigger if exists maintenance_plan_set_updated_at on maintenance_plan;
+create trigger maintenance_plan_set_updated_at before update on maintenance_plan
+  for each row execute function set_updated_at();
+
+
+-- 엑셀에 적혀 있던 연도별 등급 (A/B/C/X/-). 판정의 1차 근거가 아니라 참고·이력용.
+-- A가 찍힌 연도에서 last_done_year를 역산하고, 화면에서 원본 계획을 함께 보여준다.
+create table if not exists maintenance_plan_grade (
+  id       bigint generated always as identity primary key,
+  plan_id  uuid not null references maintenance_plan(id) on delete cascade,
+  year     integer not null,
+  /** A(강) / B / C(약) — 보수 강도. X·- 는 저장하지 않는다(그 해 보수 없음) */
+  grade    text not null,
+  unique (plan_id, year)
+);
+
+create index if not exists maintenance_plan_grade_plan_idx on maintenance_plan_grade (plan_id, year);
+
+
+-- 실제 보수 실적. 오버홀이 끝나면 여기에 남기고, 다음 회차 판정이 자동으로 갱신된다.
+-- 이 테이블이 있어야 "매년 엑셀을 손보지 않아도 계속 관리되는" 구조가 성립한다.
+create table if not exists maintenance_record (
+  id           uuid primary key default gen_random_uuid(),
+  plan_id      uuid not null references maintenance_plan(id) on delete cascade,
+  done_year    integer not null,
+  /** 실제 수행한 보수 강도 (A/B/C). status='skipped'면 의미 없다 */
+  grade        text,
+  /**
+   * done = 실제로 보수함 · skipped = 계약이 변경돼 보수하지 않음(확인된 사실).
+   * skipped도 행을 남기는 이유: "몰라서 비어 있음"과 "확인했는데 안 함"을 구분해야
+   * 판정(다음 도래 연도 계산)과 화면 표시가 갈리기 때문이다.
+   */
+  status       text not null default 'done',
+  /** 이 보수가 어느 오버홀 프로젝트에서 수행됐는지 (있으면 연결) */
+  project_id   uuid references overhaul_project(id) on delete set null,
+  note         text,
+  created_at   timestamptz not null default now(),
+  unique (plan_id, done_year)
+);
+
+-- 이미 만들어진 테이블에도 반영 (idempotent)
+alter table maintenance_record add column if not exists status text not null default 'done';
+
+create index if not exists maintenance_record_plan_idx on maintenance_record (plan_id, done_year desc);
+
+
+-- 연도별 설계내역서 (사용자가 확정한 오버홀 대상 목록).
+--
+-- 이 내역서를 엑셀로 뽑아 시공사에 주면, 시공사가 작업 시작일·종료일을 채워
+-- 되돌려준다. 그 파일을 다시 업로드하면 위 2번 섹션(공정관리)의 overhaul_task로
+-- 들어가 공정률·공정표 관리가 시작된다. 그래서 한 바퀴가 닫힌다.
+--
+-- 금액(재료비·노무비·경비)은 다루지 않는다 — 추정가 산정은 시스템 밖의 일이다.
+create table if not exists design_statement (
+  id           uuid primary key default gen_random_uuid(),
+  target_year  integer not null,
+  field        text,
+  -- 지사 — 수량산출서도 지사 단위로 뽑는다
+  branch       text,
+  title        text,          -- 공사명 (예: "2026년도 양산지사 정기점검보수공사")
+  item_count   integer not null default 0,
+  created_at   timestamptz not null default now(),
+  /** 준공 후 "이력 반영"을 마친 시각. null이면 아직 반영 전 — 목록에서 눈에 띄게 표시한다 */
+  reconciled_at timestamptz
+);
+
+alter table design_statement add column if not exists reconciled_at timestamptz;
+alter table design_statement add column if not exists branch text;
+update design_statement set branch = '양산지사' where branch is null;
+
+create table if not exists design_statement_item (
+  id           bigint generated always as identity primary key,
+  statement_id uuid not null references design_statement(id) on delete cascade,
+  plan_id      uuid references maintenance_plan(id) on delete set null,
+  /** 대분류 그룹 (Ⅰ. 발전기 및 부속설비 …) — 출력 시 머리글 행이 된다 */
+  category     text,
+  seq          integer not null,        -- 그룹 내 순번 (1부터)
+  name         text not null,           -- 명칭
+  spec         text,                    -- 규격
+  qty          numeric(14,3) not null default 1,
+  unit         text not null default 'EA',
+  /** 시공사가 채워 올 칸. 뽑을 때는 비어 있다 */
+  plan_start   date,
+  plan_end     date,
+  grade        text,                    -- 등급(A/B/C) — 명칭에 섞지 않고 별도 컬럼으로 낸다
+  note         text,                    -- 비고 (Tag No. 등)
+  /** 필수 / 선택 — 확정 당시의 분류를 남긴다 */
+  classification text
+);
+
+-- 이미 만들어진 테이블에도 grade 컬럼을 더한다 (기존 create table은 새로 만들 때만 적용됨)
+alter table design_statement_item add column if not exists grade text;
+
+create index if not exists design_statement_item_stmt_idx on design_statement_item (statement_id, category, seq);
+
+
+-- ── 계획 ↔ 실행을 잇는 고리 ────────────────────────────────────────────────
+-- 수량산출서를 엑셀로 뽑을 때 맨 끝에 "항목ID" 컬럼(= design_statement_item.id)을
+-- 함께 내보낸다. 시공사가 일정을 채워 되돌려준 그 파일을 업로드 분석에 넣으면
+-- 파서가 이 값을 읽어 아래 컬럼에 넣는다. 그래서 이름 유사도로 추측하지 않고
+-- "이 작업은 그 내역서 몇 번째 항목"이라고 정확히 말할 수 있다.
+--
+-- 항목ID 컬럼이 지워진 파일(수기 작성 내역서 등)이면 그냥 null이 되고, 준공 후
+-- 이력 반영은 예전처럼 이름 유사도 제안으로 넘어간다 — 선택적 고리다.
+-- overhaul_task보다 design_statement_item이 뒤에 정의되므로 여기서 alter로 붙인다.
+alter table overhaul_task
+  add column if not exists statement_item_id bigint
+    references design_statement_item(id) on delete set null;
+
+create index if not exists overhaul_task_statement_item_idx
+  on overhaul_task (statement_item_id);
+
+
+-- ============================================================================
 -- 첨부파일에 대하여
 --
 -- 파일 자체는 DB에 넣지 않는다. 아래 컬럼들이 파일 위치만 문자열로 들고 있다.
 --   failure_attachment.storage_path   고장이력 첨부
---   overhaul_entry.photo_before/after 분해 전·후 사진
+--   overhaul_entry_photo.data         분해 전·후 사진 (지금은 줄인 base64를 직접 담는다)
 --   document.storage_path             준공도서 PDF
 --
 -- 지금은 프로젝트 안 .data/uploads/ 에 저장한다(로컬 개발). 나중에 파일 저장소를

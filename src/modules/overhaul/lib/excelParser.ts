@@ -26,6 +26,11 @@ export interface ParsedTask {
   planEnd: string | null;
   sheetName: string;
   sourceRow: number;
+  /**
+   * 우리가 뽑아준 수량산출서의 "항목ID"(design_statement_item.id)가 되돌아온 경우.
+   * 있으면 이 작업이 그 내역서의 어느 항목인지 정확히 알 수 있다 (없으면 null).
+   */
+  statementItemId: number | null;
   /** 사람이 확인해야 하는 이유 목록. 비어 있으면 확인 불필요 */
   issues: string[];
 }
@@ -60,6 +65,8 @@ const COLUMN_PATTERNS = {
   // 작업 시작일/종료일 (별도 두 컬럼) — 있으면 이걸 최우선으로 계획일정 사용
   planStart: ["작업시작일", "시작일", "착수일", "개시일", "startdate"],
   planEnd: ["작업종료일", "종료일", "완료일", "완료예정일", "종료예정", "enddate", "finishdate"],
+  // 우리가 내보낸 수량산출서가 되돌아왔을 때의 항목 표식 (statementExporter.ts)
+  statementItemId: ["항목id", "항목아이디", "itemid", "산출서항목id", "statementitemid"],
   // 작업 예정일 (단일 컬럼) — "2026-07-10~2026-07-15" 같은 기간
   plandate: [
     "작업예정일", "예정일", "작업일정", "계획일정", "공정예정", "착수예정", "일정",
@@ -177,6 +184,13 @@ function parseOneDate(cell: Cell): string | null {
   return m ? `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}` : null;
 }
 
+/** 항목ID 셀 → 양의 정수. 비어 있거나 숫자가 아니면 null (표식이 지워진 파일) */
+function parseItemId(v: Cell): number | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(String(v).replace(/[,\s]/g, ""));
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
 function parseQty(v: Cell): number | null {
   if (v == null || v === "") return null;
   if (typeof v === "number") return v;
@@ -272,7 +286,10 @@ function hasNameHeader(row: Row): boolean {
 function resolveName(row: Row, colMap: ColumnMap): string {
   const raw = norm(colMap.name != null ? row[colMap.name] : "");
   if (raw && !isIndexToken(raw)) return raw;
-  const used = new Set([colMap.qty, colMap.unit, colMap.spec, colMap.tag, colMap.remark]);
+  const used = new Set([
+    colMap.qty, colMap.unit, colMap.spec, colMap.tag, colMap.remark,
+    colMap.statementItemId, colMap.planStart, colMap.planEnd, colMap.plandate,
+  ]);
   for (let i = colMap.name ?? 0; i < row.length; i++) {
     if (used.has(i)) continue;
     const v = norm(row[i]);
@@ -335,6 +352,12 @@ function analyzeSheet(
     const qty = colMap.qty != null ? parseQty(row[colMap.qty]) : null;
     const remark = colMap.remark != null ? norm(row[colMap.remark]) : "";
     const tag = colMap.tag != null ? norm(row[colMap.tag]) : "";
+    const statementItemId =
+      colMap.statementItemId != null ? parseItemId(row[colMap.statementItemId]) : null;
+    // 우리가 뽑아준 수량산출서는 명칭을 " 1) 발전기" 꼴로 적는다(그룹 내 순번).
+    // 되돌아온 파일을 다시 읽을 때 그 번호는 작업명이 아니므로 떼어낸다.
+    const cleanName =
+      statementItemId != null ? name.replace(/^\s*\d+\)\s*/, "").trim() || name : name;
 
     // 계획일정: ① 시작일/종료일 별도 컬럼 → ② 단일 예정일 컬럼(기간)
     const psCol = colMap.planStart != null ? parseOneDate(row[colMap.planStart]) : null;
@@ -354,8 +377,8 @@ function analyzeSheet(
     }
 
     const equipment =
-      classifyEquipment([hint, name, spec, tag]) || (EQUIP_TO_FIELD[hint] ? hint : null);
-    const field = classifyField(equipment, [hint, name, spec, tag, fileName]);
+      classifyEquipment([hint, cleanName, spec, tag]) || (EQUIP_TO_FIELD[hint] ? hint : null);
+    const field = classifyField(equipment, [hint, cleanName, spec, tag, fileName]);
 
     const issues: string[] = [];
     if (qty == null) issues.push("수량 불명확");
@@ -365,7 +388,7 @@ function analyzeSheet(
     result.tasks.push({
       field: field || "미분류",
       equipment: equipment || "기타",
-      name,
+      name: cleanName,
       spec,
       qty: qty == null ? 0 : qty,
       planQty: qty == null ? 0 : qty,
@@ -376,6 +399,7 @@ function analyzeSheet(
       planEnd: plan?.end ?? null,
       sheetName,
       sourceRow: r + 1,
+      statementItemId,
       issues,
     });
   }
@@ -387,7 +411,12 @@ function dedupe(tasks: ParsedTask[]): ParsedTask[] {
   const seen = new Map<string, number>();
   const out: ParsedTask[] = [];
   for (const t of tasks) {
-    const key = `${squash(t.name)}|${squash(t.spec)}|${squash(t.unit)}`;
+    // 항목ID가 붙어 있으면 그게 곧 신원이다 — 명칭·규격·단위가 같아도 내역서상
+    // 서로 다른 항목일 수 있어서, 합쳐 버리면 한 건이 사라진다.
+    const key =
+      t.statementItemId != null
+        ? `#${t.statementItemId}`
+        : `${squash(t.name)}|${squash(t.spec)}|${squash(t.unit)}`;
     const at = seen.get(key);
     if (at != null) {
       // 더 정보가 많은(수량 있는) 항목으로 갱신

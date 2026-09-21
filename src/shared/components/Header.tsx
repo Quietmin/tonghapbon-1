@@ -3,14 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, Avatar } from "./ui";
-import { NAV_GROUPS } from "@/shared/lib/nav";
+import { NAV_GROUPS, isActive } from "@/shared/lib/nav";
 import { useChatbotDock } from "./ChatbotDock";
 
 export default function Header() {
   const pathname = usePathname();
   const dock = useChatbotDock();
+  // 대표 경로 밖의 하위 메뉴도 챕터 소속이다 (설비관리의 /overhaul 화면들)
   const group = NAV_GROUPS.find(
-    (g) => pathname === g.root || pathname.startsWith(`${g.root}/`),
+    (g) =>
+      pathname === g.root ||
+      pathname.startsWith(`${g.root}/`) ||
+      g.items.some((it) => isActive(pathname, it)),
   );
 
   return (

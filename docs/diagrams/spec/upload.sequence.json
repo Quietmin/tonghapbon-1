@@ -1,0 +1,274 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "설계내역서 업로드 — 작업항목 추출 시퀀스",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1085,
+      620
+    ],
+    "views": [
+      {
+        "id": "dry-run",
+        "label": "1차 — 미리보기",
+        "focus": [
+          "user",
+          "ui",
+          "api",
+          "parser"
+        ],
+        "note": "dryRun=1로 파싱만 하고 저장하지 않는 미리보기 단계."
+      },
+      {
+        "id": "persist",
+        "label": "2차 — 저장",
+        "focus": [
+          "ui",
+          "api",
+          "repo",
+          "db"
+        ],
+        "note": "분야를 확인한 뒤 재파싱하고 실제로 적재한다."
+      },
+      {
+        "id": "return-path",
+        "label": "응답 경로",
+        "focus": [
+          "db",
+          "repo",
+          "api",
+          "ui",
+          "user"
+        ],
+        "note": "저장 건수가 화면까지 되돌아오는 길."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "default": {
+          "label": "일반 호출"
+        },
+        "emphasis": {
+          "label": "주 경로"
+        },
+        "return": {
+          "label": "응답"
+        }
+      }
+    }
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "담당자",
+      "sublabel": "업로드 분석 화면"
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "UploadAnalysis",
+      "sublabel": "클라이언트 컴포넌트"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "업로드 API",
+      "sublabel": "/api/overhaul/upload"
+    },
+    {
+      "id": "parser",
+      "type": "backend",
+      "label": "엑셀 파서",
+      "sublabel": "excelParser.ts"
+    },
+    {
+      "id": "repo",
+      "type": "backend",
+      "label": "저장 로직",
+      "sublabel": "repo.ts"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "overhaul_source · task"
+    }
+  ],
+  "segments": [
+    {
+      "from": 172,
+      "to": 330,
+      "label": "1차 — 미리보기 (dryRun=1)"
+    },
+    {
+      "from": 338,
+      "to": 490,
+      "label": "2차 — 재파싱 후 저장"
+    },
+    {
+      "from": 498,
+      "to": 552,
+      "label": "응답 · 이동"
+    }
+  ],
+  "messages": [
+    {
+      "id": "pick-file",
+      "from": "user",
+      "to": "ui",
+      "y": 190,
+      "label": "엑셀 파일 선택",
+      "variant": "default"
+    },
+    {
+      "id": "dry-post",
+      "from": "ui",
+      "to": "api",
+      "y": 221,
+      "label": "POST multipart · dryRun=1",
+      "variant": "emphasis"
+    },
+    {
+      "id": "analyze-1",
+      "from": "api",
+      "to": "parser",
+      "y": 252,
+      "label": "analyzeWorkbook 파싱",
+      "variant": "default"
+    },
+    {
+      "id": "parsed-1",
+      "from": "parser",
+      "to": "api",
+      "y": 283,
+      "label": "작업항목 · 물량",
+      "variant": "return"
+    },
+    {
+      "id": "preview",
+      "from": "api",
+      "to": "ui",
+      "y": 314,
+      "label": "미리보기 — 저장 안 함",
+      "variant": "return"
+    },
+    {
+      "id": "save-post",
+      "from": "ui",
+      "to": "api",
+      "y": 350,
+      "label": "POST multipart · 저장 (재파싱)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "save-call",
+      "from": "api",
+      "to": "repo",
+      "y": 381,
+      "label": "saveAnalysis",
+      "variant": "default"
+    },
+    {
+      "id": "insert",
+      "from": "repo",
+      "to": "db",
+      "y": 412,
+      "label": "INSERT source · task",
+      "variant": "emphasis"
+    },
+    {
+      "id": "rows",
+      "from": "db",
+      "to": "repo",
+      "y": 443,
+      "label": "저장 건수",
+      "variant": "return"
+    },
+    {
+      "id": "source-id",
+      "from": "repo",
+      "to": "api",
+      "y": 474,
+      "label": "source_id",
+      "variant": "return"
+    },
+    {
+      "id": "created",
+      "from": "api",
+      "to": "ui",
+      "y": 505,
+      "label": "201 · 작업 건수",
+      "variant": "return"
+    },
+    {
+      "id": "navigate",
+      "from": "ui",
+      "to": "user",
+      "y": 536,
+      "label": "작업 관리로 이동",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "ui",
+      "from": 185,
+      "to": 540,
+      "type": "frontend"
+    },
+    {
+      "participant": "api",
+      "from": 221,
+      "to": 510,
+      "type": "backend"
+    },
+    {
+      "participant": "parser",
+      "from": 247,
+      "to": 288,
+      "type": "backend"
+    },
+    {
+      "participant": "repo",
+      "from": 376,
+      "to": 510,
+      "type": "backend"
+    },
+    {
+      "participant": "db",
+      "from": 407,
+      "to": 448,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "두 번 올리는 이유",
+      "items": [
+        "1차는 dryRun=1 — 파싱만 하고 저장하지 않는다",
+        "담당자가 결과와 분야를 확인한 뒤 2차로 저장한다"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "파싱은 서버에서",
+      "items": [
+        "analyzeWorkbook은 API 라우트 안에서 돈다",
+        "64개 시트 내역서를 위해 maxDuration을 60초로 올렸다"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "저장 결과",
+      "items": [
+        "overhaul_source에 업로드 이력, overhaul_task에 작업항목",
+        "물량이 이후 공정률 계산의 기준이 된다"
+      ]
+    }
+  ]
+}

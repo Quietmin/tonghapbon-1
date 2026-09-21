@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getOrCreateProject, listAllTasks, listAllEntriesForProject } from "@/modules/overhaul/lib/repo";
+import { listAllTasks, listAllEntriesForProject } from "@/modules/overhaul/lib/repo";
+import { resolveProjectFromRequest } from "@/modules/overhaul/lib/activeProject";
 import { buildReportData } from "@/modules/overhaul/lib/report";
 import { taskProgress, taskStatus } from "@/modules/overhaul/lib/progress";
 import type { OverhaulEntry } from "@/modules/overhaul/lib/repo";
@@ -7,9 +8,9 @@ import type { OverhaulEntry } from "@/modules/overhaul/lib/repo";
 export const dynamic = "force-dynamic";
 const today = () => new Date().toISOString().slice(0, 10);
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const project = await getOrCreateProject();
+    const project = await resolveProjectFromRequest(req);
     const tasks = await listAllTasks(project.id);
     const entries = await listAllEntriesForProject(project.id);
 

@@ -41,7 +41,12 @@ export default function Sidebar() {
       {/* 메인 메뉴 3개 — 클릭한 그룹만 하위 항목이 펼쳐진다 */}
       <nav className="flex-1 flex flex-col gap-1">
         {NAV_GROUPS.map((group) => {
-          const groupActive = pathname === group.root || pathname.startsWith(`${group.root}/`);
+          // 대표 경로 밖의 하위 메뉴도 있다 (설비관리 챕터의 /overhaul 화면들) —
+          // root 접두사만 보면 그 화면에서 챕터가 접혀 버리므로 항목까지 본다.
+          const groupActive =
+            pathname === group.root ||
+            pathname.startsWith(`${group.root}/`) ||
+            group.items.some((it) => isActive(pathname, it));
           // 하위가 대표 경로 하나뿐이면 펼쳐도 같은 링크가 두 번 나올 뿐이라 접어 둔다
           const showItems =
             groupActive && !(group.items.length === 1 && group.items[0].href === group.root);
@@ -67,20 +72,29 @@ export default function Sidebar() {
 
               {showItems && (
                 <div className="ml-4 pl-3 border-l border-border-subtle flex flex-col gap-1 mb-1">
-                  {group.items.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`${LINK_BASE} py-2 text-sm ${
-                        isActive(pathname, item)
-                          ? "bg-primary-container text-on-primary font-bold translate-x-1"
-                          : "text-on-surface-variant hover:bg-surface-container-high"
-                      }`}
-                    >
-                      <Icon name={item.icon} className="text-base" />
-                      <span>{item.label}</span>
-                    </Link>
-                  ))}
+                  {group.items.map((item, i) => {
+                    const showSection = item.section && item.section !== group.items[i - 1]?.section;
+                    return (
+                      <div key={item.href}>
+                        {showSection && (
+                          <p className="px-3 mt-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60">
+                            {item.section}
+                          </p>
+                        )}
+                        <Link
+                          href={item.href}
+                          className={`${LINK_BASE} py-2 text-sm ${
+                            isActive(pathname, item)
+                              ? "bg-primary-container text-on-primary font-bold translate-x-1"
+                              : "text-on-surface-variant hover:bg-surface-container-high"
+                          }`}
+                        >
+                          <Icon name={item.icon} className="text-base" />
+                          <span>{item.label}</span>
+                        </Link>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

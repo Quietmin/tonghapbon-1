@@ -1,0 +1,345 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Plant Ops Hub — 시스템 구조",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "working-modules",
+        "label": "지금 돌아가는 경로",
+        "focus": [
+          "users",
+          "shell",
+          "overhaul",
+          "docgen",
+          "dbLayer",
+          "pg"
+        ],
+        "note": "오버홀 공정관리와 문서 자동생성만 저장 계층까지 이어져 있다."
+      },
+      {
+        "id": "stub-modules",
+        "label": "스텁 세 영역",
+        "focus": [
+          "shell",
+          "failure",
+          "chatbot",
+          "equipment"
+        ],
+        "note": "화면은 열리지만 저장 계층으로 나가는 경로가 아직 없다."
+      },
+      {
+        "id": "storage-layer",
+        "label": "저장 계층 전환",
+        "focus": [
+          "dbLayer",
+          "pg",
+          "pglite",
+          "docgen",
+          "sbDirect"
+        ],
+        "note": "DATABASE_URL 유무에 따른 전환과 docgen 전용 우회 경로."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "frontend": {
+          "label": "앱 셸"
+        },
+        "backend": {
+          "label": "모듈 · 접근 계층"
+        },
+        "database": {
+          "label": "저장소"
+        },
+        "cloud": {
+          "label": "외부 서비스"
+        },
+        "external": {
+          "label": "사용자"
+        }
+      }
+    }
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "정비 담당자",
+      "sublabel": "브라우저 · 모바일",
+      "pos": [
+        40,
+        330
+      ],
+      "size": [
+        130,
+        60
+      ]
+    },
+    {
+      "id": "shell",
+      "type": "frontend",
+      "label": "통합 앱 셸",
+      "sublabel": "사이드바 4그룹 · 홈",
+      "tag": "src/shared",
+      "pos": [
+        230,
+        326
+      ],
+      "size": [
+        150,
+        68
+      ]
+    },
+    {
+      "id": "docgen",
+      "type": "backend",
+      "label": "문서 자동생성",
+      "sublabel": "화면 5 · 사진 편집",
+      "tag": "구현 완료",
+      "pos": [
+        440,
+        60
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "overhaul",
+      "type": "backend",
+      "label": "오버홀 공정관리",
+      "sublabel": "화면 7 · API 16",
+      "tag": "구현 완료",
+      "pos": [
+        440,
+        168
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "failure",
+      "type": "backend",
+      "label": "고장이력 관리",
+      "sublabel": "화면 4",
+      "tag": "스텁 · 미연결",
+      "pos": [
+        440,
+        300
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "chatbot",
+      "type": "backend",
+      "label": "정비 챗봇",
+      "sublabel": "화면 2",
+      "tag": "스텁 · 미연결",
+      "pos": [
+        440,
+        408
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "equipment",
+      "type": "backend",
+      "label": "설비 마스터",
+      "sublabel": "4모듈 공통 참조",
+      "tag": "스텁 · 미연결",
+      "pos": [
+        440,
+        516
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "dbLayer",
+      "type": "backend",
+      "label": "DB 접근 계층",
+      "sublabel": "src/shared/lib/db.ts",
+      "tag": "단일 진입점",
+      "pos": [
+        670,
+        326
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "sbDirect",
+      "type": "cloud",
+      "label": "Supabase 직접 접근",
+      "sublabel": "docgen_ 테이블 · Storage",
+      "tag": "db.ts 우회",
+      "pos": [
+        980,
+        60
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "Supabase Postgres",
+      "sublabel": "통합 DB · 17 테이블",
+      "tag": "pg_trgm",
+      "pos": [
+        980,
+        300
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "pglite",
+      "type": "database",
+      "label": "PGlite",
+      "sublabel": "DATABASE_URL 없을 때",
+      "tag": "로컬 폴백",
+      "pos": [
+        980,
+        450
+      ],
+      "size": [
+        170,
+        68
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Vercel — Next.js 16 App Router",
+      "wraps": [
+        "shell",
+        "overhaul",
+        "docgen",
+        "failure",
+        "chatbot",
+        "equipment",
+        "dbLayer"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "Supabase — 통합본-1 프로젝트",
+      "wraps": [
+        "sbDirect",
+        "pg"
+      ],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-access",
+      "from": "users",
+      "to": "shell",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "nav-docgen",
+      "from": "shell",
+      "to": "docgen"
+    },
+    {
+      "id": "nav-overhaul",
+      "from": "shell",
+      "to": "overhaul"
+    },
+    {
+      "id": "nav-failure",
+      "from": "shell",
+      "to": "failure"
+    },
+    {
+      "id": "nav-chatbot",
+      "from": "shell",
+      "to": "chatbot"
+    },
+    {
+      "id": "nav-equipment",
+      "from": "shell",
+      "to": "equipment"
+    },
+    {
+      "id": "overhaul-sql",
+      "from": "overhaul",
+      "to": "dbLayer",
+      "label": "SQL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "db-postgres",
+      "from": "dbLayer",
+      "to": "pg",
+      "label": "DATABASE_URL 있으면",
+      "variant": "emphasis"
+    },
+    {
+      "id": "db-pglite",
+      "from": "dbLayer",
+      "to": "pglite",
+      "label": "없으면 앱 내부 DB",
+      "variant": "dashed"
+    },
+    {
+      "id": "docgen-direct",
+      "from": "docgen",
+      "to": "sbDirect",
+      "label": "supabase-js 직접",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "완성된 두 모듈",
+      "items": [
+        "오버홀 공정관리 — 보수계획·업로드·작업관리·공정표·실적입력·보고서",
+        "문서 자동생성 — 사진대장·매뉴얼·고장보고서·보관함"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "스텁 세 영역",
+      "items": [
+        "고장이력·챗봇·설비 마스터는 ModuleStub 화면만 있다",
+        "저장 계층으로 나가는 선이 아예 없다 — 이것이 현재 상태"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "저장 계층 규칙",
+      "items": [
+        "DATABASE_URL 있으면 Supabase Postgres, 없으면 PGlite",
+        "docgen만 db.ts를 우회해 supabase-js로 직접 접근한다"
+      ]
+    }
+  ]
+}
