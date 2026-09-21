@@ -334,8 +334,9 @@ create table if not exists failure_attachment (
   id           bigint generated always as identity primary key,
   failure_id   bigint not null references failure_history(id) on delete cascade,
   file_name    text not null,
-  -- 파일 경로 (.data/uploads/failure-attachments/…) — 원본의 stored_name 대체
-  storage_path text not null,
+  -- overhaul_entry_photo와 동일한 방식: data:<mime>;base64,<...> 를 그대로 담는다.
+  -- 로컬 파일시스템(.data/uploads 등)은 Vercel에서 인스턴스 재시작마다 사라지므로 쓰지 않는다.
+  data         text not null,
   created_at   timestamptz not null default now()
 );
 
