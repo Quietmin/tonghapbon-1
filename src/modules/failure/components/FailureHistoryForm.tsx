@@ -137,6 +137,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 const FIELD_KEYS = Object.keys(EMPTY) as (keyof FormState)[];
 
+export interface FailureHistoryFormProps {
+  /** 일괄 업로드 큐에서 이미 추출된 값으로 미리 채울 때 쓴다 (null은 빈 문자열로 처리) */
+  initialForm?: Partial<FailureHistoryInput>;
+  initialAttachment?: AttachmentInput | null;
+  /** 큐에서 검토용으로 펼쳤을 때는 드롭존을 다시 보여줄 필요가 없다 (기본값 true) */
+  showDropzone?: boolean;
+  /** 있으면 저장 후 내부 완료 화면 대신 이걸 부른다 — 큐 목록이 자기 상태를 갱신하도록 */
+  onSaved?: (id: string) => void;
+  /** 큐에서 검토 패널을 접을 때 쓰는 취소 버튼 (없으면 안 보임) */
+  onCancel?: () => void;
+}
+
 /**
  * 고장이력 수기 등록.
  *
@@ -145,13 +157,26 @@ const FIELD_KEYS = Object.keys(EMPTY) as (keyof FormState)[];
  * 사람이 직접 채워야 할 곳이다. PDF 없이 처음부터 전부 손으로 입력해도 된다
  * (그 경우엔 안 채운 칸이 전부 음영으로 보인다).
  *
- * 일괄 업로드(여러 건을 한 번에 등록)와는 별개 화면이다 — 여기는 한 건을
- * 등록자가 직접 확인·보완하면서 저장하는 경로.
+ * 일괄 업로드 큐 목록에서 파일 하나를 검토할 때도 이 폼을 그대로 쓴다
+ * (initialForm/initialAttachment로 미리 채우고, showDropzone=false로 드롭존만 숨김).
  */
-export default function FailureHistoryForm() {
+export default function FailureHistoryForm({
+  initialForm,
+  initialAttachment = null,
+  showDropzone = true,
+  onSaved,
+  onCancel,
+}: FailureHistoryFormProps = {}) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(EMPTY);
-  const [attachment, setAttachment] = useState<AttachmentInput | null>(null);
+  const [form, setForm] = useState<FormState>(() => {
+    const next = { ...EMPTY };
+    for (const key of FIELD_KEYS) {
+      const v = initialForm?.[key];
+      if (typeof v === "string") next[key] = v;
+    }
+    return next;
+  });
+  const [attachment, setAttachment] = useState<AttachmentInput | null>(initialAttachment);
   const [extracting, setExtracting] = useState(false);
   const [extractWarning, setExtractWarning] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -208,7 +233,8 @@ export default function FailureHistoryForm() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "저장에 실패했습니다.");
-      setSavedId(data.id);
+      if (onSaved) onSaved(data.id);
+      else setSavedId(data.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장에 실패했습니다.");
     } finally {
@@ -246,6 +272,7 @@ export default function FailureHistoryForm() {
 
   return (
     <div className="flex flex-col gap-4">
+      {showDropzone && (
       <Card
         lift={false}
         onDragOver={(e) => {
@@ -287,6 +314,7 @@ export default function FailureHistoryForm() {
           뽑아낼 수 있는 항목만 자동으로 채워집니다. PDF 없이 아래에서 직접 입력해도 됩니다.
         </p>
       </Card>
+      )}
 
       {extractWarning && (
         <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-warning/10 text-status-warning text-sm">
@@ -360,6 +388,11 @@ export default function FailureHistoryForm() {
       )}
 
       <div className="flex justify-end gap-2 pb-6">
+        {onCancel && (
+          <Button variant="ghost" onClick={onCancel} disabled={saving}>
+            취소
+          </Button>
+        )}
         <Button variant="primary" onClick={handleSave} disabled={saving}>
           {saving ? "저장 중…" : "등록"}
         </Button>
