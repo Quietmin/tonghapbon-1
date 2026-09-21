@@ -18,6 +18,11 @@ export interface NavItem {
   short?: string;
   /** 하위 경로까지 활성 처리하지 않고 정확히 일치할 때만 활성화 */
   exact?: boolean;
+  /**
+   * 데스크톱 사이드바에만 노출하고, 홈 화면 알약 목록(모바일에서도 보임)에는 숨긴다.
+   * 사이드바는 md: 이상에서만 렌더링되므로 이 항목은 결과적으로 데스크톱 전용이 된다.
+   */
+  desktopOnly?: boolean;
   /** 그룹 안에서 시간 흐름상 단계가 나뉠 때 소제목으로 표시 (예: 계약 전/후) */
   section?: string;
 }
@@ -79,7 +84,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/failure", label: "고장관리 홈", icon: "dashboard", exact: true },
       { href: "/failure/new", label: "고장보고서 작성", icon: "edit_note" },
       { href: "/failure/archive", label: "고장보고서 조회", icon: "inventory_2" },
-      { href: "/failure/history/new", label: "수기 등록", icon: "note_add" },
+      { href: "/failure/history/new", label: "수기 등록", icon: "note_add", desktopOnly: true },
     ],
   },
   {

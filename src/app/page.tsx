@@ -30,7 +30,9 @@ export default function HomePage() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-xs font-bold text-on-surface-variant transition-colors"
+                  className={`px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-xs font-bold text-on-surface-variant transition-colors ${
+                    item.desktopOnly ? "hidden md:inline-block" : ""
+                  }`}
                 >
                   {item.label}
                 </Link>
