@@ -15,7 +15,7 @@ import { cropImage, drawStrokes, flattenRotation, loadImage } from "../lib/image
  * 반영해야 하는 값만 React state 로 둔다.
  */
 
-type Tool = "pen" | "highlighter" | "rect" | "ellipse" | "line" | "crop";
+type Tool = "pen" | "highlighter" | "rect" | "ellipse" | "line" | "arrow" | "text" | "crop";
 
 const TOOLS: { tool: Tool; label: string }[] = [
   { tool: "pen", label: "펜" },
@@ -23,6 +23,8 @@ const TOOLS: { tool: Tool; label: string }[] = [
   { tool: "rect", label: "네모" },
   { tool: "ellipse", label: "동그라미" },
   { tool: "line", label: "선" },
+  { tool: "arrow", label: "화살표" },
+  { tool: "text", label: "텍스트" },
   { tool: "crop", label: "자르기" },
 ];
 
@@ -40,12 +42,25 @@ const STROKE_WIDTHS: Record<string, number> = {
   rect: 0.005,
   ellipse: 0.005,
   line: 0.005,
+  arrow: 0.006,
 };
+
+/**
+ * 글자 크기 — 사진 너비 대비 비율이라 자르기·회전 후에도 같은 비율로 맞다.
+ * 값 하나로 고정하지 않는 이유: 작은 테스트 사진과 고해상도 폰카메라 사진은
+ * 같은 비율이라도 눈에 보이는 크기가 전혀 달라서, 사용자가 직접 골라야 한다. (원본 주석)
+ */
+const TEXT_SIZE_STEPS = [0.012, 0.018, 0.025, 0.035, 0.05, 0.07, 0.09];
+const TEXT_SIZE_LABELS = ["아주 작게", "작게", "보통", "크게", "아주 크게", "매우 크게", "최대"];
+const TEXT_SIZE_DEFAULT = 2; // '보통'
 
 /** 캔버스 내부 해상도 상한 — 이보다 큰 사진은 축소해서 다룬다 (원본과 동일) */
 const SKETCH_MAX_EDGE = 1400;
 const HINT_DRAW = "손가락이나 마우스로 사진 위에 그려 주세요.";
 const HINT_CROP = "남길 영역을 드래그한 뒤 [자르기 적용]을 누르세요.";
+const HINT_TEXT = "텍스트를 표시할 위치를 눌러 주세요.";
+const HINT_TEXT_EDITING =
+  "입력하면서 [A− 작게]/[A+ 크게]로 크기를 바로 조절할 수 있습니다. [적용]으로 확정합니다.";
 const UNDO_LIMIT = 40;
 
 interface CropRect {
@@ -107,6 +122,11 @@ export default function PhotoEditorModal({
   const [canUndo, setCanUndo] = useState(false);
   const [hasStrokes, setHasStrokes] = useState(strokesRef.current.length > 0);
   const [message, setMessage] = useState<string | null>(null);
+  const [textSizeIndex, setTextSizeIndex] = useState(TEXT_SIZE_DEFAULT);
+  /** 텍스트 입력 중인지 — 켜져 있으면 activeStrokeRef 에 확정 전 text 스트로크가 들어 있다 */
+  const [drafting, setDrafting] = useState(false);
+  const [textValue, setTextValue] = useState("");
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   function trackUrl(u: string): string {
     createdUrlsRef.current.add(u);
@@ -204,6 +224,72 @@ export default function PhotoEditorModal({
     setCanUndo(true);
   }
 
+  /*
+   * 텍스트는 다른 도구처럼 드래그로 그리지 않고, 누른 자리에 바로 찍는다 —
+   * 화살표로 가리킨 곳에 설명을 붙이는 용도라 위치를 끌고 다닐 이유가 없다.
+   *
+   * 원본이 prompt() 를 버리고 화면 안 입력줄로 바꾼 이유를 그대로 따른다:
+   * prompt() 가 열려 있는 동안에는 페이지의 다른 버튼이 전혀 반응하지 않아
+   * "입력하면서 글자 크기를 조절"하는 게 불가능했다. 여기서는 타이핑과 크기
+   * 버튼이 즉시 캔버스 미리보기에 반영된다.
+   */
+  function startTextDraft(point: { x: number; y: number }) {
+    activeStrokeRef.current = {
+      tool: "text",
+      color,
+      width: TEXT_SIZE_STEPS[textSizeIndex],
+      points: [point],
+      text: "",
+    };
+    setTextValue("");
+    setDrafting(true);
+    redraw();
+    // 입력줄이 그려진 뒤에 포커스를 줘야 한다
+    requestAnimationFrame(() => textInputRef.current?.focus());
+  }
+
+  function applyTextDraft() {
+    const active = activeStrokeRef.current;
+    activeStrokeRef.current = null;
+    setDrafting(false);
+    if (active && active.tool === "text") {
+      const text = (active.text ?? "").trim();
+      // 빈 글자는 찍어도 보이지 않으니 스트로크로 만들지 않는다
+      if (text) {
+        pushUndoSnapshot();
+        strokesRef.current = [...strokesRef.current, { ...active, text }];
+        setHasStrokes(true);
+      }
+    }
+    setTextValue("");
+    redraw();
+  }
+
+  function cancelTextDraft() {
+    activeStrokeRef.current = null;
+    setDrafting(false);
+    setTextValue("");
+    redraw();
+  }
+
+  /** 도구 전환 — 텍스트 입력 중에 다른 도구로 가면 그 입력은 버린다 (원본과 동일) */
+  function selectTool(next: Tool) {
+    if (drafting && next !== "text") cancelTextDraft();
+    setTool(next);
+  }
+
+  function changeTextSize(delta: number) {
+    const next = Math.min(TEXT_SIZE_STEPS.length - 1, Math.max(0, textSizeIndex + delta));
+    setTextSizeIndex(next);
+    // 입력 중이면 크기를 바꾸는 즉시 미리보기에도 반영한다 — 이게 되게 하려고
+    // 원본이 prompt() 를 없앴다
+    const active = activeStrokeRef.current;
+    if (active && active.tool === "text") {
+      active.width = TEXT_SIZE_STEPS[next];
+      redraw();
+    }
+  }
+
   function pointFromEvent(e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -222,6 +308,12 @@ export default function PhotoEditorModal({
       cropStartRef.current = p;
       cropRectRef.current = { x: p.x, y: p.y, w: 0, h: 0 };
       redraw();
+      return;
+    }
+    if (tool === "text") {
+      // 앞서 입력 중이던 게 있으면 먼저 확정하고, 새로 누른 자리에서 다시 시작한다
+      if (activeStrokeRef.current) applyTextDraft();
+      startTextDraft(pointFromEvent(e));
       return;
     }
     activeStrokeRef.current = {
@@ -251,6 +343,8 @@ export default function PhotoEditorModal({
     }
     const active = activeStrokeRef.current;
     if (!active) return;
+    // 텍스트는 찍는 도구다 — 드래그해도 위치가 따라다니지 않는다
+    if (active.tool === "text") return;
     e.preventDefault();
     const p = pointFromEvent(e);
     if (active.tool === "pen" || active.tool === "highlighter") active.points.push(p);
@@ -270,6 +364,8 @@ export default function PhotoEditorModal({
     }
     const active = activeStrokeRef.current;
     if (!active) return;
+    // 텍스트는 손을 떼는 순간이 아니라 [적용]을 눌렀을 때 확정된다
+    if (active.tool === "text") return;
     e.preventDefault();
     const isShape = active.tool !== "pen" && active.tool !== "highlighter";
     if (isShape && active.points.length < 2) {
@@ -371,6 +467,9 @@ export default function PhotoEditorModal({
   }
 
   function handleSave() {
+    // 입력 중이던 텍스트를 [적용] 없이 바로 [저장]해도 사라지지 않도록 먼저 확정한다.
+    // applyTextDraft 는 strokesRef 를 즉시 갱신하므로 아래에서 그대로 읽어도 된다.
+    if (activeStrokeRef.current?.tool === "text") applyTextDraft();
     const result: PhotoEditorResult = {
       url: baseRef.current.url,
       width: baseRef.current.width,
@@ -382,6 +481,7 @@ export default function PhotoEditorModal({
   }
 
   const isCrop = tool === "crop";
+  const isText = tool === "text";
 
   return (
     <div className="fixed inset-0 z-[300] bg-[#1a1a1a] flex flex-col">
@@ -421,7 +521,7 @@ export default function PhotoEditorModal({
             <button
               key={t.tool}
               type="button"
-              onClick={() => setTool(t.tool)}
+              onClick={() => selectTool(t.tool)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
                 tool === t.tool ? "bg-primary text-on-primary" : "bg-white/10 text-white"
               }`}
@@ -451,6 +551,77 @@ export default function PhotoEditorModal({
               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white"
             >
               영역 지우기
+            </button>
+          </div>
+        )}
+
+        {/* 글자 크기 — 텍스트 도구일 때만. 사진 해상도마다 알맞은 크기가 달라
+            값 하나로 고정하지 않고 여기서 직접 고르게 한다 (원본과 동일) */}
+        {isText && (
+          <div className="flex gap-1.5 items-center">
+            <button
+              type="button"
+              onClick={() => changeTextSize(-1)}
+              disabled={textSizeIndex === 0}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white disabled:opacity-40"
+            >
+              A− 작게
+            </button>
+            <span className="text-white/80 text-xs min-w-16 text-center">
+              {TEXT_SIZE_LABELS[textSizeIndex]}
+            </span>
+            <button
+              type="button"
+              onClick={() => changeTextSize(1)}
+              disabled={textSizeIndex === TEXT_SIZE_STEPS.length - 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white disabled:opacity-40"
+            >
+              A+ 크게
+            </button>
+          </div>
+        )}
+
+        {/* 사진 위를 누르면 나타나는 입력줄. 타이핑이 즉시 캔버스에 반영된다 */}
+        {drafting && (
+          <div className="flex gap-1.5 items-center">
+            <input
+              ref={textInputRef}
+              type="text"
+              value={textValue}
+              autoComplete="off"
+              placeholder="표시할 텍스트 입력"
+              onChange={(e) => {
+                setTextValue(e.target.value);
+                const active = activeStrokeRef.current;
+                if (active && active.tool === "text") {
+                  active.text = e.target.value;
+                  redraw();
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyTextDraft();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancelTextDraft();
+                }
+              }}
+              className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm bg-white/10 text-white placeholder:text-white/40 outline-none focus:bg-white/15"
+            />
+            <button
+              type="button"
+              onClick={cancelTextDraft}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white shrink-0"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={applyTextDraft}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-on-primary shrink-0"
+            >
+              적용
             </button>
           </div>
         )}
@@ -492,7 +663,14 @@ export default function PhotoEditorModal({
         </div>
 
         <p className="text-white/60 text-[11px] text-center">
-          {message ?? (isCrop ? HINT_CROP : HINT_DRAW)}
+          {message ??
+            (isCrop
+              ? HINT_CROP
+              : isText
+                ? drafting
+                  ? HINT_TEXT_EDITING
+                  : HINT_TEXT
+                : HINT_DRAW)}
         </p>
       </div>
     </div>

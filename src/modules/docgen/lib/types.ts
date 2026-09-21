@@ -6,12 +6,21 @@ import type { DocMode } from "./constants";
  * 바뀌어도(픽셀 자체가 아니라 비율로 저장했으니) 다시 계산할 필요 없이 그대로 맞는다.
  */
 export interface Stroke {
-  tool: "pen" | "highlighter" | "rect" | "ellipse" | "line";
+  tool: "pen" | "highlighter" | "rect" | "ellipse" | "line" | "arrow" | "text";
   color: string;
-  /** 이미지 너비 대비 비율 (예: 0.005 = 너비의 0.5%) */
+  /**
+   * 이미지 너비 대비 비율 (예: 0.005 = 너비의 0.5%).
+   * text 도구에서는 선 굵기가 아니라 글자 크기 비율로 쓴다.
+   */
   width: number;
-  /** 0~1 로 정규화된 좌표. pen/highlighter 는 여러 점, 도형은 시작·끝 2점만 쓴다 */
+  /** 0~1 로 정규화된 좌표. pen/highlighter 는 여러 점, 도형은 시작·끝 2점, text 는 1점 */
   points: { x: number; y: number }[];
+  /**
+   * text 도구가 찍을 글자. 다른 도구에서는 쓰지 않는다.
+   * 자르기·회전으로 스트로크를 다시 만들 때 이 값을 빠뜨리면 표기한 글자가
+   * 조용히 사라지므로, 스트로크를 복제하는 곳에서는 반드시 함께 옮긴다. (원본 주석)
+   */
+  text?: string;
 }
 
 /** 편집 중인 사진 1장 — 원본의 items 배열 한 칸에 대응 */

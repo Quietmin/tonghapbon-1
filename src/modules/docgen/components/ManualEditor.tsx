@@ -42,6 +42,13 @@ export default function ManualEditor() {
         />
       )}
       saveMeta={{ manual_type: manualType, field, branch, revision }}
+      // 임시저장을 되살릴 때 머리말도 함께 돌려받는다 (키는 saveMeta 와 같다)
+      onRestoreMeta={(m) => {
+        setManualType(typeof m.manual_type === "string" ? m.manual_type : "");
+        setField(typeof m.field === "string" ? m.field : "");
+        setBranch(typeof m.branch === "string" ? m.branch : DEFAULT_BRANCH);
+        setRevision(typeof m.revision === "string" ? m.revision : "");
+      }}
       metaFields={
         <>
           <SortedSelect

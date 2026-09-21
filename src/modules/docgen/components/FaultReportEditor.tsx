@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DocEditor from "./DocEditor";
-import SortedSelect, { CheckField, TextField } from "./SortedSelect";
+import SortedSelect, { TextField } from "./SortedSelect";
 import { BRANCHES, DEFAULT_BRANCH, FAULT_FIELDS } from "../lib/constants";
 import {
   formatDateTime,
   minutesText,
+  nowForDateTimeLocal,
   orDash,
   spanMinutes,
   unitText,
@@ -39,6 +40,20 @@ export default function FaultReportEditor() {
   const [outageApt, setOutageApt] = useState("");
   const [outageBldg, setOutageBldg] = useState("");
   const [outageAt, setOutageAt] = useState("");
+
+  /*
+   * 발생일시는 이 화면을 연 시각으로 미리 채운다 — 고장 보고서는 대개 상황이
+   * 벌어진 직후에 쓰므로 그 시각이 맞는 경우가 많고, 아니면 고치면 된다.
+   *
+   * useState 초기값이 아니라 마운트 뒤에 채우는 이유: 이 페이지는 정적으로 미리
+   * 그려져서, 초기값으로 넣으면 빌드 시각이 HTML 에 박히고 브라우저가 계산한 값과
+   * 달라 하이드레이션이 어긋난다.
+   *
+   * prev 가 비어 있을 때만 채운다 — 임시저장 복구가 먼저 값을 넣었다면 덮지 않는다.
+   */
+  useEffect(() => {
+    setOccurredAt((prev) => prev || nowForDateTimeLocal());
+  }, []);
 
   /** 열공급 기간 = 복구일시 - 중단일시 */
   const outageMins = spanMinutes(outageAt, recoverAt);
@@ -196,6 +211,27 @@ export default function FaultReportEditor() {
         outage_at: outageAt || null,
         outage_mins: outageMins,
       }}
+      // 임시저장을 되살릴 때 머리말도 함께 돌려받는다 (키는 saveMeta 와 같다).
+      // 저장할 때 datetime 은 빈 값을 null 로 바꿔 넣으므로, 되돌릴 때 ?? "" 로 받는다.
+      onRestoreMeta={(m) => {
+        const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+        const num = (v: unknown) => (typeof v === "number" ? String(v) : "");
+        setBranch(str(m.branch, DEFAULT_BRANCH));
+        setField(str(m.field));
+        setOccurredAt(str(m.occurred_at));
+        setRecoverAt(str(m.recover_at));
+        setRecoverNote(str(m.recover_note));
+        setFacility(str(m.facility));
+        setDevice(str(m.device));
+        setFaultContent(str(m.fault_content));
+        setSituation(str(m.situation));
+        setCause(str(m.cause));
+        setActionTaken(str(m.action_taken));
+        setOutageNone(m.outage_none === true);
+        setOutageApt(num(m.outage_apt));
+        setOutageBldg(num(m.outage_bldg));
+        setOutageAt(str(m.outage_at));
+      }}
       metaFields={
         <>
           <SortedSelect
@@ -247,39 +283,6 @@ export default function FaultReportEditor() {
             onChange={setDevice}
           />
 
-          <CheckField
-            id="faultOutageNone"
-            label="열공급 중단 없음"
-            checked={outageNone}
-            onChange={setOutageNone}
-          />
-          {/* 중단이 없으면 세부 칸은 출력되지 않으므로 입력도 받지 않는다 */}
-          {!outageNone && (
-            <>
-              <TextField
-                id="faultOutageApt"
-                label="열공급 중단 · APT(세대)"
-                type="number"
-                value={outageApt}
-                onChange={setOutageApt}
-              />
-              <TextField
-                id="faultOutageBldg"
-                label="열공급 중단 · 건물(개소)"
-                type="number"
-                value={outageBldg}
-                onChange={setOutageBldg}
-              />
-              <TextField
-                id="faultOutageAt"
-                label="열공급 중단시간"
-                type="datetime-local"
-                value={outageAt}
-                onChange={setOutageAt}
-              />
-            </>
-          )}
-
           <TextField
             id="faultContent"
             label="고장내용"
@@ -294,6 +297,59 @@ export default function FaultReportEditor() {
             value={actionTaken}
             onChange={setActionTaken}
           />
+
+          {/*
+            '열공급 중단' 묶음 — 머리말 맨 아래(상황·조치사항 다음)에 둔다.
+            바깥 그리드의 한 줄을 통째로 써야(md:col-span-2) 세 칸이 조치사항 오른쪽으로
+            끼어들지 않고 체크박스 아래 줄로 내려온다.
+
+            체크박스가 세 칸 바로 위에 있어야 무엇을 끄는 스위치인지 읽힌다.
+            체크해도 이 줄은 남는다 — 남아 있어야 다시 풀 수 있다.
+          */}
+          <div className="md:col-span-2 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <input
+                id="faultOutageNone"
+                type="checkbox"
+                checked={outageNone}
+                onChange={(e) => setOutageNone(e.target.checked)}
+                className="w-4 h-4 accent-primary"
+              />
+              <label
+                htmlFor="faultOutageNone"
+                className="text-xs font-bold text-on-surface-variant"
+              >
+                열공급 중단 없음
+              </label>
+            </div>
+
+            {/* 중단이 없으면 세부 칸은 출력되지 않으므로 입력도 받지 않는다 */}
+            {!outageNone && (
+              <div className="grid gap-4 md:grid-cols-3">
+                <TextField
+                  id="faultOutageApt"
+                  label="열공급 중단 · APT(세대)"
+                  type="number"
+                  value={outageApt}
+                  onChange={setOutageApt}
+                />
+                <TextField
+                  id="faultOutageBldg"
+                  label="열공급 중단 · 건물(개소)"
+                  type="number"
+                  value={outageBldg}
+                  onChange={setOutageBldg}
+                />
+                <TextField
+                  id="faultOutageAt"
+                  label="열공급 중단시간"
+                  type="datetime-local"
+                  value={outageAt}
+                  onChange={setOutageAt}
+                />
+              </div>
+            )}
+          </div>
         </>
       }
     />
