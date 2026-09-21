@@ -342,6 +342,20 @@ create table if not exists failure_attachment (
 
 create index if not exists failure_attachment_failure_idx on failure_attachment (failure_id);
 
+-- storage_path(파일 경로) 방식으로 이미 만들어진 테이블을 base64 방식으로 옮긴다.
+-- create table if not exists는 이미 있는 테이블의 컬럼을 바꾸지 않으므로 따로 처리한다.
+-- (지금은 이 테이블에 실제 데이터가 없으므로 그냥 컬럼만 바꾼다 — 옮길 값이 없다)
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+     where table_name = 'failure_attachment' and column_name = 'storage_path'
+  ) then
+    alter table failure_attachment add column if not exists data text;
+    alter table failure_attachment drop column storage_path;
+  end if;
+end $$;
+
 
 -- ============================================================================
 -- 4) 정비 챗봇
