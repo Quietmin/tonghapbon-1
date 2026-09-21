@@ -71,6 +71,8 @@ interface Payload {
   targetYear: number;
   /** 서버가 실제로 걸러서 준 분야 (null이면 전체) */
   field: string | null;
+  /** 지금 보고 있는 지사 — 수량산출서 공사명에 들어간다 */
+  branch: string | null;
   availableYears: number[];
   /** 등록된 계획에 실제로 들어있는 분야들 */
   availableFields: string[];
@@ -251,7 +253,8 @@ export default function MaintenancePlan() {
   const confirmAndExport = useCallback(async () => {
     if (!data || !chosen.length) return;
     const statementField = field !== "전체" ? field : (chosen[0].field ?? null);
-    const title = `${data.targetYear}년도 정기점검보수공사`;
+    // 공사명에 지사를 넣는다 — 실제 계약 공사명 양식("2026년도 양산지사 정기점검보수공사")
+    const title = `${data.targetYear}년도 ${data.branch ? `${data.branch} ` : ""}정기점검보수공사`;
 
     setBusy("수량산출서 확정 중…");
     setError(null);

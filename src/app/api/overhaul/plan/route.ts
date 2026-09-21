@@ -7,6 +7,7 @@ import {
   listPlanFields,
   deletePlanSource,
 } from "@/modules/overhaul/lib/maintenanceRepo";
+import { resolveBranchFromRequest } from "@/modules/overhaul/lib/activeBranch";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const sp = new URL(req.url).searchParams;
-    const years = await listAvailableYears();
+    const branch = await resolveBranchFromRequest(req);
+    const years = await listAvailableYears(branch);
     const requested = Number(sp.get("year"));
     // 요청 연도가 없으면 올해, 올해가 계획 범위 밖이면 범위 안에서 가장 가까운 해
     const thisYear = new Date().getFullYear();
@@ -36,15 +38,16 @@ export async function GET(req: Request) {
     const fieldRaw = (sp.get("field") ?? "").trim();
     const field = fieldRaw && fieldRaw !== "전체" ? fieldRaw : null;
 
-    const rows = await listJudgedPlans(targetYear, field);
-    const sources = await listPlanSources();
+    const rows = await listJudgedPlans(targetYear, field, branch);
+    const sources = await listPlanSources(branch);
 
     return NextResponse.json({
       ok: true,
       targetYear,
       field,
+      branch,
       availableYears: years,
-      availableFields: await listPlanFields(),
+      availableFields: await listPlanFields(branch),
       sources,
       summary: summarize(rows),
       rows,

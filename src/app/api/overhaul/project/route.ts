@@ -12,6 +12,7 @@ import {
   PROJECT_COOKIE,
   PROJECT_COOKIE_MAX_AGE,
 } from "@/modules/overhaul/lib/activeProject";
+import { resolveBranch } from "@/modules/overhaul/lib/activeBranch";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,8 @@ function pickPatch(body: Record<string, unknown>): ProjectPatch {
 export async function GET(req: Request) {
   try {
     const project = await resolveProjectFromRequest(req);
-    return NextResponse.json({ ok: true, project, projects: await listProjects() });
+    // 회차 목록은 지금 보고 있는 지사 것만 — 지사끼리 회차가 섞이지 않는다
+    return NextResponse.json({ ok: true, project, projects: await listProjects(await resolveBranch()) });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : String(e) },
@@ -46,10 +48,13 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    // 새 회차는 지금 보고 있는 지사 소속으로 만든다 — 화면에서 지사를 따로 받지 않는다
+    const branch = await resolveBranch();
     const project = await createProject({
       name: String(body.name ?? "").trim(),
       plant: body.plant ?? null,
       unit: body.unit ?? null,
+      branch,
       start_date: body.start_date ?? null,
       end_date: body.end_date ?? null,
     });
@@ -57,7 +62,7 @@ export async function POST(req: Request) {
     const res = NextResponse.json({
       ok: true,
       project,
-      projects: await listProjects(),
+      projects: await listProjects(branch),
     });
     res.cookies.set(PROJECT_COOKIE, project.id, {
       path: "/",
@@ -93,7 +98,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({
       ok: true,
       project: await getProject(target.id),
-      projects: await listProjects(),
+      projects: await listProjects(await resolveBranch()),
     });
   } catch (e) {
     return NextResponse.json(
@@ -113,7 +118,8 @@ export async function DELETE(req: Request) {
     const id = new URL(req.url).searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, error: "id가 없습니다." }, { status: 400 });
 
-    const all = await listProjects();
+    const branch = await resolveBranch();
+    const all = await listProjects(branch);
     if (all.length <= 1) {
       return NextResponse.json(
         { ok: false, error: "마지막 회차는 지울 수 없습니다. 새 회차를 먼저 만드세요." },
@@ -122,7 +128,7 @@ export async function DELETE(req: Request) {
     }
 
     await deleteProject(id);
-    const projects = await listProjects();
+    const projects = await listProjects(branch);
 
     // 활성 회차를 지웠다면 남은 최신 회차로 옮겨준다
     const res = NextResponse.json({ ok: true, projects, project: projects[0] });

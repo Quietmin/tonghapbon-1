@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { getOrCreateProject, getProject, type OverhaulProject } from "./repo";
+import { resolveBranch } from "./activeBranch";
 
 /**
  * "지금 보고 있는 오버홀 회차"를 정하는 곳.
@@ -21,19 +22,24 @@ export const PROJECT_COOKIE = "oh_project";
 export const PROJECT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 export async function resolveProject(explicitId?: string | null): Promise<OverhaulProject> {
+  // 쿼리스트링으로 콕 집은 회차는 지사와 무관하게 존중한다 — 링크 공유 용도라서다.
   if (explicitId) {
     const byQuery = await getProject(explicitId);
     if (byQuery) return byQuery;
   }
 
+  const branch = await resolveBranch();
+
   const cookieId = (await cookies()).get(PROJECT_COOKIE)?.value;
   if (cookieId) {
     const byCookie = await getProject(cookieId);
-    if (byCookie) return byCookie;
+    // 지사를 바꾼 뒤에는 이전 지사의 회차 쿠키가 남아 있다 — 다른 지사 회차면
+    // 무시하고 아래에서 이 지사의 최근 회차로 넘어간다.
+    if (byCookie && (!branch || byCookie.branch === branch)) return byCookie;
   }
 
-  // 지정된 회차가 없거나 이미 지워졌다 → 가장 최근 회차 (없으면 기본 회차를 만든다)
-  return getOrCreateProject();
+  // 지정된 회차가 없거나 이미 지워졌다 → 그 지사의 가장 최근 회차 (없으면 만든다)
+  return getOrCreateProject(branch);
 }
 
 /** Request에서 ?projectId= 를 읽어 회차를 정한다 — API Route용 단축 */

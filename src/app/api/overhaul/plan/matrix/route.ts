@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listPlanMatrix } from "@/modules/overhaul/lib/maintenanceRepo";
+import { resolveBranchFromRequest } from "@/modules/overhaul/lib/activeBranch";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,8 @@ export async function GET(req: Request) {
     const sp = new URL(req.url).searchParams;
     const futureYears = Number(sp.get("futureYears")) || 5;
     const includeInactive = sp.get("includeInactive") === "1";
-    const payload = await listPlanMatrix({ futureYears, includeInactive });
+    const branch = await resolveBranchFromRequest(req);
+    const payload = await listPlanMatrix({ futureYears, includeInactive, branch });
     return NextResponse.json({ ok: true, ...payload });
   } catch (e) {
     return NextResponse.json(

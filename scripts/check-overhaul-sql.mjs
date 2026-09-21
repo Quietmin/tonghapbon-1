@@ -46,6 +46,14 @@ await step("overhaul_entry_photo 테이블 존재 · 옛 사진 컬럼은 사라
       where table_name='overhaul_entry' and column_name in ('photo_before','photo_after')`);
   if (c.rows.length) throw new Error("옛 사진 컬럼이 남아 있다: " + c.rows.map(r => r.column_name).join(","));
 });
+await step("지사(branch) 컬럼 — 회차·계획·계획파일·산출서 네 곳 모두", async () => {
+  const r = await db.query(
+    `select table_name from information_schema.columns
+      where column_name='branch'
+        and table_name in ('overhaul_project','maintenance_plan','maintenance_plan_source','design_statement')`);
+  const found = r.rows.map((x) => x.table_name).sort();
+  if (found.length !== 4) throw new Error("branch 컬럼이 빠진 테이블이 있다. 있는 곳: " + found.join(","));
+});
 
 // ── 최소한의 시드: 회차 1건, 내역서 1건+항목 1건, 작업 1건, 실적 1건 ──────
 console.log("\n[2] 시드 데이터");
@@ -420,6 +428,35 @@ await step("이력 반영 후보를 다른 회차에서 찾지 않는다", async
     throw new Error(`다른 회차 작업이 후보로 잡혔다: ${r.rows[0].guess_name}`);
   }
   await db.query(`delete from overhaul_project where id in ($1,$2)`, [a, b]);
+});
+
+await step("지사 분리 — 회차·설비가 지사별로만 보인다", async () => {
+  const ys = (await db.query(
+    `insert into overhaul_project (name, branch) values ('양산 회차','양산지사') returning id`)).rows[0].id;
+  const dg = (await db.query(
+    `insert into overhaul_project (name, branch) values ('대구 회차','대구지사') returning id`)).rows[0].id;
+
+  const projs = await db.query(
+    `select id from overhaul_project where branch = $1
+      order by start_date desc nulls last, created_at desc`, ["양산지사"]);
+  if (projs.rows.length !== 1 || projs.rows[0].id !== ys) throw new Error("회차 지사 필터가 틀리다");
+
+  await db.query(
+    `insert into maintenance_plan (name, field, branch, cycle_kind) values ('양산 설비','기계','양산지사','none')`);
+  await db.query(
+    `insert into maintenance_plan (name, field, branch, cycle_kind) values ('대구 설비','기계','대구지사','none')`);
+  const plans = await db.query(
+    `select name from maintenance_plan p where p.is_active and p.branch = $1`, ["대구지사"]);
+  if (plans.rows.length !== 1 || plans.rows[0].name !== "대구 설비") throw new Error("설비 지사 필터가 틀리다");
+
+  // 매트릭스의 등급 조회도 지사 조인으로 좁혀진다
+  const grades = await db.query(
+    `select t.plan_id from maintenance_plan_grade t
+       join maintenance_plan p on p.id = t.plan_id and p.branch = $1`, ["대구지사"]);
+  if (grades.rows.length !== 0) throw new Error("남의 지사 등급이 섞여 나온다");
+
+  await db.query(`delete from overhaul_project where id in ($1,$2)`, [ys, dg]);
+  await db.query(`delete from maintenance_plan where name in ('양산 설비','대구 설비')`);
 });
 
 console.log(`\n결과: ${pass} ok, ${fail} fail\n`);

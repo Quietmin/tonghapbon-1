@@ -6,6 +6,7 @@ import {
   type ReconcileDecision,
 } from "@/modules/overhaul/lib/maintenanceRepo";
 import { resolveProjectFromRequest } from "@/modules/overhaul/lib/activeProject";
+import { resolveBranchFromRequest } from "@/modules/overhaul/lib/activeBranch";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, project, ...result });
     }
     if (q != null) {
-      const results = await searchActivePlansLite(q);
+      const results = await searchActivePlansLite(q, 20, await resolveBranchFromRequest(req));
       return NextResponse.json({ ok: true, results });
     }
     return NextResponse.json({ ok: false, error: "statementId 또는 q가 필요합니다." }, { status: 400 });

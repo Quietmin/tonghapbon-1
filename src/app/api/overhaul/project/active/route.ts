@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProject, listProjects } from "@/modules/overhaul/lib/repo";
 import { PROJECT_COOKIE, PROJECT_COOKIE_MAX_AGE } from "@/modules/overhaul/lib/activeProject";
+import { resolveBranch } from "@/modules/overhaul/lib/activeBranch";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "회차를 찾을 수 없습니다." }, { status: 404 });
     }
 
-    const res = NextResponse.json({ ok: true, project, projects: await listProjects() });
+    const res = NextResponse.json({
+      ok: true,
+      project,
+      projects: await listProjects(await resolveBranch()),
+    });
     res.cookies.set(PROJECT_COOKIE, project.id, {
       path: "/",
       maxAge: PROJECT_COOKIE_MAX_AGE,

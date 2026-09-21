@@ -6,6 +6,7 @@ import {
   deleteDesignStatement,
   type StatementItemInput,
 } from "@/modules/overhaul/lib/maintenanceRepo";
+import { resolveBranchFromRequest } from "@/modules/overhaul/lib/activeBranch";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,10 @@ export async function GET(req: Request) {
     }
     return NextResponse.json({ ok: true, statement, items });
   }
-  return NextResponse.json({ ok: true, statements: await listDesignStatements() });
+  return NextResponse.json({
+    ok: true,
+    statements: await listDesignStatements(await resolveBranchFromRequest(req)),
+  });
 }
 
 /** 사용자가 선택한 항목으로 수량산출서를 확정 저장한다 */
@@ -35,10 +39,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "선택된 항목이 없습니다." }, { status: 400 });
     }
 
+    const branch = await resolveBranchFromRequest(req);
     const { statementId, items: saved } = await createDesignStatement({
       targetYear,
       field: body.field ?? null,
-      title: String(body.title ?? `${targetYear}년도 정기점검보수공사`),
+      branch,
+      title: String(
+        body.title ?? `${targetYear}년도 ${branch ? `${branch} ` : ""}정기점검보수공사`,
+      ),
       items,
     });
     // 저장된 항목을 그대로 돌려준다 — 화면이 이걸로 엑셀을 뽑아야

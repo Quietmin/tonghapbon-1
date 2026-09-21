@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseMaintenancePlan } from "@/modules/overhaul/lib/maintenancePlanParser";
 import { saveParsedPlan } from "@/modules/overhaul/lib/maintenanceRepo";
+import { resolveBranchFromRequest } from "@/modules/overhaul/lib/activeBranch";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -26,6 +27,15 @@ export async function POST(req: Request) {
     const dryRun = String(form.get("dryRun") ?? "") === "1";
     const thisYear = new Date().getFullYear();
 
+    // 계획은 지사 소속이다 — 지사를 안 고르고 저장하면 어느 지사에서도 안 보인다
+    const branch = await resolveBranchFromRequest(req);
+    if (!dryRun && !branch) {
+      return NextResponse.json(
+        { ok: false, error: "지사를 먼저 선택하세요." },
+        { status: 400 },
+      );
+    }
+
     const results = [];
     for (const file of files) {
       const buf = new Uint8Array(await file.arrayBuffer());
@@ -36,6 +46,7 @@ export async function POST(req: Request) {
         const saved = await saveParsedPlan({
           fileName: file.name,
           field,
+          branch,
           sheetCount: parsed.sheetCount,
           items: parsed.items,
         });

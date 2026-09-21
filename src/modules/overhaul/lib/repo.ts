@@ -12,6 +12,8 @@ export interface OverhaulProject {
   name: string;
   plant: string | null;
   unit: string | null;
+  /** 이 회차가 속한 지사 — 화면은 지사를 먼저 고르고 그 지사의 회차만 본다 */
+  branch: string | null;
   start_date: string | null;
   end_date: string | null;
 }
@@ -61,7 +63,7 @@ const TASK_COLUMNS = `id, source_id, equipment_id, name, spec, unit,
             plan_start::text, plan_end::text, needs_review, sheet_name, row_index,
             statement_item_id`;
 
-const PROJECT_COLUMNS = `id, name, plant, unit, start_date::text, end_date::text`;
+const PROJECT_COLUMNS = `id, name, plant, unit, branch, start_date::text, end_date::text`;
 
 // ---------------------------------------------------------------------------
 // 프로젝트 (오버홀 회차)
@@ -71,7 +73,16 @@ const PROJECT_COLUMNS = `id, name, plant, unit, start_date::text, end_date::text
 // 지금 어느 회차를 보고 있는지는 activeProject.ts가 쿠키로 들고 있다.
 // ---------------------------------------------------------------------------
 
-export async function listProjects(): Promise<OverhaulProject[]> {
+/** branch를 주면 그 지사의 회차만 — 지사 선택 전(null)에는 전체를 돌려준다 */
+export async function listProjects(branch?: string | null): Promise<OverhaulProject[]> {
+  if (branch) {
+    return query<OverhaulProject>(
+      `select ${PROJECT_COLUMNS} from overhaul_project
+        where branch = $1
+        order by start_date desc nulls last, created_at desc`,
+      [branch],
+    );
+  }
   return query<OverhaulProject>(
     `select ${PROJECT_COLUMNS} from overhaul_project
       order by start_date desc nulls last, created_at desc`,
@@ -89,19 +100,21 @@ export async function createProject(input: {
   name: string;
   plant?: string | null;
   unit?: string | null;
+  branch?: string | null;
   start_date?: string | null;
   end_date?: string | null;
 }): Promise<OverhaulProject> {
   const name = input.name?.trim();
   if (!name) throw new Error("프로젝트명을 입력하세요.");
   const created = await queryOne<OverhaulProject>(
-    `insert into overhaul_project (name, plant, unit, start_date, end_date)
-     values ($1,$2,$3,$4,$5)
+    `insert into overhaul_project (name, plant, unit, branch, start_date, end_date)
+     values ($1,$2,$3,$4,$5,$6)
      returning ${PROJECT_COLUMNS}`,
     [
       name,
       input.plant || null,
       input.unit || null,
+      input.branch || null,
       input.start_date || null,
       input.end_date || null,
     ],
@@ -116,20 +129,29 @@ export async function deleteProject(id: string): Promise<number> {
 }
 
 /**
- * 가장 최근 회차를 돌려준다. 하나도 없으면 기본값으로 만든다.
+ * 그 지사의 가장 최근 회차를 돌려준다. 하나도 없으면 기본값으로 만든다.
  * 활성 회차가 지정되지 않았을 때의 기본 선택이다 (activeProject.ts 참고).
+ * branch가 null이면(지사 선택 전) 전체에서 최근 회차를 본다.
  */
-export async function getOrCreateProject(): Promise<OverhaulProject> {
-  const found = await queryOne<OverhaulProject>(
-    `select ${PROJECT_COLUMNS} from overhaul_project
-      order by start_date desc nulls last, created_at desc limit 1`,
-  );
+export async function getOrCreateProject(branch?: string | null): Promise<OverhaulProject> {
+  const found = branch
+    ? await queryOne<OverhaulProject>(
+        `select ${PROJECT_COLUMNS} from overhaul_project
+          where branch = $1
+          order by start_date desc nulls last, created_at desc limit 1`,
+        [branch],
+      )
+    : await queryOne<OverhaulProject>(
+        `select ${PROJECT_COLUMNS} from overhaul_project
+          order by start_date desc nulls last, created_at desc limit 1`,
+      );
   if (found) return found;
 
   const created = await queryOne<OverhaulProject>(
-    `insert into overhaul_project (name, plant, unit)
-     values ('정기 오버홀', '발전본부', '1호기')
+    `insert into overhaul_project (name, plant, unit, branch)
+     values ('정기 오버홀', '발전본부', '1호기', $1)
      returning ${PROJECT_COLUMNS}`,
+    [branch ?? null],
   );
   if (!created) throw new Error("프로젝트를 만들지 못했습니다.");
   return created;

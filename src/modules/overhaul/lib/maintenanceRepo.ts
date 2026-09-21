@@ -52,15 +52,17 @@ export interface JudgedPlanRow extends PlanRow {
 export async function saveParsedPlan(params: {
   fileName: string;
   field: string | null;
+  /** 이 계획이 속한 지사 — 판정·매트릭스·산출서가 모두 이 값으로 갈린다 */
+  branch: string | null;
   sheetCount: number;
   items: ParsedPlanItem[];
 }): Promise<{ sourceId: string; itemCount: number }> {
-  const { fileName, field, sheetCount, items } = params;
+  const { fileName, field, branch, sheetCount, items } = params;
 
   const source = await queryOne<{ id: string }>(
-    `insert into maintenance_plan_source (file_name, field, sheet_count, item_count)
-     values ($1, $2, $3, $4) returning id`,
-    [fileName, field, sheetCount, items.length],
+    `insert into maintenance_plan_source (file_name, field, branch, sheet_count, item_count)
+     values ($1, $2, $3, $4, $5) returning id`,
+    [fileName, field, branch, sheetCount, items.length],
   );
   if (!source) throw new Error("업로드 이력을 저장하지 못했습니다.");
 
@@ -75,7 +77,7 @@ export async function saveParsedPlan(params: {
   // 639건을 한 건씩 INSERT하면 왕복이 그만큼 쌓여 25초가 걸렸다.
   // 여러 행을 한 문장으로 묶어 보내 왕복 수를 줄인다.
   const CHUNK = 100;
-  const PLAN_COLS = 19;
+  const PLAN_COLS = 20;
 
   for (let start = 0; start < items.length; start += CHUNK) {
     const chunk = items.slice(start, start + CHUNK);
@@ -97,6 +99,7 @@ export async function saveParsedPlan(params: {
         it.maker,
         it.spec,
         field,
+        branch,
         it.cycleRaw,
         it.cycle.kind === "fixed" ? (it.cycle.years ?? null) : null,
         it.cycle.kind,
@@ -114,8 +117,8 @@ export async function saveParsedPlan(params: {
     const inserted = await query<{ id: string }>(
       `insert into maintenance_plan
          (source_id, equipment_id, category, sub_category, name, tag_no, maker, spec, field,
-          cycle_raw, cycle_years, cycle_kind, cycle_options, patrol_cycle, method, completion,
-          last_done_year, sheet_name, row_index)
+          branch, cycle_raw, cycle_years, cycle_kind, cycle_options, patrol_cycle, method,
+          completion, last_done_year, sheet_name, row_index)
        values ${placeholders.join(",")}
        returning id`,
       values,
@@ -143,7 +146,14 @@ export async function saveParsedPlan(params: {
   return { sourceId: source.id, itemCount: items.length };
 }
 
-export async function listPlanSources(): Promise<PlanSource[]> {
+export async function listPlanSources(branch?: string | null): Promise<PlanSource[]> {
+  if (branch) {
+    return query<PlanSource>(
+      `select id, file_name, field, sheet_count, item_count, uploaded_at::text
+         from maintenance_plan_source where branch = $1 order by uploaded_at desc`,
+      [branch],
+    );
+  }
   return query<PlanSource>(
     `select id, file_name, field, sheet_count, item_count, uploaded_at::text
        from maintenance_plan_source order by uploaded_at desc`,
@@ -175,6 +185,8 @@ export interface PlanItemInput {
   cycleRaw?: string | null;
   method?: string | null;
   completion?: string | null;
+  /** 추가 시에만 쓴다 — 지금 보고 있는 지사. 수정에서는 지사를 옮기지 않으므로 무시된다 */
+  branch?: string | null;
 }
 
 async function linkEquipment(category: string | null | undefined, field: string | null | undefined) {
@@ -194,8 +206,8 @@ export async function createManualPlanItem(input: PlanItemInput): Promise<{ id: 
   const row = await queryOne<{ id: string }>(
     `insert into maintenance_plan
        (source_id, equipment_id, category, sub_category, name, tag_no, maker, spec, field,
-        cycle_raw, cycle_years, cycle_kind, cycle_options, method, completion, is_active)
-     values (null, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true)
+        branch, cycle_raw, cycle_years, cycle_kind, cycle_options, method, completion, is_active)
+     values (null, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, true)
      returning id`,
     [
       equipmentId,
@@ -206,6 +218,7 @@ export async function createManualPlanItem(input: PlanItemInput): Promise<{ id: 
       input.maker ?? null,
       input.spec ?? null,
       input.field ?? null,
+      input.branch ?? null,
       input.cycleRaw ?? null,
       cycle.kind === "fixed" ? (cycle.years ?? null) : null,
       cycle.kind,
@@ -273,12 +286,17 @@ export async function setPlanItemActive(id: string, isActive: boolean): Promise<
 export async function listJudgedPlans(
   targetYear: number,
   field?: string | null,
+  branch?: string | null,
 ): Promise<JudgedPlanRow[]> {
   const params: unknown[] = [targetYear];
   let fieldClause = "";
   if (field) {
     params.push(field);
     fieldClause = ` and p.field = $${params.length}`;
+  }
+  if (branch) {
+    params.push(branch);
+    fieldClause += ` and p.branch = $${params.length}`;
   }
 
   const rows = await query<PlanRow & { planned_grade: string | null }>(
@@ -348,19 +366,33 @@ export function summarize(rows: JudgedPlanRow[]): PlanSummary {
 }
 
 /** 계획에 등록된 연도 범위 — 화면의 연도 선택 목록용 */
-export async function listAvailableYears(): Promise<number[]> {
-  const rows = await query<{ year: number }>(
-    `select distinct year from maintenance_plan_grade order by year`,
-  );
+export async function listAvailableYears(branch?: string | null): Promise<number[]> {
+  const rows = branch
+    ? await query<{ year: number }>(
+        `select distinct g.year from maintenance_plan_grade g
+           join maintenance_plan p on p.id = g.plan_id
+          where p.branch = $1 order by g.year`,
+        [branch],
+      )
+    : await query<{ year: number }>(
+        `select distinct year from maintenance_plan_grade order by year`,
+      );
   return rows.map((r) => r.year);
 }
 
 /** 등록된 계획에 실제로 들어있는 분야 — 화면의 분야 버튼을 이 값으로 만든다 */
-export async function listPlanFields(): Promise<string[]> {
+export async function listPlanFields(branch?: string | null): Promise<string[]> {
+  const params: unknown[] = [];
+  let branchClause = "";
+  if (branch) {
+    params.push(branch);
+    branchClause = ` and branch = $${params.length}`;
+  }
   const rows = await query<{ field: string }>(
     `select distinct field from maintenance_plan
-      where is_active and field is not null and btrim(field) <> ''
+      where is_active and field is not null and btrim(field) <> ''${branchClause}
       order by field`,
+    params,
   );
   return rows.map((r) => r.field);
 }
@@ -445,9 +477,20 @@ export async function listPlanMatrix(opts?: {
   futureYears?: number;
   /** 사용중지된 설비도 함께 보여줄지 — 기본은 뺀다 */
   includeInactive?: boolean;
+  /** 지사 — 주면 그 지사 설비만. 연도 축도 그 지사 데이터로만 계산된다 */
+  branch?: string | null;
 }): Promise<MatrixPayload> {
   const thisYear = opts?.thisYear ?? new Date().getFullYear();
   const futureYears = opts?.futureYears ?? 5;
+
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (!opts?.includeInactive) where.push("p.is_active");
+  if (opts?.branch) {
+    params.push(opts.branch);
+    where.push(`p.branch = $${params.length}`);
+  }
+  const whereClause = where.length ? `where ${where.join(" and ")}` : "";
 
   const plans = await query<
     Omit<PlanRow, "recorded_year"> & {
@@ -460,20 +503,31 @@ export async function listPlanMatrix(opts?: {
             p.cycle_raw, p.cycle_years, p.cycle_kind, p.cycle_options,
             p.patrol_cycle, p.method, p.completion, p.last_done_year, p.sheet_name, p.is_active
        from maintenance_plan p
-      ${opts?.includeInactive ? "" : "where p.is_active"}
+      ${whereClause}
       order by p.sheet_name, p.row_index`,
+    params,
   );
 
   // 등급·실적은 건별로 부르면 왕복이 639번이 된다. 통째로 받아 메모리에서 묶는다.
+  // 지사를 골랐으면 그 지사 설비 것만 — 연도 축(minYear)이 남의 지사 이력에
+  // 끌려 늘어나지 않게 하기 위해서다.
+  const branchJoin = opts?.branch
+    ? ` join maintenance_plan p on p.id = t.plan_id and p.branch = $1`
+    : "";
+  const branchParams = opts?.branch ? [opts.branch] : [];
   const grades = await query<{ plan_id: string; year: number; grade: string }>(
-    `select plan_id, year, grade from maintenance_plan_grade`,
+    `select t.plan_id, t.year, t.grade from maintenance_plan_grade t${branchJoin}`,
+    branchParams,
   );
   const records = await query<{
     plan_id: string;
     done_year: number;
     grade: string | null;
     status: "done" | "skipped";
-  }>(`select plan_id, done_year, grade, status from maintenance_record`);
+  }>(
+    `select t.plan_id, t.done_year, t.grade, t.status from maintenance_record t${branchJoin}`,
+    branchParams,
+  );
 
   const gradeBy = new Map<string, Map<number, string>>();
   for (const g of grades) {
@@ -645,13 +699,14 @@ export interface StatementItemInput {
 export async function createDesignStatement(params: {
   targetYear: number;
   field: string | null;
+  branch: string | null;
   title: string;
   items: StatementItemInput[];
 }): Promise<{ statementId: string; items: DesignStatementItemRow[] }> {
   const stmt = await queryOne<{ id: string }>(
-    `insert into design_statement (target_year, field, title, item_count)
-     values ($1,$2,$3,$4) returning id`,
-    [params.targetYear, params.field, params.title, params.items.length],
+    `insert into design_statement (target_year, field, branch, title, item_count)
+     values ($1,$2,$3,$4,$5) returning id`,
+    [params.targetYear, params.field, params.branch, params.title, params.items.length],
   );
   if (!stmt) throw new Error("수량산출서를 만들지 못했습니다.");
 
@@ -718,6 +773,7 @@ export interface DesignStatementRow {
   id: string;
   target_year: number;
   field: string | null;
+  branch: string | null;
   title: string | null;
   item_count: number;
   created_at: string;
@@ -725,9 +781,16 @@ export interface DesignStatementRow {
   reconciled_at: string | null;
 }
 
-export async function listDesignStatements(): Promise<DesignStatementRow[]> {
+export async function listDesignStatements(branch?: string | null): Promise<DesignStatementRow[]> {
+  if (branch) {
+    return query<DesignStatementRow>(
+      `select id, target_year, field, branch, title, item_count, created_at::text, reconciled_at::text
+         from design_statement where branch = $1 order by created_at desc`,
+      [branch],
+    );
+  }
   return query<DesignStatementRow>(
-    `select id, target_year, field, title, item_count, created_at::text, reconciled_at::text
+    `select id, target_year, field, branch, title, item_count, created_at::text, reconciled_at::text
        from design_statement order by created_at desc`,
   );
 }
@@ -753,7 +816,7 @@ export async function getDesignStatement(statementId: string): Promise<{
   items: DesignStatementItemRow[];
 }> {
   const statement = await queryOne<DesignStatementRow>(
-    `select id, target_year, field, title, item_count, created_at::text, reconciled_at::text
+    `select id, target_year, field, branch, title, item_count, created_at::text, reconciled_at::text
        from design_statement where id = $1`,
     [statementId],
   );
@@ -953,16 +1016,23 @@ export async function suggestReconciliation(
 export async function searchActivePlansLite(
   q: string,
   limit = 20,
+  branch?: string | null,
 ): Promise<{ id: string; name: string; tag_no: string | null; category: string | null }[]> {
   const kw = q.trim();
   if (!kw) return [];
+  const params: unknown[] = [`%${kw}%`, limit];
+  let branchClause = "";
+  if (branch) {
+    params.push(branch);
+    branchClause = ` and branch = $${params.length}`;
+  }
   return query(
     `select id, name, tag_no, category
        from maintenance_plan
-      where is_active and (name ilike $1 or tag_no ilike $1 or category ilike $1)
+      where is_active and (name ilike $1 or tag_no ilike $1 or category ilike $1)${branchClause}
       order by name
       limit $2`,
-    [`%${kw}%`, limit],
+    params,
   );
 }
 

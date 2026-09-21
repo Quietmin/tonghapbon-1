@@ -5,14 +5,19 @@ import {
   setPlanItemActive,
   type PlanItemInput,
 } from "@/modules/overhaul/lib/maintenanceRepo";
+import { resolveBranchFromRequest } from "@/modules/overhaul/lib/activeBranch";
 
 export const dynamic = "force-dynamic";
 
-/** POST — 엑셀에 없던 설비를 손으로 추가한다. */
+/** POST — 엑셀에 없던 설비를 손으로 추가한다. 지금 보고 있는 지사 소속이 된다. */
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as PlanItemInput;
-    const created = await createManualPlanItem(body);
+    const branch = await resolveBranchFromRequest(req);
+    if (!branch) {
+      return NextResponse.json({ ok: false, error: "지사를 먼저 선택하세요." }, { status: 400 });
+    }
+    const created = await createManualPlanItem({ ...body, branch });
     return NextResponse.json({ ok: true, ...created });
   } catch (e) {
     return NextResponse.json(

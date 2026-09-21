@@ -104,11 +104,20 @@ create table if not exists overhaul_project (
   name         text not null,
   plant        text,
   unit         text,
+  -- 지사 — 유지보수 업무는 지사별로 독립 운영되므로 회차가 지사에 속한다.
+  -- 화면은 지사를 먼저 고르고(oh_branch 쿠키), 그 지사의 회차만 본다.
+  branch       text,
   start_date   date,   -- 계약 시작일
   end_date     date,   -- 준공 예정일
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+
+-- 기존 테이블에도 반영 (idempotent). 지사 개념 도입 전에 쌓인 행은 양산지사 것이다
+-- (이 시스템을 먼저 쓰기 시작한 지사 — docgen의 DEFAULT_BRANCH와 같은 근거).
+alter table overhaul_project add column if not exists branch text;
+update overhaul_project set branch = '양산지사' where branch is null;
+create index if not exists overhaul_project_branch_idx on overhaul_project (branch);
 
 drop trigger if exists overhaul_project_set_updated_at on overhaul_project;
 create trigger overhaul_project_set_updated_at before update on overhaul_project
@@ -416,10 +425,15 @@ create table if not exists maintenance_plan_source (
   file_name    text not null,
   -- 기계 / 전기 / 제어 — 파일이 담당하는 분야
   field        text,
+  -- 지사 — 보수계획도 지사별로 따로 세운다 (overhaul_project.branch와 같은 개념)
+  branch       text,
   sheet_count  integer not null default 0,
   item_count   integer not null default 0,
   uploaded_at  timestamptz not null default now()
 );
+
+alter table maintenance_plan_source add column if not exists branch text;
+update maintenance_plan_source set branch = '양산지사' where branch is null;
 
 -- 설비별 보수계획 1행 = 태그넘버로 개별 관리되는 설비 하나 (수량은 항상 1)
 create table if not exists maintenance_plan (
@@ -435,6 +449,10 @@ create table if not exists maintenance_plan (
   maker         text,          -- 제작사
   spec          text,          -- 사양 → 수량산출서의 Range로 나간다
   field         text,          -- 기계 / 전기 / 제어
+  -- 지사 — 설비·판정·매트릭스가 모두 이 값으로 갈린다. source의 branch를 행마다
+  -- 중복 보관한다: 손으로 추가한 설비(source_id null)도 지사를 가져야 하고,
+  -- 조회마다 source를 join하지 않기 위해서다.
+  branch        text,
 
   -- 판정의 근거가 되는 값들
   /** 정밀점검주기 원문 ("2년", "5년±6월", "실내: 3년 주기, 실외: 2년 주기", "필요시") */
@@ -468,8 +486,11 @@ create table if not exists maintenance_plan (
 
 -- 이미 만들어진 테이블에도 반영 (idempotent)
 alter table maintenance_plan add column if not exists is_active boolean not null default true;
+alter table maintenance_plan add column if not exists branch text;
+update maintenance_plan set branch = '양산지사' where branch is null;
 
 create index if not exists maintenance_plan_source_idx on maintenance_plan (source_id);
+create index if not exists maintenance_plan_branch_idx on maintenance_plan (branch);
 create index if not exists maintenance_plan_field_idx  on maintenance_plan (field);
 create index if not exists maintenance_plan_method_idx on maintenance_plan (method);
 create index if not exists maintenance_plan_equip_idx  on maintenance_plan (equipment_id);
@@ -533,6 +554,8 @@ create table if not exists design_statement (
   id           uuid primary key default gen_random_uuid(),
   target_year  integer not null,
   field        text,
+  -- 지사 — 수량산출서도 지사 단위로 뽑는다
+  branch       text,
   title        text,          -- 공사명 (예: "2026년도 양산지사 정기점검보수공사")
   item_count   integer not null default 0,
   created_at   timestamptz not null default now(),
@@ -541,6 +564,8 @@ create table if not exists design_statement (
 );
 
 alter table design_statement add column if not exists reconciled_at timestamptz;
+alter table design_statement add column if not exists branch text;
+update design_statement set branch = '양산지사' where branch is null;
 
 create table if not exists design_statement_item (
   id           bigint generated always as identity primary key,
