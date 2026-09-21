@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Card,
   Icon,
@@ -12,6 +12,7 @@ import {
   ProgressBar,
 } from "@/shared/components/ui";
 import { taskProgress } from "../lib/progress";
+import TaskEditor from "./TaskEditor";
 import type { OverhaulTask, OverhaulProject } from "../lib/repo";
 
 /**
@@ -34,28 +35,37 @@ interface Payload {
     overall: number;
     riskCount: number;
     personnel: number;
+    /** 수량·단위·분야가 불명확해 사람이 확인해야 하는 항목 수 (PRD 6.8) */
+    reviewCount: number;
     remainingDays: number;
     endDate: string | null;
     expected: number;
   };
 }
 
+/** 편집 패널 상태 — null이면 닫힘, "new"면 추가, 그 외는 그 작업 수정 */
+type EditTarget = OverhaulTask | "new" | null;
+
 export default function TaskManagement() {
+  const router = useRouter();
   const [q, setQ] = useState("");
   const [field, setField] = useState("전체");
   const [equipment, setEquipment] = useState("전체");
+  const [onlyReview, setOnlyReview] = useState(false);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [edit, setEdit] = useState<EditTarget>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const sp = new URLSearchParams({ page: String(page), field, equipment, q });
+    if (onlyReview) sp.set("needsReview", "1");
     const res = await fetch(`/api/overhaul/tasks?${sp}`);
     const json = await res.json();
     if (json.ok) setData(json);
     setLoading(false);
-  }, [page, field, equipment, q]);
+  }, [page, field, equipment, q, onlyReview]);
 
   // 검색어는 타이핑이 멈춘 뒤에 보낸다
   useEffect(() => {
@@ -83,14 +93,39 @@ export default function TaskManagement() {
             {data?.project.name ?? "—"} · 전체 {(s?.taskCount ?? 0).toLocaleString()}개 작업
           </p>
         </div>
-        <Link
-          href="/overhaul/upload"
-          className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-primary text-on-primary hover:opacity-90 transition-opacity"
-        >
-          <Icon name="add" className="text-base" />
-          작업 추가
-        </Link>
+        <div className="flex items-center gap-2">
+          <a
+            href="/overhaul/upload"
+            className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-surface-container-high text-on-surface hover:bg-surface-container-highest border border-border-subtle transition-colors"
+          >
+            <Icon name="upload_file" className="text-base" />
+            엑셀로 일괄 추가
+          </a>
+          <button
+            onClick={() => setEdit("new")}
+            className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-primary text-on-primary hover:opacity-90 transition-opacity"
+          >
+            <Icon name="add" className="text-base" />
+            작업 추가
+          </button>
+        </div>
       </div>
+
+      {edit && (
+        <TaskEditor
+          task={edit === "new" ? null : edit}
+          equipmentOptions={data?.equipmentOptions ?? []}
+          onCancel={() => setEdit(null)}
+          onSaved={() => {
+            setEdit(null);
+            void load();
+          }}
+          onDeleted={() => {
+            setEdit(null);
+            void load();
+          }}
+        />
+      )}
 
       <Card lift={false} className="p-card-padding">
         {/* 필터 바 */}
@@ -126,6 +161,19 @@ export default function TaskManagement() {
               </option>
             ))}
           </select>
+          <button
+            onClick={() => reset(setOnlyReview)(!onlyReview)}
+            title="수량·단위·분야가 불명확해 사람이 확인해야 하는 항목만 봅니다"
+            className={`h-11 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 whitespace-nowrap transition-colors border ${
+              onlyReview
+                ? "bg-status-warning/15 text-status-warning border-status-warning/40"
+                : "bg-surface-container-low text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
+            }`}
+          >
+            <Icon name={onlyReview ? "filter_alt" : "filter_alt_off"} className="text-base" />
+            확인 필요
+            {(s?.reviewCount ?? 0) > 0 && <span className="tabular-nums">{s?.reviewCount}</span>}
+          </button>
         </div>
 
         {/* 테이블 */}
@@ -133,12 +181,20 @@ export default function TaskManagement() {
           <p className="py-16 text-center text-sm text-on-surface-variant">불러오는 중…</p>
         ) : rows.length === 0 ? (
           <EmptyState
-            icon={s?.taskCount ? "search_off" : "table_rows"}
-            title={s?.taskCount ? "조건에 맞는 작업이 없습니다" : "등록된 작업이 없습니다"}
+            icon={s?.taskCount ? (onlyReview ? "verified" : "search_off") : "table_rows"}
+            title={
+              !s?.taskCount
+                ? "등록된 작업이 없습니다"
+                : onlyReview
+                  ? "확인이 필요한 항목이 없습니다"
+                  : "조건에 맞는 작업이 없습니다"
+            }
             desc={
-              s?.taskCount
-                ? "검색어나 필터를 바꿔 보세요."
-                : "업로드 분석에서 설계내역서 엑셀을 넣으면 작업항목이 여기에 쌓입니다."
+              !s?.taskCount
+                ? "업로드 분석에서 설계내역서 엑셀을 넣거나, '작업 추가'로 직접 넣으세요."
+                : onlyReview
+                  ? "수량·단위·분야가 모두 정상으로 인식됐습니다."
+                  : "검색어나 필터를 바꿔 보세요."
             }
           />
         ) : (
@@ -152,6 +208,7 @@ export default function TaskManagement() {
                   <th className="pb-3 px-3 w-40">진행률</th>
                   <th className="pb-3 px-3">상태</th>
                   <th className="pb-3 px-3">담당자</th>
+                  <th className="pb-3 pl-3 w-10" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -160,7 +217,12 @@ export default function TaskManagement() {
                   const status =
                     p >= 100 ? "완료" : risk.has(t.id) ? "지연" : p > 0 ? "진행중" : "대기";
                   return (
-                    <tr key={t.id} className="hover:bg-surface-container-low transition-colors">
+                    <tr
+                      key={t.id}
+                      onClick={() => router.push(`/overhaul/entry?task=${t.id}`)}
+                      title="눌러서 실적 입력으로 이동"
+                      className="group cursor-pointer hover:bg-surface-container-low transition-colors"
+                    >
                       <td className="py-3 pr-3">
                         <div className="flex items-center gap-2 mb-0.5">
                           <FieldChip field={t.field ?? "미분류"} />
@@ -178,7 +240,9 @@ export default function TaskManagement() {
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold text-on-surface text-sm">{t.name}</p>
+                        <p className="font-semibold text-on-surface text-sm group-hover:text-primary transition-colors">
+                          {t.name}
+                        </p>
                         <p className="text-xs text-on-surface-variant">
                           {t.equipment_type ?? "기타"}
                           {t.sheet_name ? ` · ${t.sheet_name}` : ""}
@@ -213,6 +277,19 @@ export default function TaskManagement() {
                             {t.assignee || <span className="text-on-surface-variant">미지정</span>}
                           </span>
                         </div>
+                      </td>
+                      <td className="py-3 pl-3">
+                        <button
+                          title="이 작업 수정·삭제"
+                          onClick={(e) => {
+                            // 행 클릭(실적 입력 이동)과 겹치지 않게 막는다
+                            e.stopPropagation();
+                            setEdit(t);
+                          }}
+                          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                        >
+                          <Icon name="edit" className="text-base" />
+                        </button>
                       </td>
                     </tr>
                   );

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getOrCreateProject, listAllTasks } from "@/modules/overhaul/lib/repo";
+import { listAllTasks } from "@/modules/overhaul/lib/repo";
+import { resolveProjectFromRequest } from "@/modules/overhaul/lib/activeProject";
 import {
   overallProgress,
   progressByField,
@@ -12,9 +13,9 @@ import { plannedOverall, scheduleDelayTasks } from "@/modules/overhaul/lib/sched
 export const dynamic = "force-dynamic";
 const today = () => new Date().toISOString().slice(0, 10);
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const project = await getOrCreateProject();
+    const project = await resolveProjectFromRequest(req);
     const tasks = await listAllTasks(project.id);
 
     const sched = scheduleInfo(project);

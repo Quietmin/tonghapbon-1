@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Card, Icon, Button, FieldChip, EmptyState } from "@/shared/components/ui";
-import ProjectSettings from "./ProjectSettings";
 import type { ParsedTask } from "../lib/excelParser";
 
 /**
@@ -23,7 +23,11 @@ interface AnalysisResult {
   needVerifyCount: number;
   byField: Record<string, number>;
   byEquipment: Record<string, number>;
+  /** 우리가 뽑아준 수량산출서의 "항목ID"를 달고 온 행 수 */
+  statementLinkedCount: number;
   sample: ParsedTask[];
+  /** 이 파일을 분석할 때 고른 분야 — 등록도 이 분야로 된다 */
+  usedField: string;
 }
 
 interface Source {
@@ -41,8 +45,16 @@ export default function UploadAnalysis() {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
-  // 분석에 쓴 파일을 들고 있어야 확정 저장 때 서버로 다시 보낼 수 있다
-  const [pending, setPending] = useState<File[]>([]);
+  /**
+   * 분석에 쓴 파일 + 그때 고른 분야.
+   *
+   * 분야를 파일과 함께 묶어 두는 게 핵심이다. 예전에는 파일만 모아 두고 등록할 때
+   * "현재" 분야 하나를 전부에 적용해서, 기계로 분석한 파일을 전기로 바꾼 뒤
+   * 등록하면 조용히 전기로 저장됐다 — 화면에는 여전히 기계로 보이는 채로.
+   */
+  const [pending, setPending] = useState<{ file: File; fieldHint: string }[]>([]);
+  /** 등록을 마친 직후 결과 안내 (몇 건 등록됐고, 내역서와 몇 건이 이어졌는지) */
+  const [done, setDone] = useState<{ tasks: number; linked: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadSources = useCallback(async () => {
@@ -55,46 +67,67 @@ export default function UploadAnalysis() {
     void loadSources();
   }, [loadSources]);
 
-  /** 파일이 들어오면 바로 분석한다. 이 단계에서는 저장하지 않는다(dryRun). */
-  const analyze = useCallback(
-    async (files: File[]) => {
-      const excel = files.filter((f) => /\.(xlsx|xlsm|xls)$/i.test(f.name));
-      if (!excel.length) {
-        setError("엑셀 파일(.xlsx, .xlsm, .xls)만 분석할 수 있습니다.");
-        return;
-      }
-      setError(null);
-      setBusy(`${excel.map((f) => f.name).join(", ")} 분석 중…`);
-      try {
-        const fd = new FormData();
-        for (const f of excel) fd.append("file", f);
-        fd.append("fieldHint", fieldHint);
-        fd.append("dryRun", "1");
-        const res = await fetch("/api/overhaul/upload", { method: "POST", body: fd });
-        const json = await res.json();
-        if (!json.ok) throw new Error(json.error ?? "분석에 실패했습니다.");
-        setResults((prev) => [...prev, ...json.results]);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setBusy(null);
-      }
-    },
-    [fieldHint],
-  );
+  /**
+   * 파일이 들어오면 바로 분석한다. 이 단계에서는 저장하지 않는다(dryRun).
+   * 분야는 인자로 받는다 — 분석한 뒤 사용자가 분야를 바꿔도 이 결과는 그대로여야 한다.
+   */
+  const analyze = useCallback(async (files: File[], usedField: string) => {
+    setError(null);
+    setBusy(`${files.map((f) => f.name).join(", ")} 분석 중…`);
+    try {
+      const fd = new FormData();
+      for (const f of files) fd.append("file", f);
+      fd.append("fieldHint", usedField);
+      fd.append("dryRun", "1");
+      const res = await fetch("/api/overhaul/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error ?? "분석에 실패했습니다.");
+      // 서버는 분야를 모른다 — 화면이 그때 고른 값을 결과에 붙여 둔다
+      const fresh = json.results as Omit<AnalysisResult, "usedField">[];
+      setResults((prev) => [...prev, ...fresh.map((r) => ({ ...r, usedField }))]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, []);
 
-  /** 미리 본 결과를 실제 작업항목으로 확정한다. 파일을 다시 보내 서버에서 재파싱한다. */
+  /**
+   * 미리 본 결과를 실제 작업항목으로 확정한다. 파일을 다시 보내 서버에서 재파싱한다.
+   *
+   * 분야가 섞여 있을 수 있으므로 분야별로 묶어서 따로 보낸다.
+   * 그래야 각 파일이 "분석할 때 보여준 그 분야"로 저장된다.
+   */
   const commit = useCallback(
-    async (files: File[]) => {
+    async (items: { file: File; fieldHint: string }[]) => {
       setBusy("작업항목으로 등록 중…");
       setError(null);
       try {
-        const fd = new FormData();
-        for (const f of files) fd.append("file", f);
-        fd.append("fieldHint", fieldHint);
-        const res = await fetch("/api/overhaul/upload", { method: "POST", body: fd });
-        const json = await res.json();
-        if (!json.ok) throw new Error(json.error ?? "등록에 실패했습니다.");
+        const byField = new Map<string, File[]>();
+        for (const it of items) {
+          const list = byField.get(it.fieldHint) ?? [];
+          list.push(it.file);
+          byField.set(it.fieldHint, list);
+        }
+
+        type CommitResult = { extractedCount: number; linkedStatementItems: number };
+        let tasks = 0;
+        let linked = 0;
+
+        for (const [hint, files] of byField) {
+          const fd = new FormData();
+          for (const f of files) fd.append("file", f);
+          fd.append("fieldHint", hint);
+          const res = await fetch("/api/overhaul/upload", { method: "POST", body: fd });
+          const json = await res.json();
+          if (!json.ok) throw new Error(json.error ?? "등록에 실패했습니다.");
+          for (const r of (json.results ?? []) as CommitResult[]) {
+            tasks += r.extractedCount ?? 0;
+            linked += r.linkedStatementItems ?? 0;
+          }
+        }
+
+        setDone({ tasks, linked });
         setResults([]);
         setPending([]);
         await loadSources();
@@ -104,15 +137,35 @@ export default function UploadAnalysis() {
         setBusy(null);
       }
     },
-    [fieldHint, loadSources],
+    [loadSources],
   );
 
   const handleFiles = useCallback(
     (files: File[]) => {
-      setPending((prev) => [...prev, ...files]);
-      void analyze(files);
+      const excel = files.filter((f) => /\.(xlsx|xlsm|xls)$/i.test(f.name));
+      if (!excel.length) {
+        setError("엑셀 파일(.xlsx, .xlsm, .xls)만 분석할 수 있습니다.");
+        return;
+      }
+
+      // 이미 등록된 파일명이면 되묻는다. 같은 내역서를 두 번 올리면 작업항목이
+      // 그대로 두 배가 되는데, 화면만 봐서는 알아채기 어렵기 때문이다.
+      // (파일명을 바꿔 올리면 못 잡는다 — 그건 등록된 파일 목록에서 되돌리면 된다)
+      const dupes = excel.filter((f) => sources.some((s) => s.file_name === f.name));
+      if (dupes.length) {
+        const ok = confirm(
+          `${dupes.map((f) => `"${f.name}"`).join(", ")} 은(는) 이미 등록된 파일입니다.\n\n` +
+            "그대로 등록하면 같은 작업항목이 두 번 쌓입니다. 계속할까요?\n" +
+            "(다시 올리려는 것이면, 아래 '등록된 파일'에서 기존 것을 먼저 지우세요)",
+        );
+        if (!ok) return;
+      }
+
+      setDone(null);
+      setPending((prev) => [...prev, ...excel.map((file) => ({ file, fieldHint }))]);
+      void analyze(excel, fieldHint);
     },
-    [analyze],
+    [analyze, fieldHint, sources],
   );
 
   const removeSource = useCallback(
@@ -134,11 +187,18 @@ export default function UploadAnalysis() {
         <h1 className="text-display-lg text-on-surface pt-2">업로드 분석</h1>
         <p className="text-body-md text-on-surface-variant mt-2">
           설계내역서 엑셀을 넣으면 바로 분석해서 작업항목을 뽑아냅니다. 엑셀 원본은 저장하지
-          않고, 추출된 항목만 남습니다.
+          않고, 추출된 항목만 남습니다. 작업항목은 위에 표시된 회차에 쌓입니다 —{" "}
+          <Link href="/overhaul/project" className="text-primary font-semibold hover:underline">
+            회차 관리
+          </Link>
+          에서 바꿀 수 있습니다.
+        </p>
+        <p className="text-sm text-on-surface-variant mt-1.5">
+          보수계획에서 뽑은 수량산출서를 시공사가 채워 되돌려준 파일이면, 맨 끝
+          <b> 항목ID</b> 열이 남아 있는지 확인하세요. 그 열이 있으면 어느 내역서 항목인지
+          정확히 이어져 준공 후 이력 반영이 자동으로 맞춰집니다.
         </p>
       </div>
-
-      <ProjectSettings />
 
       {/* 분야 지정 */}
       <Card className="p-card-padding" lift={false}>
@@ -218,6 +278,22 @@ export default function UploadAnalysis() {
         </Card>
       )}
 
+      {done && (
+        <Card className="p-4 border border-status-success/30" lift={false}>
+          <p className="text-sm text-status-success flex flex-wrap items-center gap-2">
+            <Icon name="check_circle" className="text-base" />
+            작업항목 {done.tasks.toLocaleString()}건을 등록했습니다.
+            {done.linked > 0 && ` 수량산출서 항목 ${done.linked}건에 일정을 되돌려 적었습니다.`}
+            <Link
+              href="/overhaul/tasks"
+              className="font-bold underline decoration-status-success/40"
+            >
+              작업 관리로 가기
+            </Link>
+          </p>
+        </Card>
+      )}
+
       {/* 분석 결과 */}
       {results.length > 0 && (
         <>
@@ -241,7 +317,7 @@ export default function UploadAnalysis() {
                 <Icon name="close" className="text-base" />
                 취소
               </Button>
-              <Button onClick={() => commit(pending)} disabled={!!busy}>
+              <Button onClick={() => commit(pending)} disabled={!!busy || !pending.length}>
                 <Icon name="playlist_add" className="text-base" />
                 작업항목으로 등록
               </Button>
@@ -258,12 +334,26 @@ export default function UploadAnalysis() {
                     <b className="text-primary">{r.extractedCount}건</b> 추출 ·{" "}
                     {r.excludedCount}건 제외(소계·합계·원가시트 등)
                   </p>
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    분야 <b className="text-on-surface">{r.usedField}</b>(으)로 등록됩니다
+                    {r.usedField !== fieldHint && " — 위에서 분야를 바꿔도 이 파일은 그대로입니다"}
+                  </p>
                 </div>
-                {r.needVerifyCount > 0 && (
-                  <span className="px-2.5 py-1 rounded-full bg-status-warning/10 text-status-warning text-xs font-bold">
-                    확인 필요 {r.needVerifyCount}건
-                  </span>
-                )}
+                <div className="flex flex-wrap gap-1.5">
+                  {r.statementLinkedCount > 0 && (
+                    <span
+                      className="px-2.5 py-1 rounded-full bg-status-success/10 text-status-success text-xs font-bold"
+                      title="수량산출서의 항목ID가 남아 있어 내역서 항목과 정확히 이어집니다"
+                    >
+                      내역서 연결 {r.statementLinkedCount}건
+                    </span>
+                  )}
+                  {r.needVerifyCount > 0 && (
+                    <span className="px-2.5 py-1 rounded-full bg-status-warning/10 text-status-warning text-xs font-bold">
+                      확인 필요 {r.needVerifyCount}건
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-4 mt-4">

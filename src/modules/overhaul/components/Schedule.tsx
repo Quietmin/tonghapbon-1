@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { Card, Icon, FieldChip, EmptyState } from "@/shared/components/ui";
+import { useRouter } from "next/navigation";
+import { Card, Icon, Button, FieldChip, EmptyState } from "@/shared/components/ui";
 import { addDays, toDate, ymd } from "../lib/schedule";
 
 /**
@@ -16,6 +17,9 @@ interface TaskSchedule {
   endOff: number;
   plannedStartStr: string;
   plannedEndStr: string;
+  /** excel = 지정된 일정 · auto = 작업명 키워드 자동배치 · none = 계약기간 미설정 */
+  source: "excel" | "auto" | "none";
+  phase: { key: string; label: string };
 }
 
 interface ActualBar {
@@ -86,14 +90,68 @@ export default function Schedule() {
   const [equipment, setEquipment] = useState("전체");
   const [onlyDelay, setOnlyDelay] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  /** 계획일정을 손으로 고치는 중인 작업 */
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [draft, setDraft] = useState<{ start: string; end: string }>({ start: "", end: "" });
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const reload = useCallback(async () => {
+    const json = await (await fetch("/api/overhaul/schedule")).json();
+    if (json.ok) setData(json);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    void (async () => {
-      const json = await (await fetch("/api/overhaul/schedule")).json();
-      if (json.ok) setData(json);
-      setLoading(false);
-    })();
+    void reload();
+  }, [reload]);
+
+  const openEditor = useCallback((r: Row) => {
+    setEditing(r);
+    setSaveError(null);
+    // 자동배치된 일정은 계산값이라 미리 채우지 않는다 — 비워 두면 "자동 유지"라는 뜻이
+    // 분명해지고, 실수로 자동배치 값을 지정 일정으로 굳혀 버리는 일이 없다.
+    setDraft(
+      r.sch.source === "excel"
+        ? { start: r.sch.plannedStartStr, end: r.sch.plannedEndStr }
+        : { start: "", end: "" },
+    );
   }, []);
+
+  /** 계획일정 저장. 둘 다 비우면 자동배치로 되돌아간다 */
+  const savePlan = useCallback(
+    async (next: { start: string; end: string }) => {
+      if (!editing) return;
+      if (next.start && next.end && next.end < next.start) {
+        setSaveError("종료일이 시작일보다 앞설 수 없습니다.");
+        return;
+      }
+      setBusy(true);
+      setSaveError(null);
+      try {
+        const json = await (
+          await fetch("/api/overhaul/tasks", {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              id: editing.id,
+              // 일정만 보낸다 — needs_review를 빼야 "확인 필요" 표시가 그대로 남는다
+              patch: { plan_start: next.start, plan_end: next.end },
+            }),
+          })
+        ).json();
+        if (!json.ok) throw new Error(json.error ?? "저장에 실패했습니다.");
+        setEditing(null);
+        await reload();
+      } catch (e) {
+        setSaveError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [editing, reload],
+  );
 
   const total = data?.total ?? 1;
   const todayOff = data?.todayOff ?? 0;
@@ -178,7 +236,7 @@ export default function Schedule() {
           <h1 className="text-display-lg text-on-surface">공정표</h1>
           <p className="text-on-surface-variant text-body-md">
             {data.hasPeriod
-              ? `작업명 키워드 기준으로 자동 배치된 계획일정입니다. (오버홀 ${startDate} ~ ${data.project.end_date} · 총 ${total}일)`
+              ? `엑셀에 예정일이 있으면 그 일정을, 없으면 작업명 키워드로 자동 배치합니다. 달력 아이콘으로 직접 조정할 수 있습니다. (오버홀 ${startDate} ~ ${data.project.end_date} · 총 ${total}일)`
               : "계약기간이 설정되지 않아 전체 기간 대비 배치를 계산할 수 없습니다. 업로드 분석에서 계약기간을 먼저 설정하세요."}
           </p>
         </div>
@@ -191,6 +249,84 @@ export default function Schedule() {
           </div>
         )}
       </div>
+
+      {editing && (
+        <Card className="p-card-padding border border-primary/30" lift={false}>
+          <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
+            <h2 className="text-title-sm text-on-surface flex items-center gap-2">
+              <Icon name="edit_calendar" className="text-base text-primary" />
+              계획일정 조정
+            </h2>
+            <span className="text-xs font-bold text-on-surface-variant">
+              {editing.sch.source === "excel"
+                ? "지금은 지정된 일정입니다"
+                : `지금은 자동배치입니다 (${editing.sch.phase.label})`}
+            </span>
+          </div>
+          <p className="text-sm text-on-surface-variant mb-4">
+            {editing.equipment} · <b className="text-on-surface">{editing.name}</b>
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-label-caps uppercase text-on-surface-variant">계획 시작일</span>
+              <input
+                type="date"
+                className="input"
+                value={draft.start}
+                min={data.project.start_date ?? undefined}
+                max={data.project.end_date ?? undefined}
+                onChange={(e) => setDraft({ ...draft, start: e.target.value })}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-label-caps uppercase text-on-surface-variant">계획 종료일</span>
+              <input
+                type="date"
+                className="input"
+                value={draft.end}
+                min={draft.start || data.project.start_date || undefined}
+                max={data.project.end_date ?? undefined}
+                onChange={(e) => setDraft({ ...draft, end: e.target.value })}
+              />
+            </label>
+            <p className="sm:col-span-2 text-xs text-on-surface-variant self-end pb-1">
+              날짜를 넣으면 그 일정이 자동배치를 이깁니다. 계약기간(
+              {data.project.start_date} ~ {data.project.end_date}) 밖으로는 넣지 마세요 —
+              막대가 양 끝에 붙어 표시됩니다.
+            </p>
+          </div>
+
+          {saveError && (
+            <p className="text-sm text-error flex items-center gap-2 mt-3">
+              <Icon name="error" className="text-base" />
+              {saveError}
+            </p>
+          )}
+
+          <div className="flex items-center gap-2 mt-4 flex-wrap">
+            <Button onClick={() => savePlan(draft)} disabled={busy}>
+              <Icon name="save" className="text-base" />
+              {busy ? "저장 중…" : "일정 지정"}
+            </Button>
+            <Button variant="ghost" onClick={() => setEditing(null)} disabled={busy}>
+              취소
+            </Button>
+            {editing.sch.source === "excel" && (
+              <Button
+                variant="ghost"
+                className="ml-auto"
+                disabled={busy}
+                onClick={() => savePlan({ start: "", end: "" })}
+                title="지정된 일정을 지우고 작업명 키워드 자동배치로 되돌립니다"
+              >
+                <Icon name="auto_mode" className="text-base" />
+                자동배치로 되돌리기
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {!data.hasPeriod ? (
         <Card lift={false} className="p-card-padding">
@@ -342,10 +478,13 @@ export default function Schedule() {
                             const barColor = barColorOf(r);
                             const labelOff = Math.max(r.sch.endOff, r.actualBar?.endOff || 0);
                             return (
-                              <Link
+                              <div
                                 key={r.id}
-                                href={`/overhaul/entry?task=${r.id}`}
-                                className="flex items-center py-1.5 group cursor-pointer border-b border-border-subtle/40 last:border-0"
+                                onClick={() => router.push(`/overhaul/entry?task=${r.id}`)}
+                                title="눌러서 실적 입력으로 이동"
+                                className={`flex items-center py-1.5 group cursor-pointer border-b border-border-subtle/40 last:border-0 ${
+                                  editing?.id === r.id ? "bg-primary/5" : ""
+                                }`}
                               >
                                 <div className="w-[220px] shrink-0 pr-3 pl-7">
                                   <div className="flex items-center gap-1.5">
@@ -357,9 +496,28 @@ export default function Schedule() {
                                         <Icon name="check" className="text-[10px]" /> 완료
                                       </span>
                                     )}
+                                    <button
+                                      title="계획일정 조정"
+                                      onClick={(e) => {
+                                        // 행 클릭(실적 입력 이동)과 겹치지 않게 막는다
+                                        e.stopPropagation();
+                                        openEditor(r);
+                                      }}
+                                      className="ml-auto shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                                    >
+                                      <Icon name="edit_calendar" className="text-sm" />
+                                    </button>
                                   </div>
-                                  <p className="text-[10px] text-on-surface-variant font-mono-data">
+                                  <p className="text-[10px] text-on-surface-variant font-mono-data flex items-center gap-1">
                                     계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}
+                                    {r.sch.source === "excel" && (
+                                      <span
+                                        className="text-[9px] font-bold text-primary not-italic"
+                                        title="엑셀에서 받았거나 손으로 지정한 일정"
+                                      >
+                                        지정
+                                      </span>
+                                    )}
                                   </p>
                                   <p
                                     className={`text-[10px] font-mono-data ${
@@ -412,7 +570,7 @@ export default function Schedule() {
                                     {r.actual}%
                                   </span>
                                 </div>
-                              </Link>
+                              </div>
                             );
                           })}
                       </div>

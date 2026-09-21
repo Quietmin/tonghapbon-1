@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { getOrCreateProject, listSources, deleteSource } from "@/modules/overhaul/lib/repo";
+import { listSources, deleteSource } from "@/modules/overhaul/lib/repo";
+import { resolveProjectFromRequest } from "@/modules/overhaul/lib/activeProject";
 
 export const dynamic = "force-dynamic";
 
 /** 업로드 이력 목록. 엑셀 원본은 보관하지 않고 파일명·건수만 남는다. */
-export async function GET() {
-  const project = await getOrCreateProject();
+export async function GET(req: Request) {
+  const project = await resolveProjectFromRequest(req);
   const sources = await listSources(project.id);
   return NextResponse.json({ ok: true, project, sources });
 }
