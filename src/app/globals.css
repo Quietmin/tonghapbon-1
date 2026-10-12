@@ -6,7 +6,12 @@
  * 원본: legacy/plantsync/tailwind.config.js
  */
 @theme {
-  --color-background: #f9f9ff;
+  /*
+   * 바탕은 카드보다 한 단계 어두워야 한다. 예전 값(#f9f9ff)은 카드의 흰색과
+   * 거의 같아서, 조회 목록이나 입력 카드의 테두리가 어디인지 보이지 않았다.
+   * 사이드바(surface-container-high) < 바탕 < 카드(흰색) 세 단계로 벌려 둔다.
+   */
+  --color-background: #eceff9;
   --color-on-background: #181c23;
 
   --color-surface: #f9f9ff;
@@ -102,8 +107,9 @@
   --text-mono-data: 13px;
   --text-mono-data--line-height: 18px;
 
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0 10px 25px rgba(0, 0, 0, 0.06);
+  /* 넓게 퍼지는 빛보다 가장자리가 읽히는 그림자가 경계를 또렷하게 만든다 */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.05), 0 10px 24px rgba(0, 0, 0, 0.08);
 
   --container-content: 1440px;
 }
@@ -131,11 +137,12 @@ body {
 
 @layer components {
   .glass-card {
-    background: rgba(255, 255, 255, 0.8);
+    /* 0.8 이면 바탕이 비쳐 카드가 바탕색에 끌려간다 — 거의 불투명하게 둔다 */
+    background: rgba(255, 255, 255, 0.96);
     /* 접두사는 Lightning CSS가 타깃에 맞춰 붙인다.
        -webkit- 형을 직접 쓰면 표준 속성이 제거되어 블러가 사라진다. */
     backdrop-filter: blur(25px);
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.07);
     box-shadow: var(--shadow-card);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }

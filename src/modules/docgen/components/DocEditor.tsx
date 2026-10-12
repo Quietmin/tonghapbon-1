@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Button, Card, EmptyState, Icon } from "@/shared/components/ui";
+import { Button, Card, EmptyState, Icon, ScreenHeader, type Accent } from "@/shared/components/ui";
 import {
   MAX_PHOTOS,
   MODE_LABELS,
   MODE_PLACEHOLDERS,
+  MODE_TITLES,
   PHOTOS_PER_PAGE,
   type DocMode,
 } from "../lib/constants";
@@ -69,6 +70,29 @@ export interface DocEditorProps {
   renderLetterhead?: (pageNo: number, pageCount: number, title: string) => React.ReactNode;
   /** 고장 보고서 첫 장의 "1. 고장 요약" 표 */
   faultSummary?: React.ReactNode;
+  /**
+   * 머리말 칸 배치를 모드가 직접 정할 때 쓴다 (매뉴얼은 원본과 같이
+   * 종류·분야·지사 → 파일명 → 작성자·개정번호 순으로 줄을 나눈다).
+   * 넘기지 않으면 기본 2열 격자에 파일명·작성자·metaFields 를 차례로 넣는다.
+   * 넘기면 metaFields 는 쓰이지 않는다 — 배치를 통째로 맡기는 것이기 때문이다.
+   */
+  renderMeta?: (parts: {
+    fileNameField: React.ReactNode;
+    /** 보관함이 설정돼 있지 않으면 null — 작성자는 보관함 표시용 값이라서 */
+    authorField: React.ReactNode | null;
+  }) => React.ReactNode;
+  /** 머리말 아래에 붙는 모드 전용 입력 묶음 (매뉴얼의 1~4번 항목) */
+  sections?: React.ReactNode;
+  /** 사진대장·매뉴얼 첫 장에서 사진 격자 위에 들어가는 블록 */
+  firstPageSummary?: React.ReactNode;
+  /**
+   * 제목 줄 오른쪽에 서는 것 — 같은 챕터의 조회 화면으로 건너가는 버튼.
+   * 좁은 폭에서는 제목 아래로 내려가 가로폭을 다 쓴다(모바일 하단탭에는 작성·조회
+   * 구분이 없어서, 이 버튼이 둘 사이를 오가는 유일한 길이다).
+   */
+  headingAction?: React.ReactNode;
+  /** 챕터 색 (고장관리는 tertiary). 색 규칙은 ui.tsx 의 ACCENT_STYLE 참고 */
+  accent?: Accent;
   /** 매뉴얼 모드에서 텍스트 전용 칸 추가를 허용할지 */
   allowTextItems?: boolean;
   /**
@@ -82,6 +106,12 @@ export interface DocEditorProps {
    * 직접 되돌릴 수 없다. 넘기지 않으면 머리말은 복원되지 않고 사진·설명만 살아난다.
    */
   onRestoreMeta?: (meta: Record<string, unknown>) => void;
+  /**
+   * 보관함 컬럼에는 없지만 임시저장에는 남아야 하는 값 (매뉴얼 1~4번 항목 본문 등).
+   * saveMeta 에 넣으면 docgen_documents 에 없는 컬럼이라 저장 자체가 거부된다.
+   * 임시저장할 때만 saveMeta 와 합쳐 넣고, 복구할 때 onRestoreMeta 로 함께 돌려준다.
+   */
+  draftExtra?: Record<string, unknown>;
 }
 
 export default function DocEditor({
@@ -90,9 +120,15 @@ export default function DocEditor({
   numbered = false,
   renderLetterhead,
   faultSummary,
+  renderMeta,
+  sections,
+  firstPageSummary,
+  headingAction,
+  accent = "primary",
   allowTextItems = false,
   saveMeta,
   onRestoreMeta,
+  draftExtra,
 }: DocEditorProps) {
   const [fileName, setFileName] = useState("");
   const [author, setAuthor] = useState("");
@@ -117,6 +153,8 @@ export default function DocEditor({
   // 최신 값만 ref 로 들고 있다가 저장할 때 읽는다.
   const saveMetaRef = useRef(saveMeta);
   saveMetaRef.current = saveMeta;
+  const draftExtraRef = useRef(draftExtra);
+  draftExtraRef.current = draftExtra;
 
   // 들어올 때 한 번만 확인한다. 이어서 쓸지는 사용자가 고른다 — 조용히 되살리면
   // 새 문서를 쓰려던 사람이 남의 내용 위에 덮어쓰게 된다.
@@ -145,7 +183,10 @@ export default function DocEditor({
         mode,
         fileName,
         author,
-        meta: (saveMetaRef.current ?? {}) as Record<string, unknown>,
+        meta: {
+          ...(saveMetaRef.current ?? {}),
+          ...(draftExtraRef.current ?? {}),
+        } as Record<string, unknown>,
         items: items.map((it) =>
           isTextItem(it)
             ? { kind: "text" as const, id: it.id, body: it.body }
@@ -425,7 +466,8 @@ export default function DocEditor({
   // 측정해서 사진·설명 칸 높이를 맞춘다. items(=사진·설명 내용) 가 바뀔 때마다 다시 잰다.
   useLayoutEffect(() => {
     const fit = mode === "fault" ? fitFaultPageLayout : fitReportPageLayout;
-    pageRefs.current.forEach((el) => fit(el));
+    // 쪽 번호를 넘긴다 — 고장 보고서는 첫 장과 이어지는 장의 격자 줄 수가 다르다
+    pageRefs.current.forEach((el, i) => fit(el, i));
   });
 
   /** 원본의 [순서 이동] — 옮길 순번을 골라 그 자리로 끼워 넣는다 */
@@ -544,19 +586,58 @@ export default function DocEditor({
 
   // 고장 보고서의 "2. 관련 사진"은 사진 격자라 텍스트 칸을 놓을 자리가 없다.
   // 매뉴얼로 만들다 모드를 바꾼 경우를 대비해 사진만 골라 쪽을 나눈다. (원본 주석)
+  /* 파일명·작성자 칸은 어느 배치에서든 같은 모양이라 여기서 한 번만 만든다.
+     renderMeta 를 넘긴 모드는 이 둘을 받아 원하는 줄에 꽂는다. */
+  const fileNameField = (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="docFileName" className="text-xs font-bold text-on-surface-variant">
+        파일명
+      </label>
+      <input
+        id="docFileName"
+        type="text"
+        value={fileName}
+        onChange={(e) => setFileName(e.target.value)}
+        placeholder={MODE_PLACEHOLDERS[mode]}
+        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+      />
+    </div>
+  );
+
+  /* 로그인이 없으므로 작성자를 자동으로 알 수 없다. 보관함 목록에서 누가 만든
+     문서인지 구분하려면 직접 적어야 한다(검증되지 않는 값). 보관함이 꺼져 있으면
+     적어 둘 곳이 없으므로 칸 자체를 두지 않는다. */
+  const authorField = archiveEnabled ? (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="docAuthor" className="text-xs font-bold text-on-surface-variant">
+        작성자 <span className="font-normal">(보관함 표시용, 선택)</span>
+      </label>
+      <input
+        id="docAuthor"
+        type="text"
+        value={author}
+        onChange={(e) => setAuthor(e.target.value)}
+        placeholder="예: 김영섭"
+        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+      />
+    </div>
+  ) : null;
+
   const photos = items.filter((it): it is PhotoItem => !isTextItem(it));
   const pages: DocItem[][] = mode === "fault" ? chunkFaultPages(photos) : chunkPages(items);
   const title = fileName || label;
 
   return (
     <>
-      <section className="pt-2">
-        <h1 className="text-display-lg text-on-surface">{label} 만들기</h1>
-        <p className="text-body-md text-on-surface-variant mt-2">
-          사진을 추가하고 설명을 적으면 A4 규격 {label} 문서를 자동으로 구성합니다. 최대{" "}
-          {MAX_PHOTOS}장.
-        </p>
-      </section>
+      <ScreenHeader
+        icon="edit_note"
+        title={`${MODE_TITLES[mode]} 작성`}
+        desc={`사진을 추가하고 설명을 적으면 A4 규격 ${label} 문서를 자동으로 구성합니다. 최대 ${MAX_PHOTOS}장.`}
+        accent={accent}
+        // 꽉 찬 칩 = 작성. 같은 챕터의 조회 화면은 같은 색 연한 칩이다
+        tone="solid"
+        action={headingAction}
+      />
 
       {/* ---- 이어서 작성 안내 ----
           조용히 되살리지 않고 물어본다 — 새로 쓰려던 사람이 예전 내용 위에
@@ -588,39 +669,16 @@ export default function DocEditor({
 
       {/* ---- 머리말 ---- */}
       <Card className="p-card-padding">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="docFileName" className="text-xs font-bold text-on-surface-variant">
-              파일명
-            </label>
-            <input
-              id="docFileName"
-              type="text"
-              value={fileName}
-              onChange={(e) => setFileName(e.target.value)}
-              placeholder={MODE_PLACEHOLDERS[mode]}
-              className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
-            />
+        {renderMeta ? (
+          renderMeta({ fileNameField, authorField })
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {fileNameField}
+            {authorField}
+            {metaFields}
           </div>
-          {/* 로그인이 없으므로 작성자를 자동으로 알 수 없다. 보관함 목록에서
-              누가 만든 문서인지 구분하려면 직접 적어야 한다(검증되지 않는 값). */}
-          {archiveEnabled && (
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="docAuthor" className="text-xs font-bold text-on-surface-variant">
-                작성자 <span className="font-normal">(보관함 표시용, 선택)</span>
-              </label>
-              <input
-                id="docAuthor"
-                type="text"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                placeholder="예: 김영섭"
-                className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
-              />
-            </div>
-          )}
-          {metaFields}
-        </div>
+        )}
+        {sections}
       </Card>
 
       {/* ---- 사진 추가 ---- */}
@@ -876,6 +934,7 @@ export default function DocEditor({
                     items={pageItems}
                     numbered={numbered}
                     startIndex={pageIndex * PHOTOS_PER_PAGE}
+                    summary={pageIndex === 0 ? firstPageSummary : undefined}
                   />
                 )}
               </div>

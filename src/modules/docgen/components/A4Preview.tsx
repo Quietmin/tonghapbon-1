@@ -39,16 +39,24 @@ interface A4PageProps {
   startIndex?: number;
   /** 페이지 맨 위 — 사진대장의 배너 줄, 매뉴얼의 표제부 표 */
   letterhead?: React.ReactNode;
+  /**
+   * 사진 격자 위에 한 번만 들어가는 블록 (매뉴얼 첫 장의 1~4번 항목).
+   * 첫 장에만 넣을지는 호출부가 정한다 — 여기서는 받은 대로 그린다.
+   * 이 블록이 길어지면 fitReportPageLayout 이 grid.offsetTop 으로 그만큼을
+   * 자동으로 빼므로 사진 칸이 알아서 줄어든다.
+   */
+  summary?: React.ReactNode;
 }
 
 export const A4Page = forwardRef<HTMLDivElement, A4PageProps>(function A4Page(
-  { title, items, numbered = false, startIndex = 0, letterhead },
+  { title, items, numbered = false, startIndex = 0, letterhead, summary },
   ref,
 ) {
   return (
     <div ref={ref} className="a4-page">
       {letterhead}
       {title && <div className="page-title">{title}</div>}
+      {summary}
 
       <div className="page-grid">
         {items.map((item, i) => (

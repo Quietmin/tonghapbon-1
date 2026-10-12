@@ -31,9 +31,34 @@ export function nowForDateTimeLocal(at: Date = new Date()): string {
   );
 }
 
-/** 두 datetime-local 값의 차이를 분으로. 값이 모자라거나 순서가 거꾸로면 null. (원본과 동일) */
+/**
+ * "YYYY-MM-DDTHH:mm" 을 날짜·시각 두 조각으로. 둘 중 하나만 있어도 받는다
+ * (날짜만 고르고 시각은 나중에 고르는 경우가 있다).
+ */
+export function splitLocal(v: string): { date: string; time: string } {
+  const [date = "", time = ""] = String(v || "").split("T");
+  return { date, time: time.slice(0, 5) };
+}
+
+/**
+ * 날짜·시각을 다시 "YYYY-MM-DDTHH:mm" 으로.
+ * 날짜가 없으면 시각만 있어도 의미가 없으므로 빈 문자열이다.
+ */
+export function joinLocal(date: string, time: string): string {
+  if (!date) return "";
+  return time ? `${date}T${time}` : date;
+}
+
+/**
+ * 두 datetime-local 값의 차이를 분으로. 값이 모자라거나 순서가 거꾸로면 null. (원본과 동일)
+ *
+ * 시각 없이 날짜만 있으면 재지 않는다 — "2026-10-12" 는 브라우저가 UTC 자정으로
+ * 읽어서 한국 기준으로 9시간 어긋난 기간이 조용히 찍힌다. 원본도 날짜와 시각이
+ * 모두 있을 때만 계산한다.
+ */
 export function spanMinutes(from: string, to: string): number | null {
   if (!from || !to) return null;
+  if (!from.includes("T") || !to.includes("T")) return null;
   const start = new Date(from);
   const end = new Date(to);
   if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;

@@ -30,6 +30,11 @@ export interface NavItem {
 export interface NavGroup {
   key: "equipment" | "failure" | "manual";
   label: string;
+  /**
+   * 챕터 색. 사이드바·하단탭·각 화면 제목이 모두 이 값을 읽으므로, 챕터를
+   * 어디서 보든 같은 색으로 보인다. 색 규칙 자체는 ui.tsx 의 ACCENT_STYLE 참고.
+   */
+  accent: "primary" | "tertiary";
   /** 모바일 하단바용 짧은 이름 (NavItem.short 와 같은 이유) */
   short?: string;
   icon: string;
@@ -48,6 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
     // /overhaul 화면들은 지사별 독립 운영이라 지사 관문(BranchGate)을 지난다.
     key: "equipment",
     label: "설비관리",
+    accent: "primary",
     short: "설비",
     icon: "precision_manufacturing",
     root: "/equipment",
@@ -76,28 +82,31 @@ export const NAV_GROUPS: NavGroup[] = [
     // 배치만 이 챕터로 옮겼고 서식은 원본 그대로다.
     key: "failure",
     label: "고장관리",
+    // 고장 보고서는 사고 기록이라 다른 챕터와 색부터 갈라 둔다
+    accent: "tertiary",
     short: "고장",
     icon: "report",
     root: "/failure",
-    desc: "고장 보고서를 작성하고, 보관된 지난 보고서를 지사·연도·키워드로 찾아봅니다.",
+    desc: "지난 고장 보고서를 지사·분야·설비명·고장내용으로 찾아보고, 새 보고서를 작성합니다.",
+    // 챕터 첫 화면이 곧 조회다 — 따로 "홈"을 두지 않는다.
+    // exact — /failure/new 에서도 조회가 켜져 보이면 어디 있는지 알 수 없다.
     items: [
-      { href: "/failure", label: "고장관리 홈", icon: "dashboard", exact: true },
+      { href: "/failure", label: "고장보고서 조회", icon: "inventory_2", exact: true },
       { href: "/failure/new", label: "고장보고서 작성", icon: "edit_note" },
-      { href: "/failure/archive", label: "고장보고서 조회", icon: "inventory_2" },
       { href: "/failure/history/new", label: "수기 등록", icon: "note_add", desktopOnly: true },
     ],
   },
   {
     key: "manual",
     label: "매뉴얼관리",
+    accent: "primary",
     short: "매뉴얼",
     icon: "menu_book",
     root: "/manual",
-    desc: "현장 매뉴얼을 작성하고, 보관된 매뉴얼을 지사·연도·키워드로 찾아봅니다.",
+    desc: "보관된 매뉴얼을 지사·분야·작성자·파일명으로 찾아보고, 새 매뉴얼을 작성합니다.",
     items: [
-      { href: "/manual", label: "매뉴얼관리 홈", icon: "dashboard", exact: true },
+      { href: "/manual", label: "매뉴얼 조회", icon: "inventory_2", exact: true },
       { href: "/manual/new", label: "매뉴얼 작성", icon: "edit_note" },
-      { href: "/manual/archive", label: "매뉴얼 조회", icon: "inventory_2" },
     ],
   },
 ];

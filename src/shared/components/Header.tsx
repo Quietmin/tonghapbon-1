@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { Icon, Avatar } from "./ui";
 import { NAV_GROUPS, isActive } from "@/shared/lib/nav";
 import { useChatbotDock } from "./ChatbotDock";
+import { useSidebar } from "./SidebarState";
 
 export default function Header() {
   const pathname = usePathname();
   const dock = useChatbotDock();
+  const sidebar = useSidebar();
   // 대표 경로 밖의 하위 메뉴도 챕터 소속이다 (설비관리의 /overhaul 화면들)
   const group = NAV_GROUPS.find(
     (g) =>
@@ -19,7 +21,21 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 bg-surface-glass backdrop-blur-xl border-b border-border-subtle px-gutter h-16 flex justify-between items-center w-full print:hidden">
-      <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        {/*
+          사이드바 여닫기. 숨긴 뒤 다시 부를 곳이 여기뿐이라 늘 같은 자리에 둔다.
+          모바일에는 사이드바가 없고 하단탭을 쓰므로 데스크톱에서만 보인다.
+        */}
+        <button
+          type="button"
+          onClick={sidebar.toggle}
+          aria-label={sidebar.open ? "메뉴 숨기기" : "메뉴 보기"}
+          aria-expanded={sidebar.open}
+          title={sidebar.open ? "메뉴 숨기기" : "메뉴 보기"}
+          className="hidden md:flex w-9 h-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+        >
+          <Icon name={sidebar.open ? "menu_open" : "menu"} />
+        </button>
         <h2 className="text-2xl font-black text-primary tracking-tight truncate">유지보수 마스터</h2>
         {group && (
           <>

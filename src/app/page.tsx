@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, Icon } from "@/shared/components/ui";
+import { ACCENT_STYLE, Card, Icon } from "@/shared/components/ui";
 import { HIDDEN_ROUTES, NAV_GROUPS } from "@/shared/lib/nav";
 
 export default function HomePage() {
@@ -16,11 +16,20 @@ export default function HomePage() {
       <section className="grid gap-gutter md:grid-cols-2 xl:grid-cols-3">
         {NAV_GROUPS.map((group) => (
           <Card key={group.key} className="p-card-padding flex flex-col">
-            <div className="w-12 h-12 rounded-2xl bg-primary-fixed text-on-primary-fixed-variant flex items-center justify-center mb-4">
+            {/* 챕터 색 — 사이드바·각 화면 제목과 같은 색이라 처음 화면부터 같게 읽힌다 */}
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${
+                ACCENT_STYLE[group.accent].soft
+              }`}
+            >
               <Icon name={group.icon} className="text-2xl" />
             </div>
             <Link href={group.root}>
-              <h2 className="text-headline-md text-on-surface hover:text-primary transition-colors">
+              <h2
+                className={`text-headline-md text-on-surface transition-colors ${
+                  group.accent === "tertiary" ? "hover:text-tertiary" : "hover:text-primary"
+                }`}
+              >
                 {group.label}
               </h2>
             </Link>

@@ -1,5 +1,6 @@
 // 재사용 UI 요소 — 디자인 토큰(글래스카드/필칩/진행바/링) 기반
 // 원본: legacy/plantsync/src/components/ui.jsx 를 TSX로 이식
+import Link from "next/link";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 
 export function Icon({
@@ -184,9 +185,39 @@ export function Avatar({
 
 const BUTTON_STYLE = {
   primary: "bg-primary text-on-primary hover:opacity-90 shadow-sm",
+  // 고장관리 챕터의 주 버튼. 색만 다르고 역할은 primary 와 같다 (ACCENT_STYLE 참고)
+  tertiary: "bg-tertiary text-on-tertiary hover:opacity-90 shadow-sm",
   ghost: "bg-surface-container-high text-on-surface hover:bg-surface-container-highest border border-border-subtle",
   danger: "bg-error text-on-error hover:opacity-90",
 } as const;
+
+/**
+ * 챕터 색.
+ *
+ * 고장관리만 주황(tertiary)이고 나머지는 파랑(primary)이다. 세 챕터에 각각 다른
+ * 색을 주면 그냥 알록달록해질 뿐이라, "고장은 주황" 한 가지 규칙만 둔다 —
+ * 고장 보고서는 사고 기록이라 눈에 먼저 들어와야 하고, 매뉴얼·설비와 섞이면
+ * 안 되는 문서다.
+ *
+ * solid 는 "내가 지금 만드는 것"(작성 화면), soft 는 "쌓여 있는 것"(조회 화면)에
+ * 쓴다. 같은 색이라 챕터는 한눈에 같고, 채도로 작성/조회가 갈린다.
+ */
+export const ACCENT_STYLE = {
+  primary: {
+    solid: "bg-primary text-on-primary",
+    soft: "bg-primary-fixed text-on-primary-fixed-variant",
+    bar: "bg-primary",
+    chip: "bg-primary-fixed text-on-primary-fixed-variant",
+  },
+  tertiary: {
+    solid: "bg-tertiary text-on-tertiary",
+    soft: "bg-tertiary-fixed text-on-tertiary-fixed-variant",
+    bar: "bg-tertiary",
+    chip: "bg-tertiary-fixed text-on-tertiary-fixed-variant",
+  },
+} as const;
+
+export type Accent = keyof typeof ACCENT_STYLE;
 
 export function Button({
   variant = "primary",
@@ -201,6 +232,73 @@ export function Button({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * 버튼처럼 보이는 링크. 생김새는 Button 과 같은 곳(BUTTON_STYLE)에서 가져온다 —
+ * 두 벌로 두면 색이나 모서리가 조금씩 어긋난다.
+ * <Link> 안에 <button> 을 넣으면 안 되므로(중첩 상호작용 요소) 따로 둔다.
+ */
+export function ButtonLink({
+  href,
+  variant = "primary",
+  className = "",
+  children,
+}: {
+  href: string;
+  variant?: keyof typeof BUTTON_STYLE;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`px-4 py-2.5 rounded-xl font-bold text-sm inline-flex items-center justify-center gap-2 transition-all ${BUTTON_STYLE[variant]} ${className}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * 화면 맨 위 제목 줄 — 아이콘 칩 · 제목 · 설명 · 오른쪽 버튼.
+ *
+ * 작성과 조회가 같은 자리·같은 모양이라, 바뀌는 건 아이콘과 칩 채도뿐이다:
+ * 꽉 찬 칩이면 작성(쓰는 화면), 연한 칩이면 조회(찾는 화면). 색은 챕터를 말한다.
+ */
+export function ScreenHeader({
+  icon,
+  title,
+  desc,
+  accent = "primary",
+  tone = "solid",
+  action,
+}: {
+  icon: string;
+  title: string;
+  desc: string;
+  accent?: Accent;
+  /** solid = 작성, soft = 조회 */
+  tone?: "solid" | "soft";
+  /** 오른쪽에 서는 버튼. 좁은 폭에서는 아래로 내려가 가로폭을 다 쓴다 */
+  action?: ReactNode;
+}) {
+  return (
+    <section className="pt-2 flex flex-wrap items-start justify-between gap-4">
+      <div className="flex items-start gap-4 min-w-0">
+        <div
+          className={`w-12 h-12 mt-1 rounded-2xl shrink-0 flex items-center justify-center ${ACCENT_STYLE[accent][tone]}`}
+        >
+          <Icon name={icon} className="text-2xl" />
+        </div>
+        <div className="min-w-0">
+          <h1 className="text-display-lg text-on-surface">{title}</h1>
+          <p className="text-body-md text-on-surface-variant mt-2">{desc}</p>
+        </div>
+      </div>
+      {action && <div className="shrink-0 max-md:w-full [&>*]:max-md:w-full">{action}</div>}
+    </section>
   );
 }
 

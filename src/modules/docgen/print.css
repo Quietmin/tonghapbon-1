@@ -97,6 +97,27 @@
 .mh-value { width: 8.5%; font-size: 12px; }
 .mh-field { font-size: 12px; font-weight: 500; white-space: nowrap; }
 
+/* ---- 매뉴얼 1~4번 항목 (첫 장, 사진 격자 위) -----------------------------
+   원본 .man-sec / .man-sec-body / .man-prep-table 규격 그대로.
+   본문을 1em 들여쓰는 것도 원본과 같다 — 제목("1. 목적")보다 한 칸 안으로
+   들어가야 항목 제목과 본문이 구분된다. */
+.man-sec { margin: 0 0 5mm; }
+.man-sec-heading { font-size: 15px; font-weight: 700; color: #000; margin: 0 0 2mm; }
+.man-sec-body {
+  font-size: 14px; color: #000; line-height: 1.6; padding-left: 1em;
+  white-space: pre-wrap; word-break: keep-all; overflow-wrap: break-word;
+}
+.man-prep-table {
+  width: calc(100% - 1em); border-collapse: collapse; table-layout: fixed;
+  margin: 2mm 0 0 1em;
+}
+.man-prep-table td {
+  border: 1px solid #000; padding: 1.6mm 2mm; font-size: 13px; text-align: center;
+  color: #000; word-break: keep-all; overflow-wrap: break-word;
+}
+/* 첫 줄은 머리글 */
+.man-prep-table tr:first-child td { font-weight: 700; background: #f2f2f2; }
+
 /* ---- 고장 보고서 --------------------------------------------------------- */
 .fr-head-row {
   display: flex; align-items: center; justify-content: space-between;

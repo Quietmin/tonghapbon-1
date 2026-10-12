@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import Sidebar from "@/shared/components/Sidebar";
-import Header from "@/shared/components/Header";
-import MobileNav from "@/shared/components/MobileNav";
-import ChatbotDock, { ChatbotDockProvider } from "@/shared/components/ChatbotDock";
+import Shell from "@/shared/components/Shell";
+import { ChatbotDockProvider } from "@/shared/components/ChatbotDock";
+import { SidebarProvider } from "@/shared/components/SidebarState";
 import PwaRegister from "@/shared/components/PwaRegister";
 
 export const metadata: Metadata = {
@@ -48,17 +47,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {/* 챗봇 도크는 어느 화면에서나 떠 있어야 해서 레이아웃에 한 번만 마운트한다.
-            헤더의 챗봇 버튼도 같은 상태를 만져야 하므로 Provider 가 셸 전체를 감싼다. */}
+            헤더의 챗봇 버튼·사이드바 접기 버튼도 같은 상태를 만져야 하므로
+            Provider 둘이 셸 전체를 감싼다. 실제 배치는 Shell 이 한다. */}
         <ChatbotDockProvider>
-          <div className="flex min-h-screen overflow-x-hidden">
-            <Sidebar />
-            <main className="flex-1 md:ml-[280px] w-full min-h-screen flex flex-col pb-24 md:pb-12">
-              <Header />
-              <div className="p-gutter max-w-content mx-auto w-full space-y-gutter">{children}</div>
-            </main>
-            <MobileNav />
-            <ChatbotDock />
-          </div>
+          <SidebarProvider>
+            <Shell>{children}</Shell>
+          </SidebarProvider>
         </ChatbotDockProvider>
         <PwaRegister />
       </body>

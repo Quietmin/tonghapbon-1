@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import DocEditor from "./DocEditor";
-import SortedSelect, { TextField } from "./SortedSelect";
+import SortedSelect, {
+  ComputedField,
+  DateField,
+  InlineCheck,
+  SectionHeading,
+  TextAreaField,
+  TextField,
+  TimeField,
+  UnitField,
+} from "./SortedSelect";
 import { BRANCHES, DEFAULT_BRANCH, FAULT_FIELDS } from "../lib/constants";
+import { ButtonLink, Icon } from "@/shared/components/ui";
 import {
   formatDateTime,
   minutesText,
@@ -19,8 +29,13 @@ import {
  * 행 구성·병합까지 그대로 옮긴 것이다. 서식이 결재 문서로 그대로 올라가므로
  * 칸 폭(34/24mm)과 행 순서를 임의로 바꾸지 않는다.
  *
+ * 입력 화면 배치도 원본과 같다 — 파일명·작성자 다음에 "1. 고장 요약"을 두고,
+ * 날짜와 시각을 따로 받으며, 열공급 중단·상황·조치사항은 각각 접어 둘 수 있다.
+ * 값은 "YYYY-MM-DDTHH:mm" 한 덩어리로 들고 다닌다(저장 컬럼이 timestamptz 라
+ * 합쳐진 값이 필요하고, 출력 서식도 그 형태를 그대로 받는다).
+ *
  * 입력 항목은 Supabase docgen_documents 의 고장 보고서 전용 컬럼에 맞췄다
- * (occurred_at / facility / device / fault_content / situation / cause /
+ * (occurred_at / facility / device / fault_content / situation /
  *  recover_at / action_taken / outage_*).
  */
 export default function FaultReportEditor() {
@@ -31,7 +46,6 @@ export default function FaultReportEditor() {
   const [device, setDevice] = useState("");
   const [faultContent, setFaultContent] = useState("");
   const [situation, setSituation] = useState("");
-  const [cause, setCause] = useState("");
   const [recoverAt, setRecoverAt] = useState("");
   const [recoverNote, setRecoverNote] = useState("");
   const [actionTaken, setActionTaken] = useState("");
@@ -40,6 +54,13 @@ export default function FaultReportEditor() {
   const [outageApt, setOutageApt] = useState("");
   const [outageBldg, setOutageBldg] = useState("");
   const [outageAt, setOutageAt] = useState("");
+  /*
+   * 상황·조치사항의 '생략'. 열공급 중단과 달리 출력물에서 행 자체가 빠진다 —
+   * '해당없음'을 찍지 않는다(원본과 동일). 보관함에는 '생략'이라고 남겨,
+   * 나중에 목록에서 볼 때 "안 적었다"와 "일부러 뺐다"가 구분되게 한다.
+   */
+  const [situationNone, setSituationNone] = useState(false);
+  const [actionNone, setActionNone] = useState(false);
 
   /*
    * 발생일시는 이 화면을 연 시각으로 미리 채운다 — 고장 보고서는 대개 상황이
@@ -66,15 +87,6 @@ export default function FaultReportEditor() {
     const note = recoverNote.trim();
     if (picked && note) return `${picked} ${note}`;
     return picked || note || "-";
-  })();
-
-  /* 원본은 '추정 원인'을 고장내용에 합쳤다(커밋 89a46da). 입력란은 남겨 두되
-     출력에서는 같은 행에 이어 붙여 서식을 원본과 맞춘다. */
-  const faultContentText = (() => {
-    const body = faultContent.trim();
-    const c = cause.trim();
-    if (body && c) return `${body}\n${c}`;
-    return body || c || "-";
   })();
 
   /** 출력물 첫 장의 "1. 고장 요약" 표 */
@@ -149,16 +161,16 @@ export default function FaultReportEditor() {
         <tr>
           <td className="fr-label">고장내용(추정 원인)</td>
           <td className="fr-body" colSpan={4}>
-            {faultContentText}
+            {orDash(faultContent)}
           </td>
         </tr>
 
-        {/* 상황을 비우면 행 자체를 만들지 않는다 — 열공급 중단과 달리 '해당없음'을 찍지 않는다 */}
-        {situation.trim() && (
+        {/* 생략하면 행 자체를 만들지 않는다 — 열공급 중단과 달리 '해당없음'을 찍지 않는다 */}
+        {!situationNone && (
           <tr>
             <td className="fr-label">{"상황(운전자/목격자\n진술 포함)"}</td>
             <td className="fr-body" colSpan={4}>
-              {situation}
+              {orDash(situation)}
             </td>
           </tr>
         )}
@@ -174,12 +186,11 @@ export default function FaultReportEditor() {
           </td>
         </tr>
 
-        {/* 조치사항도 비우면 행 자체를 만들지 않는다 */}
-        {actionTaken.trim() && (
+        {!actionNone && (
           <tr>
             <td className="fr-label">조치사항</td>
             <td className="fr-body" colSpan={4}>
-              {actionTaken}
+              {orDash(actionTaken)}
             </td>
           </tr>
         )}
@@ -190,20 +201,29 @@ export default function FaultReportEditor() {
   return (
     <DocEditor
       mode="fault"
+      accent="tertiary"
       faultSummary={faultSummary}
+      // 작성 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 작성 버튼과
+      // 같은 색으로 둬서, 두 화면을 오갈 때 같은 자리의 같은 버튼으로 읽히게 한다.
+      headingAction={
+        <ButtonLink href="/failure" variant="tertiary">
+          <Icon name="inventory_2" className="text-lg" />
+          고장보고서 조회
+        </ButtonLink>
+      }
       saveMeta={{
         branch,
         field,
-        // datetime-local 은 빈 문자열을 주는데 timestamptz 컬럼은 그걸 거부한다 → null
+        // 날짜 칸은 빈 문자열을 주는데 timestamptz 컬럼은 그걸 거부한다 → null
         occurred_at: occurredAt || null,
         recover_at: recoverAt || null,
         recover_note: recoverNote,
         facility,
         device,
         fault_content: faultContent,
-        situation,
-        cause,
-        action_taken: actionTaken,
+        // 일부러 뺀 항목은 '생략'으로 남긴다 (원본과 같은 값)
+        situation: situationNone ? "생략" : situation,
+        action_taken: actionNone ? "생략" : actionTaken,
         outage_none: outageNone,
         // 비었으면 null — 0 으로 넣으면 "0세대 중단"으로 읽힌다
         outage_apt: outageApt ? Number(outageApt) : null,
@@ -224,133 +244,228 @@ export default function FaultReportEditor() {
         setFacility(str(m.facility));
         setDevice(str(m.device));
         setFaultContent(str(m.fault_content));
-        setSituation(str(m.situation));
-        setCause(str(m.cause));
-        setActionTaken(str(m.action_taken));
+        // '생략'은 값이 아니라 상태다 — 되살릴 때 입력칸에 그 글자를 넣지 않는다
+        const situationValue = str(m.situation);
+        setSituationNone(situationValue === "생략");
+        setSituation(situationValue === "생략" ? "" : situationValue);
+        const actionValue = str(m.action_taken);
+        setActionNone(actionValue === "생략");
+        setActionTaken(actionValue === "생략" ? "" : actionValue);
         setOutageNone(m.outage_none === true);
         setOutageApt(num(m.outage_apt));
         setOutageBldg(num(m.outage_bldg));
         setOutageAt(str(m.outage_at));
       }}
-      metaFields={
-        <>
-          <SortedSelect
-            id="faultBranch"
-            label="지사"
-            values={BRANCHES}
-            value={branch}
-            onChange={setBranch}
-          />
-          <SortedSelect
-            id="faultField"
-            label="분야"
-            values={FAULT_FIELDS}
-            value={field}
-            onChange={setField}
-          />
-          <TextField
-            id="faultOccurredAt"
-            label="발생일시"
-            type="datetime-local"
-            value={occurredAt}
-            onChange={setOccurredAt}
-          />
-          <TextField
-            id="faultRecoverAt"
-            label="복구일시"
-            type="datetime-local"
-            value={recoverAt}
-            onChange={setRecoverAt}
-          />
-          <TextField
-            id="faultRecoverNote"
-            label="복구일시 비고"
-            value={recoverNote}
-            onChange={setRecoverNote}
-            placeholder="예: 예정"
-          />
-          <TextField
-            id="faultFacility"
-            label="설비명"
-            value={facility}
-            onChange={setFacility}
-            placeholder="예: 열수송관"
-          />
-          <TextField
-            id="faultDevice"
-            label="기기명(고장위치)"
-            value={device}
-            onChange={setDevice}
-          />
+      // 파일명·작성자는 한 줄씩 따로 선다 (원본 배치)
+      renderMeta={({ fileNameField, authorField }) => (
+        <div className="flex flex-col gap-4">
+          {fileNameField}
+          {authorField}
+        </div>
+      )}
+      sections={
+        <div className="mt-5 pt-5 border-t border-border-subtle">
+          <SectionHeading accent="tertiary" title="1. 고장 요약" />
 
-          <TextField
-            id="faultContent"
-            label="고장내용"
-            value={faultContent}
-            onChange={setFaultContent}
-          />
-          <TextField id="faultCause" label="추정 원인" value={cause} onChange={setCause} />
-          <TextField id="faultSituation" label="상황" value={situation} onChange={setSituation} />
-          <TextField
-            id="faultAction"
-            label="조치사항"
-            value={actionTaken}
-            onChange={setActionTaken}
-          />
-
-          {/*
-            '열공급 중단' 묶음 — 머리말 맨 아래(상황·조치사항 다음)에 둔다.
-            바깥 그리드의 한 줄을 통째로 써야(md:col-span-2) 세 칸이 조치사항 오른쪽으로
-            끼어들지 않고 체크박스 아래 줄로 내려온다.
-
-            체크박스가 세 칸 바로 위에 있어야 무엇을 끄는 스위치인지 읽힌다.
-            체크해도 이 줄은 남는다 — 남아 있어야 다시 풀 수 있다.
-          */}
-          <div className="md:col-span-2 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <input
-                id="faultOutageNone"
-                type="checkbox"
-                checked={outageNone}
-                onChange={(e) => setOutageNone(e.target.checked)}
-                className="w-4 h-4 accent-primary"
+          <div className="flex flex-col gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <DateField
+                id="faultOccurredDate"
+                label="발생일시"
+                value={occurredAt}
+                onChange={setOccurredAt}
               />
-              <label
-                htmlFor="faultOutageNone"
-                className="text-xs font-bold text-on-surface-variant"
-              >
-                열공급 중단 없음
-              </label>
+              <TimeField
+                id="faultOccurredTime"
+                label="발생시각"
+                value={occurredAt}
+                onChange={setOccurredAt}
+              />
             </div>
 
-            {/* 중단이 없으면 세부 칸은 출력되지 않으므로 입력도 받지 않는다 */}
-            {!outageNone && (
-              <div className="grid gap-4 md:grid-cols-3">
-                <TextField
+            <SortedSelect
+              id="faultField"
+              label="고장분야"
+              values={FAULT_FIELDS}
+              value={field}
+              onChange={setField}
+            />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <SortedSelect
+                id="faultBranch"
+                label="지사"
+                values={BRANCHES}
+                value={branch}
+                onChange={setBranch}
+              />
+              <TextField
+                id="faultFacility"
+                label="설비명"
+                value={facility}
+                onChange={setFacility}
+                placeholder="예: ST 보조 변압기"
+              />
+            </div>
+
+            <TextField
+              id="faultDevice"
+              label="기기명(고장위치)"
+              value={device}
+              onChange={setDevice}
+              placeholder="예: ST 보조 변압기 방압변"
+            />
+          </div>
+
+          {/* 체크가 세부 칸 바로 위에 있어야 무엇을 끄는 스위치인지 읽힌다 */}
+          <SectionHeading
+            accent="tertiary"
+            title="열공급 중단"
+            trailing={
+              <InlineCheck
+                id="faultOutageNone"
+                label="해당없음"
+                checked={outageNone}
+                onChange={setOutageNone}
+              />
+            }
+          />
+          {/* 중단이 없으면 출력물에 세부 칸이 나오지 않으므로 입력도 받지 않는다 */}
+          {!outageNone && (
+            <div className="flex flex-col gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <UnitField
                   id="faultOutageApt"
-                  label="열공급 중단 · APT(세대)"
-                  type="number"
+                  label="APT"
+                  unit="세대"
                   value={outageApt}
                   onChange={setOutageApt}
+                  placeholder="예: 120"
                 />
-                <TextField
+                <UnitField
                   id="faultOutageBldg"
-                  label="열공급 중단 · 건물(개소)"
-                  type="number"
+                  label="건물"
+                  unit="개소"
                   value={outageBldg}
                   onChange={setOutageBldg}
+                  placeholder="예: 3"
                 />
-                <TextField
-                  id="faultOutageAt"
-                  label="열공급 중단시간"
-                  type="datetime-local"
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <DateField
+                  id="faultOutageDate"
+                  label="중단일자"
+                  value={outageAt}
+                  onChange={setOutageAt}
+                />
+                <TimeField
+                  id="faultOutageTime"
+                  label="중단시각"
                   value={outageAt}
                   onChange={setOutageAt}
                 />
               </div>
-            )}
+              <ComputedField
+                id="faultOutageDuration"
+                label="기간 (자동 계산)"
+                value={minutesText(outageMins)}
+                placeholder="중단일시와 복구일시를 입력하면 자동 계산됩니다"
+              />
+            </div>
+          )}
+
+          <div className="mt-6">
+            <TextAreaField
+              id="faultContent"
+              label="고장내용(추정 원인)"
+              value={faultContent}
+              onChange={setFaultContent}
+              placeholder="고장 내용을 입력하세요."
+            />
           </div>
-        </>
+
+          <SectionHeading
+            accent="tertiary"
+            title="상황(운전자/목격자 진술 포함)"
+            trailing={
+              <InlineCheck
+                id="faultSituationNone"
+                label="생략"
+                checked={situationNone}
+                onChange={setSituationNone}
+              />
+            }
+          />
+          {/* 지우지 않고 잠가 둔다 — 체크를 풀면 적어 둔 내용이 그대로 돌아와야 한다 */}
+          <div className={situationNone ? "opacity-45 pointer-events-none" : undefined}>
+            <TextAreaField
+              id="faultSituation"
+              value={situation}
+              onChange={setSituation}
+              minRows={3}
+              disabled={situationNone}
+              placeholder="상황을 입력하세요."
+            />
+          </div>
+
+          <div className="mt-6 flex flex-col gap-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <DateField
+                id="faultRecoverDate"
+                label="복구 일자"
+                value={recoverAt}
+                onChange={setRecoverAt}
+              />
+              <TimeField
+                id="faultRecoverTime"
+                label="복구 시각"
+                value={recoverAt}
+                onChange={setRecoverAt}
+              />
+              <TextField
+                id="faultRecoverNote"
+                label="직접 입력"
+                value={recoverNote}
+                onChange={setRecoverNote}
+                placeholder="예: 미정 / 부품 수급 후"
+              />
+            </div>
+            <ComputedField
+              id="faultDownTime"
+              label="설비 정지기간 (자동 계산)"
+              value={minutesText(downMins)}
+              placeholder="발생일시와 복구일시를 입력하면 자동 계산됩니다"
+            />
+          </div>
+
+          <SectionHeading
+            accent="tertiary"
+            title="조치사항"
+            trailing={
+              <InlineCheck
+                id="faultActionNone"
+                label="생략"
+                checked={actionNone}
+                onChange={setActionNone}
+              />
+            }
+          />
+          <div className={actionNone ? "opacity-45 pointer-events-none" : undefined}>
+            <TextAreaField
+              id="faultAction"
+              value={actionTaken}
+              onChange={setActionTaken}
+              minRows={3}
+              disabled={actionNone}
+              placeholder="조치 사항을 입력하세요."
+            />
+          </div>
+
+          <SectionHeading accent="tertiary" title="2. 관련 사진" />
+          <p className="text-xs text-on-surface-variant leading-relaxed">
+            아래에서 추가하는 사진이 등록한 순서대로 이 항목의 내용으로 출력됩니다.
+          </p>
+        </div>
       }
     />
   );

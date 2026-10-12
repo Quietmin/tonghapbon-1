@@ -19,6 +19,12 @@
  * 공간이 남는다. 그래서 고장 보고서는 칸을 늘리지 않고(stretchCells:false)
  * 내용 높이 그대로 두고, 캡션 높이만 맞춘다.
  */
+import {
+  FAULT_PHOTOS_FIRST_PAGE,
+  FAULT_PHOTOS_PER_PAGE,
+  PHOTOS_PER_PAGE,
+} from "./constants";
+
 const PX_PER_MM = 96 / 25.4;
 const PAGE_HEIGHT_PX = 297 * PX_PER_MM;
 const PAD_BOTTOM_PX = 14 * PX_PER_MM;
@@ -29,6 +35,16 @@ interface FitRowOptions {
   growSelector: string;
   textSelector: string | null;
   columns: number;
+  /**
+   * 이 서식이 한 장에 담도록 설계된 줄 수. 페이지 높이를 이 수로 나눠 한 줄의 몫을
+   * 정한다.
+   *
+   * 실제로 올라온 칸 수로 나누면 안 된다 — 사진이 한 장뿐인 장에서는 줄이 하나라
+   * 그 칸이 남은 페이지 전체를 차지하고, 가운데 정렬된 사진이 페이지 한가운데로
+   * 내려가 제목 아래가 텅 비게 된다. 한 장은 늘 같은 격자여야 하므로, 칸이 몇 개
+   * 들어왔든 한 줄의 몫은 같다. (원본도 available/2 로 고정이다)
+   */
+  rows: number;
   minGrowPx: number;
   minCompanionPx: number;
   /**
@@ -44,10 +60,9 @@ function fitRows(pageEl: HTMLElement, opts: FitRowOptions): void {
   if (!grid) return;
 
   const available = PAGE_HEIGHT_PX - grid.offsetTop - PAD_BOTTOM_PX;
-  const rowCount = Math.ceil(grid.children.length / opts.columns);
-  if (rowCount === 0) return;
+  if (opts.rows <= 0) return;
 
-  const rowHeight = Math.floor(available / rowCount);
+  const rowHeight = Math.floor(available / opts.rows);
   if (rowHeight <= opts.minCompanionPx + opts.minGrowPx) return;
 
   const cells = Array.from(grid.children) as HTMLElement[];
@@ -83,7 +98,11 @@ function fitRows(pageEl: HTMLElement, opts: FitRowOptions): void {
   }
 }
 
-/** 사진대장·매뉴얼 — .page-grid 의 .photo-set(2열), 늘어나는 건 .desc-box(.desc-text 로 잰다) */
+/**
+ * 사진대장·매뉴얼 — .page-grid 의 .photo-set(2열 2줄),
+ * 늘어나는 건 .desc-box(.desc-text 로 잰다).
+ * 한 장에 4장(2×2)이 들어가는 서식이므로 줄 수는 늘 2다.
+ */
 export function fitReportPageLayout(pageEl: HTMLElement | null): void {
   if (!pageEl) return;
   fitRows(pageEl, {
@@ -91,6 +110,7 @@ export function fitReportPageLayout(pageEl: HTMLElement | null): void {
     growSelector: ".desc-box",
     textSelector: ".desc-text",
     columns: 2,
+    rows: PHOTOS_PER_PAGE / 2,
     minGrowPx: 9 * PX_PER_MM,
     minCompanionPx: 45 * PX_PER_MM,
   });
@@ -103,14 +123,19 @@ export function fitReportPageLayout(pageEl: HTMLElement | null): void {
  */
 const FAULT_CAP_MIN_PX = 10 * 1.4 + 3 * PX_PER_MM;
 
-/** 고장 보고서 — .fr-photo-grid 의 .fr-photo-cell(3열), 늘어나는 건 .fr-photo-cap 자신 */
-export function fitFaultPageLayout(pageEl: HTMLElement | null): void {
+/**
+ * 고장 보고서 — .fr-photo-grid 의 .fr-photo-cell(3열), 늘어나는 건 .fr-photo-cap 자신.
+ * 첫 장은 위를 고장 요약 표가 차지해 한 줄(3장)만, 이어지는 장은 세 줄(9장)이다.
+ */
+export function fitFaultPageLayout(pageEl: HTMLElement | null, pageIndex = 0): void {
   if (!pageEl) return;
+  const capacity = pageIndex === 0 ? FAULT_PHOTOS_FIRST_PAGE : FAULT_PHOTOS_PER_PAGE;
   fitRows(pageEl, {
     gridSelector: ".fr-photo-grid",
     growSelector: ".fr-photo-cap",
     textSelector: null,
     columns: 3,
+    rows: capacity / 3,
     minGrowPx: FAULT_CAP_MIN_PX,
     minCompanionPx: 40 * PX_PER_MM,
     // .fr-photo-box 가 62mm 고정이라 칸을 늘리면 빈 공간만 생긴다 (위 주석 참고)

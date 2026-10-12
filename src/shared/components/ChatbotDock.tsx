@@ -191,7 +191,8 @@ export default function ChatbotDock() {
       role="dialog"
       aria-label="정비 챗봇"
       className={[
-        "print:hidden fixed z-[200] flex flex-col bg-surface-container border border-border-subtle shadow-2xl",
+        // 떠 있는 판이라 카드와 같은 흰색이어야 바탕 위에 올라앉은 것으로 읽힌다
+      "print:hidden fixed z-[200] flex flex-col bg-surface-container-lowest border border-border-subtle shadow-2xl",
         // 모바일: 하단 시트 (하단탭 위에 붙는다)
         "inset-x-0 bottom-16 h-[70vh] rounded-t-2xl",
         // 데스크톱: 우하단 패널
