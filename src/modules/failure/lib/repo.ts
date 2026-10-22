@@ -108,7 +108,14 @@ export async function createFailure(
   let equipmentId: string | null = null;
   if (equipmentName) {
     try {
-      equipmentId = await ensureEquipment({ name: equipmentName, field: orNull(input.failureField) });
+      // 설비 마스터는 지사별로 나뉘므로 이 이력의 지사로 찾는다. 지사가 비면
+      // ensureEquipment가 막아서 아래 catch로 떨어진다 — 어느 지사 것인지 모르는 채
+      // 설비를 만들어 마스터를 오염시키는 것보다 연결을 포기하는 쪽이 낫다.
+      equipmentId = await ensureEquipment({
+        name: equipmentName,
+        branch: orNull(input.branch) ?? "",
+        field: orNull(input.failureField),
+      });
     } catch {
       // 설비 마스터 연결 실패는 등록 자체를 막지 않는다 — equipment_name 원문은 그대로 저장된다.
     }
