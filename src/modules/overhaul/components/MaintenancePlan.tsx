@@ -200,6 +200,11 @@ export default function MaintenancePlan() {
 
   const rows = data?.rows ?? [];
 
+  // 목록 페이지네이션 — 수백 건을 한 번에 그리면 스크롤이 끝이 없다.
+  // 기본 10개씩, 페이지당 개수는 아래 표 하단에서 바꾼다.
+  const [pageSize, setPageSize] = useState<number | "all">(10);
+  const [page, setPage] = useState(1);
+
   const visible = useMemo(() => {
     const kw = q.trim().toLowerCase();
     return rows.filter((r) => {
@@ -219,6 +224,21 @@ export default function MaintenancePlan() {
     });
   }, [rows, tab, q, field]);
 
+  // 탭·검색·분야·페이지 크기가 바뀌면 1페이지로 — 남은 페이지 번호가 범위를 벗어난다
+  useEffect(() => {
+    setPage(1);
+  }, [tab, q, field, pageSize]);
+
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(visible.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () =>
+      pageSize === "all"
+        ? visible
+        : visible.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [visible, safePage, pageSize],
+  );
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -227,8 +247,10 @@ export default function MaintenancePlan() {
       return next;
     });
 
-  const toggleAllVisible = () => {
-    const ids = visible.map((r) => r.id);
+  /** 주어진 행 묶음을 통째로 선택/해제 — 머리글 체크박스(이 페이지)와
+   *  하단 "검색결과 전체 선택"(필터 결과 전부)이 같이 쓴다 */
+  const toggleAll = (list: { id: string }[]) => {
+    const ids = list.map((r) => r.id);
     const allOn = ids.every((id) => selected.has(id));
     setSelected((prev) => {
       const next = new Set(prev);
@@ -613,10 +635,10 @@ export default function MaintenancePlan() {
                         {tab !== "참고" && (
                           <input
                             type="checkbox"
-                            checked={visible.length > 0 && visible.every((r) => selected.has(r.id))}
-                            onChange={toggleAllVisible}
+                            checked={paged.length > 0 && paged.every((r) => selected.has(r.id))}
+                            onChange={() => toggleAll(paged)}
                             className="w-4 h-4"
-                            title="보이는 항목 전체 선택"
+                            title="이 페이지 전체 선택"
                           />
                         )}
                       </th>
@@ -629,7 +651,7 @@ export default function MaintenancePlan() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-subtle">
-                    {visible.map((r) => (
+                    {paged.map((r) => (
                       <tr key={r.id} className="hover:bg-surface-container-low transition-colors">
                         <td className="py-3 pl-card-padding">
                           {tab !== "참고" && (
@@ -706,6 +728,90 @@ export default function MaintenancePlan() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* 페이지네이션 — 페이지당 개수 · 검색결과 전체 선택 · 페이지 이동 */}
+            {visible.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-card-padding py-3 border-t border-border-subtle">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+                  <span>페이지당</span>
+                  <select
+                    value={String(pageSize)}
+                    onChange={(e) =>
+                      setPageSize(e.target.value === "all" ? "all" : Number(e.target.value))
+                    }
+                    className="h-8 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-sm font-bold outline-none focus:border-primary"
+                  >
+                    {[10, 20, 50, 100].map((n) => (
+                      <option key={n} value={n}>
+                        {n}개
+                      </option>
+                    ))}
+                    <option value="all">전체</option>
+                  </select>
+                  {tab !== "참고" && (
+                    <button
+                      type="button"
+                      onClick={() => toggleAll(visible)}
+                      className="ml-1 text-sm font-bold text-primary hover:underline"
+                    >
+                      {visible.every((r) => selected.has(r.id))
+                        ? "검색결과 전체 해제"
+                        : `검색결과 전체 선택 (${visible.length})`}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-on-surface-variant mr-2 font-mono-data">
+                    {pageSize === "all"
+                      ? `전체 ${visible.length}건`
+                      : `${(safePage - 1) * pageSize + 1}–${Math.min(
+                          safePage * pageSize,
+                          visible.length,
+                        )} / ${visible.length}건`}
+                  </span>
+                  {pageSize !== "all" && totalPages > 1 && (
+                    <>
+                      {(
+                        [
+                          { icon: "first_page", to: 1, off: safePage === 1 },
+                          { icon: "chevron_left", to: safePage - 1, off: safePage === 1 },
+                        ] as const
+                      ).map((b) => (
+                        <button
+                          key={b.icon}
+                          type="button"
+                          disabled={b.off}
+                          onClick={() => setPage(b.to)}
+                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                        >
+                          <Icon name={b.icon} className="text-base" />
+                        </button>
+                      ))}
+                      <span className="px-2 text-sm font-bold text-on-surface font-mono-data">
+                        {safePage} / {totalPages}
+                      </span>
+                      {(
+                        [
+                          { icon: "chevron_right", to: safePage + 1, off: safePage === totalPages },
+                          { icon: "last_page", to: totalPages, off: safePage === totalPages },
+                        ] as const
+                      ).map((b) => (
+                        <button
+                          key={b.icon}
+                          type="button"
+                          disabled={b.off}
+                          onClick={() => setPage(b.to)}
+                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                        >
+                          <Icon name={b.icon} className="text-base" />
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </Card>

@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@/shared/components/ui";
 
 /**
- * 오버홀 화면의 지사 관문.
+ * 오버홀 화면(/overhaul/*)의 지사 관문.
  *
  * 유지보수 업무는 지사별로 독립 운영되므로, 오버홀에 들어오면 먼저 지사를
  * 고르게 하고 그 뒤의 모든 화면(보수계획·회차·실적·이력)을 그 지사 데이터로
  * 좁힌다. 선택은 쿠키(oh_branch)에 담겨 서버가 읽는다 (activeBranch.ts).
+ * 설비 마스터(/equipment)는 관문 대신 전 지사 개요에서 지사를 고르는데,
+ * 같은 쿠키를 쓰므로 어느 쪽에서 골라도 챕터 전체에 이어진다.
  *
  * 기본 지사를 깔지 않는 이유: 기본값이 있으면 다른 지사 사람이 그걸 못 보고
  * 남의 지사에 실적을 쌓는다. 처음 한 번 고르면 1년짜리 쿠키라 다시 묻지 않는다.
@@ -64,9 +66,9 @@ export default function BranchGate({ children }: { children: React.ReactNode }) 
       <div className="max-w-3xl">
         <h1 className="text-display-lg text-on-surface pt-2">지사 선택</h1>
         <p className="text-body-md text-on-surface-variant mt-2">
-          유지보수 업무는 지사별로 따로 운영됩니다. 소속 지사를 고르면 보수계획·회차·실적
-          이력이 모두 그 지사 것만 보입니다. 한 번 고르면 기억되고, 위쪽 지사 표시에서
-          언제든 바꿀 수 있습니다.
+          유지보수 업무는 지사별로 따로 운영됩니다. 소속 지사를 고르면 설비 마스터와
+          보수계획·회차·실적 이력이 모두 그 지사 것만 보입니다. 한 번 고르면 기억되고,
+          위쪽 지사 표시에서 언제든 바꿀 수 있습니다.
         </p>
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {sorted.map((b) => (
@@ -107,7 +109,7 @@ export default function BranchGate({ children }: { children: React.ReactNode }) 
           ))}
         </select>
         <span className="text-xs text-on-surface-variant">
-          보수계획·회차·실적이 이 지사 것만 보입니다
+          설비·보수계획·회차·실적이 이 지사 것만 보입니다
         </span>
       </div>
       {children}
