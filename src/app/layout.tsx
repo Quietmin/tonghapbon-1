@@ -45,7 +45,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>
+      {/*
+        overflow-x-hidden 은 여기(body)에 둔다 — Shell 안의 div 에 두면
+        position:sticky 가 깨진다(가로 overflow 를 막으려고 overflow-x 를 non-visible
+        로 주면, 명세상 overflow-y 도 auto 로 같이 승격돼 그 div 가 새 스크롤
+        컨테이너가 되고, 안의 sticky 는 그 컨테이너 기준으로 계산된다 — 그런데 실제
+        스크롤은 창 전체에서 일어나니 서로 어긋나 버린다. body/html 은 뷰포트
+        자체로 취급되는 특례라 이 문제가 없다). A4 미리보기를 오른쪽에 고정해 둔
+        DocEditor 2열 레이아웃이 이 자리를 쓴다.
+      */}
+      <body className="overflow-x-hidden">
         {/* 챗봇 도크는 어느 화면에서나 떠 있어야 해서 레이아웃에 한 번만 마운트한다.
             헤더의 챗봇 버튼·사이드바 접기 버튼도 같은 상태를 만져야 하므로
             Provider 둘이 셸 전체를 감싼다. 실제 배치는 Shell 이 한다. */}

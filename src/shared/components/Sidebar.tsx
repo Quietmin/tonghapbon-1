@@ -101,9 +101,26 @@ export default function Sidebar() {
     >
       <div className="flex items-center gap-2 mb-4 shrink-0">
         <Link href="/" className="flex items-center gap-3 px-2 min-w-0 flex-1">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shrink-0">
-            <Icon name="factory" />
-          </div>
+          {/*
+            헤더(Header.tsx) 오른쪽의 그 로고와 같은 파일 — 같은 한국지역난방공사
+            마크를 쓴다. 텍스트 두 줄(제목+부제)과 높이를 맞춰 h-10 으로 둔다.
+
+            원본 GIF 는 바탕이 투명이 아니라 흰색을 그대로 칠해 둔 파일이다(사진대장
+            출력물은 A4 흰 종이 위에 올라가므로 상관없었다). 사이드바 배경은 흰색이
+            아니라 옅은 회보라(surface-container-highest)라 로고만 흰 네모로 떠
+            보였다. mix-blend-mode:multiply 를 걸면 흰 바탕은 곱해져 사라지고
+            (흰색×배경=배경 그대로) 빨간 마크만 남는다 — 새 이미지 파일 없이 CSS 한
+            줄로 어떤 배경에서도 자연스럽게 섞인다.
+          */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+          <img
+            src="/manual-logo.gif"
+            alt="한국지역난방공사"
+            width={393}
+            height={327}
+            className="h-10 w-auto shrink-0"
+            style={{ mixBlendMode: "multiply" }}
+          />
           <div className="min-w-0">
             <h1 className="text-title-sm font-black text-on-surface leading-tight truncate">
               유지보수 마스터

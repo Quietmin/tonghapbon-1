@@ -79,6 +79,19 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    key: "manual",
+    label: "매뉴얼관리",
+    accent: "primary",
+    short: "매뉴얼",
+    icon: "menu_book",
+    root: "/manual",
+    desc: "보관된 매뉴얼을 지사·분야·작성자·파일명으로 찾아보고, 새 매뉴얼을 작성합니다.",
+    items: [
+      { href: "/manual", label: "매뉴얼 조회", icon: "inventory_2", exact: true },
+      { href: "/manual/new", label: "매뉴얼 작성", icon: "edit_note" },
+    ],
+  },
+  {
     // 작성/조회 화면은 문서 자동생성(docgen) 모듈의 것을 그대로 쓴다 —
     // 배치만 이 챕터로 옮겼고 서식은 원본 그대로다.
     key: "failure",
@@ -95,19 +108,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/failure", label: "고장보고서 조회", icon: "inventory_2", exact: true },
       { href: "/failure/new", label: "고장보고서 작성", icon: "edit_note" },
       { href: "/failure/history/new", label: "수기 등록", icon: "note_add", desktopOnly: true },
-    ],
-  },
-  {
-    key: "manual",
-    label: "매뉴얼관리",
-    accent: "primary",
-    short: "매뉴얼",
-    icon: "menu_book",
-    root: "/manual",
-    desc: "보관된 매뉴얼을 지사·분야·작성자·파일명으로 찾아보고, 새 매뉴얼을 작성합니다.",
-    items: [
-      { href: "/manual", label: "매뉴얼 조회", icon: "inventory_2", exact: true },
-      { href: "/manual/new", label: "매뉴얼 작성", icon: "edit_note" },
     ],
   },
 ];

@@ -17,7 +17,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const sidebar = useSidebar();
 
   return (
-    <div className="flex min-h-screen overflow-x-hidden">
+    // overflow-x-hidden 은 여기 두지 않는다 — body 로 옮긴 이유는 layout.tsx 주석 참고
+    // (안쪽 div 에 두면 DocEditor 의 sticky 미리보기가 깨진다)
+    <div className="flex min-h-screen">
       <Sidebar />
       <main
         className={`flex-1 w-full min-h-screen flex flex-col pb-24 md:pb-12 transition-[margin-left] duration-200 ease-out ${

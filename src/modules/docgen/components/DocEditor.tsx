@@ -42,6 +42,27 @@ function nextId() {
   return `item-${seq}`;
 }
 
+/**
+ * A4 쪽의 자연 크기(px). print.css 의 .a4-page 가 쓰는 210mm/297mm 와 같은 기준
+ * (96dpi 가정 — 브라우저 CSS mm 단위의 고정 변환값). 미리보기를 칸 폭에 맞춰 줄일
+ * 때, 줄어든 만큼 자리도 같이 줄이려면(안 그러면 밑에 빈 칸이 남는다) 이 자연
+ * 크기를 알아야 한다.
+ *
+ * 높이는 min-height 라 모든 쪽이 항상 이 값 이상이다(fitPageLayout 이 내용을
+ * 넘치지 않게 눌러 담으므로 실제로도 늘 이 값과 같다) — 쪽마다 실제 렌더된
+ * 높이를 따로 재지 않아도 된다.
+ */
+const A4_WIDTH_PX = 210 * (96 / 25.4);
+const A4_HEIGHT_PX = 297 * (96 / 25.4);
+
+/** 수동 확대/축소 범위. 100% 는 이 A4_WIDTH_PX(실제 크기) 기준이다 — PDF 출력과 같은 잣대. */
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 2;
+const ZOOM_STEP = 0.1;
+function clampZoom(v: number): number {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v));
+}
+
 /** Gmail 작성 화면 주소 (원본 gmailComposeUrl 과 동일) */
 function gmailComposeUrl(subject: string, body: string): string {
   return `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(
@@ -142,6 +163,59 @@ export default function DocEditor({
   // 폰에서 앨범 선택이 막히므로 두 개로 나눈다 (현장에서 찍고 바로 붙일 때 씀).
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // 미리보기를 칸 폭에 맞춰 줄이는 배율. 1 을 넘지 않는다(키우지는 않는다) —
+  // 좁은 칸(2열 작성 화면의 오른쪽, 폰 화면)에서 원래 크기(794px)로 두면 가로
+  // 스크롤을 해야만 쪽 전체를 볼 수 있어서, 통째로 줄여 한 번에 보이게 한다.
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
+  useEffect(() => {
+    const el = previewContainerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const cs = window.getComputedStyle(el);
+      const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const available = el.clientWidth - padX;
+      setPreviewScale(available > 0 ? Math.min(1, available / A4_WIDTH_PX) : 1);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /*
+   * 수동 확대/축소. null 이면 "칸 폭에 맞춤"(previewScale)을 그대로 쓴다 — 처음
+   * 들어왔을 때나 아직 손대지 않았을 때의 기본값이다. 버튼이나 Ctrl+휠로 한 번
+   * 건드리면 구체적인 배율로 고정되고, 창 크기가 바뀌어도(= previewScale 이
+   * 바뀌어도) 사용자가 고른 배율을 그대로 유지한다 — 다시 자동으로 돌아가려면
+   * 퍼센트 숫자를 눌러 null 로 되돌린다.
+   */
+  const [zoom, setZoom] = useState<number | null>(null);
+  const baseScale = zoom ?? previewScale;
+
+  function zoomIn() {
+    setZoom(clampZoom(baseScale + ZOOM_STEP));
+  }
+  function zoomOut() {
+    setZoom(clampZoom(baseScale - ZOOM_STEP));
+  }
+  function zoomReset() {
+    setZoom(null);
+  }
+
+  // Ctrl+휠로 확대/축소 — 미리보기 위에 마우스가 있을 때만. 네이티브 리스너로 다는
+  // 이유는 preventDefault 때문이다: 이걸 안 막으면 브라우저가 화면 전체를
+  // 확대/축소해 버린다(트랙패드 두 손가락 오므리기도 브라우저에는 Ctrl+휠로 들어와
+  // 같이 막힌다). Ctrl 없는 보통 휠은 그대로 둬 칸 안 세로 스크롤이 막히지 않게 한다.
+  useEffect(() => {
+    const el = previewContainerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setZoom((prev) => clampZoom((prev ?? previewScale) - e.deltaY * 0.001));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [previewScale]);
 
   const archiveEnabled = isDocgenSupabaseConfigured();
   const label = MODE_LABELS[mode];
@@ -509,6 +583,12 @@ export default function DocEditor({
    */
   async function runExport(title: string, mailWindow: Window | null) {
     setBusy(true);
+    // busy=true 가 되면 미리보기가 축소를 풀고 실제 크기로 돌아간다(아래 effectiveScale
+    // 참고) — html2canvas 가 축소된 채로 캡처해 버리기 때문이다. setBusy 는 비동기라
+    // 다음 두 번의 화면 그리기(rAF)를 기다려 그 변화가 실제로 반영된 뒤에 캡처를
+    // 시작한다. 한 번만 기다리면 브라우저에 따라 아직 이전 프레임일 수 있다.
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
     const pages = pageRefs.current.filter((el): el is HTMLDivElement => el !== null);
 
     try {
@@ -626,6 +706,9 @@ export default function DocEditor({
   const photos = items.filter((it): it is PhotoItem => !isTextItem(it));
   const pages: DocItem[][] = mode === "fault" ? chunkFaultPages(photos) : chunkPages(items);
   const title = fileName || label;
+  // 출력(PDF 출력·메일로 전송) 중에는 1(실제 크기)로 되돌린다 — html2canvas 는
+  // 조상의 transform 까지 반영해서 찍으므로, 줄인 채로 두면 PDF 가 작게 나온다.
+  const effectiveScale = busy ? 1 : baseScale;
 
   return (
     <>
@@ -667,281 +750,373 @@ export default function DocEditor({
         </Card>
       )}
 
-      {/* ---- 머리말 ---- */}
-      <Card className="p-card-padding">
-        {renderMeta ? (
-          renderMeta({ fileNameField, authorField })
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {fileNameField}
-            {authorField}
-            {metaFields}
-          </div>
-        )}
-        {sections}
-      </Card>
+      {/*
+        작성(왼쪽) · 미리보기(오른쪽) 2열.
+        입력칸 바로 옆에서 A4 쪽이 바뀌는 걸 보면서 쓰라는 요청으로 나눴다 — 전에는
+        미리보기가 폼 맨 아래에 있어서, 위에서 적는 동안은 화면 밖으로 밀려 있었다.
+        오른쪽은 스크롤해도 같은 자리에 붙어 있는다(xl:sticky) — 그래야 폼의 아래쪽
+        칸(출력 버튼 등)까지 내려가도 미리보기가 계속 보인다("생중계").
 
-      {/* ---- 사진 추가 ---- */}
-      <Card className="p-card-padding">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => fileInputRef.current?.click()} disabled={items.length >= MAX_PHOTOS}>
-            <Icon name="add_photo_alternate" className="text-lg" />
-            사진 추가
-          </Button>
-          {/* 촬영은 폰에서만 의미가 있어 모바일 폭에서만 보인다 */}
-          <Button
-            variant="ghost"
-            className="md:hidden"
-            onClick={() => cameraInputRef.current?.click()}
-            disabled={items.length >= MAX_PHOTOS}
-          >
-            <Icon name="photo_camera" className="text-lg" />
-            촬영
-          </Button>
-          {allowTextItems && (
-            <Button variant="ghost" onClick={addTextItem}>
-              <Icon name="text_fields" className="text-lg" />
-              텍스트 칸 추가
-            </Button>
-          )}
-          <span className="text-sm text-on-surface-variant ml-auto">
-            {items.length} / {MAX_PHOTOS}
-          </span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            hidden
-            onChange={(e) => {
-              addFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          {/* capture="environment" — 후면 카메라를 바로 연다. 촬영은 한 장씩이라
-              multiple 을 붙이지 않는다(붙이면 일부 기기에서 앨범으로 빠진다). */}
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            hidden
-            onChange={(e) => {
-              addFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          {/* 사진 교체용 — 어느 칸을 바꿀지는 replaceTargetIdRef 가 들고 있다 */}
-          <input
-            ref={replaceFileInputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => {
-              handleReplaceFile(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </div>
+        좁은 화면(xl 미만: 1280px)에서는 다시 세로로 쌓는다 — 미리보기 A4 쪽(210mm
+        ≈ 794px)과 입력 폼을 억지로 나란히 욱여넣으면 둘 다 못 쓸 만큼 좁아진다.
+      */}
+      <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start">
+        <div className="flex flex-col gap-gutter min-w-0">
+          {/* ---- 머리말 ---- */}
+          <Card className="p-card-padding">
+            {renderMeta ? (
+              renderMeta({ fileNameField, authorField })
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {fileNameField}
+                {authorField}
+                {metaFields}
+              </div>
+            )}
+            {sections}
+          </Card>
 
-        {error && (
-          <p className="mt-3 text-sm font-bold text-status-error flex items-center gap-1.5">
-            <Icon name="error" className="text-base" />
-            {error}
-          </p>
-        )}
-
-        {items.length === 0 ? (
-          <EmptyState
-            icon="photo_library"
-            title="사진이 없습니다"
-            desc="[사진 추가]로 앨범에서 고르세요. 한 번에 여러 장 선택할 수 있습니다. 폰에서는 [촬영]으로 바로 찍어 붙일 수 있습니다."
-          />
-        ) : (
-          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((item, i) => (
-              <li
-                key={item.id}
-                className="rounded-2xl border border-border-subtle bg-surface-container-high overflow-hidden"
+          {/* ---- 사진 추가 ---- */}
+          <Card className="p-card-padding">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => fileInputRef.current?.click()} disabled={items.length >= MAX_PHOTOS}>
+                <Icon name="add_photo_alternate" className="text-lg" />
+                사진 추가
+              </Button>
+              {/* 촬영은 폰에서만 의미가 있어 모바일 폭에서만 보인다 */}
+              <Button
+                variant="ghost"
+                className="md:hidden"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={items.length >= MAX_PHOTOS}
               >
-                <div className="flex items-center justify-between px-3 py-2">
-                  <span className="text-xs font-bold text-on-surface-variant">
-                    {i + 1}번{"kind" in item ? " · 텍스트" : ""}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {!("kind" in item) && (
+                <Icon name="photo_camera" className="text-lg" />
+                촬영
+              </Button>
+              {allowTextItems && (
+                <Button variant="ghost" onClick={addTextItem}>
+                  <Icon name="text_fields" className="text-lg" />
+                  텍스트 칸 추가
+                </Button>
+              )}
+              <span className="text-sm text-on-surface-variant ml-auto">
+                {items.length} / {MAX_PHOTOS}
+              </span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              {/* capture="environment" — 후면 카메라를 바로 연다. 촬영은 한 장씩이라
+                  multiple 을 붙이지 않는다(붙이면 일부 기기에서 앨범으로 빠진다). */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              {/* 사진 교체용 — 어느 칸을 바꿀지는 replaceTargetIdRef 가 들고 있다 */}
+              <input
+                ref={replaceFileInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  handleReplaceFile(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+
+            {error && (
+              <p className="mt-3 text-sm font-bold text-status-error flex items-center gap-1.5">
+                <Icon name="error" className="text-base" />
+                {error}
+              </p>
+            )}
+
+            {items.length === 0 ? (
+              <EmptyState
+                icon="photo_library"
+                title="사진이 없습니다"
+                desc="[사진 추가]로 앨범에서 고르세요. 한 번에 여러 장 선택할 수 있습니다. 폰에서는 [촬영]으로 바로 찍어 붙일 수 있습니다."
+              />
+            ) : (
+              // 왼쪽 폭이 전체 화면보다 좁아질 수 있어(2열 미리보기 때문에) 3열까지는
+              // 욱여넣지 않는다 — sm:grid-cols-2 가 폼 칸이 좁은 화면에서도 무난하다.
+              <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                {items.map((item, i) => (
+                  <li
+                    key={item.id}
+                    className="rounded-2xl border border-border-subtle bg-surface-container-high overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <span className="text-xs font-bold text-on-surface-variant">
+                        {i + 1}번{"kind" in item ? " · 텍스트" : ""}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {!("kind" in item) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(item.id)}
+                              title="편집 (자르기·마킹)"
+                              className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                            >
+                              <Icon name="edit" className="text-base" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => pickReplacement(item.id)}
+                              title="사진 변경 (설명·순서는 그대로)"
+                              className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                            >
+                              <Icon name="swap_horiz" className="text-base" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => rotate(item.id)}
+                              title="90도 회전"
+                              className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                            >
+                              <Icon name="rotate_right" className="text-base" />
+                            </button>
+                          </>
+                        )}
+                        <select
+                          value={i}
+                          onChange={(e) => move(item.id, Number(e.target.value))}
+                          title="순서 이동"
+                          className="h-7 rounded-lg bg-surface-container text-xs text-on-surface px-1.5 border border-border-subtle"
+                        >
+                          {items.map((_, n) => (
+                            <option key={n} value={n}>
+                              {n + 1}번으로
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => remove(item.id)}
+                          title="삭제"
+                          className="w-7 h-7 rounded-lg hover:bg-status-error/10 flex items-center justify-center text-status-error"
+                        >
+                          <Icon name="delete" className="text-base" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {"kind" in item ? (
+                      <AutoTextarea
+                        value={item.body}
+                        onChange={(v) => updateText(item.id, v)}
+                        minRows={3}
+                        placeholder="칸 하나를 통째로 쓰는 텍스트입니다."
+                        className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none"
+                      />
+                    ) : (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(item.id)}
-                          title="편집 (자르기·마킹)"
-                          className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
-                        >
-                          <Icon name="edit" className="text-base" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => pickReplacement(item.id)}
-                          title="사진 변경 (설명·순서는 그대로)"
-                          className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
-                        >
-                          <Icon name="swap_horiz" className="text-base" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => rotate(item.id)}
-                          title="90도 회전"
-                          className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
-                        >
-                          <Icon name="rotate_right" className="text-base" />
-                        </button>
+                        <div className="aspect-4/3 bg-surface-container flex items-center justify-center overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- object URL */}
+                          <img
+                            src={item.previewUrl ?? item.url}
+                            alt=""
+                            className="max-w-full max-h-full object-contain"
+                            style={{
+                              transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
+                            }}
+                          />
+                        </div>
+                        <AutoTextarea
+                          value={item.desc}
+                          onChange={(v) => updateDesc(item.id, v)}
+                          minRows={1}
+                          placeholder="사진 설명"
+                          className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none"
+                        />
                       </>
                     )}
-                    <select
-                      value={i}
-                      onChange={(e) => move(item.id, Number(e.target.value))}
-                      title="순서 이동"
-                      className="h-7 rounded-lg bg-surface-container text-xs text-on-surface px-1.5 border border-border-subtle"
-                    >
-                      {items.map((_, n) => (
-                        <option key={n} value={n}>
-                          {n + 1}번으로
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => remove(item.id)}
-                      title="삭제"
-                      className="w-7 h-7 rounded-lg hover:bg-status-error/10 flex items-center justify-center text-status-error"
-                    >
-                      <Icon name="delete" className="text-base" />
-                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {/* ---- 출력 ---- */}
+          <Card className="p-card-padding flex flex-col gap-3">
+            {/* 세 버튼은 한가운데 — 안내 문구와 섞어 왼쪽으로 치우쳐 있던 것을
+                따로 떼어, 넉넉한 간격을 두고 폭 가운데로 모았다. */}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {/* 새로고침하면 작성 중이던 내용이 사라지므로, 잠깐 자리를 비울 때 눌러 둔다 */}
+              <Button
+                variant="ghost"
+                onClick={() => void handleSaveDraft()}
+                disabled={draftBusy || items.length === 0}
+              >
+                <Icon name="save" className="text-lg" />
+                {draftBusy ? "저장 중…" : "임시저장"}
+              </Button>
+              <Button onClick={handleExport} disabled={busy || items.length === 0}>
+                <Icon name="picture_as_pdf" className="text-lg" />
+                {busy ? "만들고 있습니다…" : "PDF 출력"}
+              </Button>
+              <Button variant="ghost" onClick={handleMail} disabled={busy || items.length === 0}>
+                <Icon name="mail" className="text-lg" />
+                메일로 전송
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-on-surface-variant">
+                A4 {pages.length}페이지 · 사진 {photos.length}장
+              </span>
+              {archiveEnabled ? (
+                <span className="text-xs text-on-surface-variant ml-auto flex items-center gap-1">
+                  <Icon name="cloud_done" className="text-sm" />
+                  출력하면 보관함에도 저장됩니다
+                </span>
+              ) : (
+                <span className="text-xs text-on-surface-variant ml-auto flex items-center gap-1">
+                  <Icon name="info" className="text-sm" />
+                  보관함 미설정 — PDF 다운로드만 됩니다
+                </span>
+              )}
+            </div>
+
+            {notice && (
+              <p className="text-sm font-bold text-status-success flex items-center gap-1.5">
+                <Icon name="check_circle" className="text-base" />
+                {notice}
+              </p>
+            )}
+          </Card>
+        </div>
+
+        {/* ---- A4 미리보기 ----
+            실제 출력과 같은 DOM 을 그대로 PDF 로 만든다. 칸 폭에 맞춰 통째로
+            줄여서(scale) 쪽 전체가 한 번에 보이게 한다 — 좁은 칸(2열 작성 화면의
+            오른쪽, 또는 폰 화면)에서 원래 크기(794px)로 두면 가로 스크롤을 해야만
+            전체를 볼 수 있었다.
+
+            html2canvas 는 조상의 transform 까지 반영해서 캡처해 버린다(= 줄어든
+            채로 PDF 가 찍힌다). 그래서 출력(PDF 출력·메일로 전송) 중에는
+            effectiveScale 을 1 로 되돌려 실제 크기로 캡처하고, 끝나면 다시 줄인다
+            (runExport 의 busy 상태를 그대로 쓴다).
+
+            xl 이상에서는 오른쪽 칸 전체를 sticky 로 고정한다 — 헤더(64px) 바로 아래
+            붙어서, 왼쪽 폼을 아무리 내려도 미리보기가 같은 자리에 머문다. 안쪽
+            스크롤 영역에는 화면 높이에 맞춘 세로 스크롤을 따로 준다 — 그러지 않으면
+            쪽 수가 많을 때 미리보기 자체가 페이지 전체 스크롤을 끌고 가서
+            sticky 가 무의미해진다.
+        */}
+        <section className="min-w-0 xl:sticky xl:top-[88px]">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-headline-md text-on-surface">A4 미리보기</h2>
+            {/* 확대/축소 — 100% 가 실제 크기(PDF 출력과 같은 잣대)다. 미리보기 위에서
+                Ctrl+휠로도 같은 값을 조절할 수 있다. */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={zoomOut}
+                disabled={baseScale <= ZOOM_MIN}
+                aria-label="미리보기 축소"
+                title="축소 (Ctrl+휠)"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Icon name="remove" className="text-base" />
+              </button>
+              <button
+                type="button"
+                onClick={zoomReset}
+                title="눌러서 칸 폭에 맞추기"
+                className="w-14 h-8 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-xs font-bold text-on-surface tabular-nums hover:bg-surface-container-high"
+              >
+                {Math.round(baseScale * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={zoomIn}
+                disabled={baseScale >= ZOOM_MAX}
+                aria-label="미리보기 확대"
+                title="확대 (Ctrl+휠)"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Icon name="add" className="text-base" />
+              </button>
+            </div>
+          </div>
+          <div
+            ref={previewContainerRef}
+            className="overflow-auto rounded-2xl bg-surface-container-high p-4 xl:max-h-[calc(100vh-7rem)]"
+          >
+            <div className="flex flex-col gap-6 w-max">
+              {pages.map((pageItems, pageIndex) => (
+                <div
+                  key={pageIndex}
+                  className="shadow-lg"
+                  // 줄어든 만큼 칸도 같이 줄인다 — transform 은 칠해지는 모양만 바꿀
+                  // 뿐 차지하는 자리는 그대로라, 안 줄이면 밑에 빈 칸이 남는다.
+                  style={{
+                    width: A4_WIDTH_PX * effectiveScale,
+                    height: A4_HEIGHT_PX * effectiveScale,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: A4_WIDTH_PX,
+                      transform: effectiveScale === 1 ? undefined : `scale(${effectiveScale})`,
+                      transformOrigin: "top left",
+                    }}
+                  >
+                    {mode === "fault" ? (
+                      <FaultA4Page
+                        ref={(el) => {
+                          pageRefs.current[pageIndex] = el;
+                        }}
+                        title={title}
+                        items={pageItems as PhotoItem[]}
+                        pageIndex={pageIndex}
+                        summary={faultSummary}
+                      />
+                    ) : (
+                      <A4Page
+                        ref={(el) => {
+                          pageRefs.current[pageIndex] = el;
+                        }}
+                        // 매뉴얼은 표제부 표가 제목을 품으므로 가운데 큰 제목을 따로 두지 않는다
+                        title={mode === "manual" ? undefined : title}
+                        letterhead={
+                          renderLetterhead
+                            ? renderLetterhead(pageIndex + 1, pages.length, title)
+                            : mode === "report"
+                              ? <PageBanner />
+                              : undefined
+                        }
+                        items={pageItems}
+                        numbered={numbered}
+                        startIndex={pageIndex * PHOTOS_PER_PAGE}
+                        summary={pageIndex === 0 ? firstPageSummary : undefined}
+                      />
+                    )}
                   </div>
                 </div>
-
-                {"kind" in item ? (
-                  <AutoTextarea
-                    value={item.body}
-                    onChange={(v) => updateText(item.id, v)}
-                    minRows={3}
-                    placeholder="칸 하나를 통째로 쓰는 텍스트입니다."
-                    className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none"
-                  />
-                ) : (
-                  <>
-                    <div className="aspect-4/3 bg-surface-container flex items-center justify-center overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- object URL */}
-                      <img
-                        src={item.previewUrl ?? item.url}
-                        alt=""
-                        className="max-w-full max-h-full object-contain"
-                        style={{
-                          transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
-                        }}
-                      />
-                    </div>
-                    <AutoTextarea
-                      value={item.desc}
-                      onChange={(v) => updateDesc(item.id, v)}
-                      minRows={1}
-                      placeholder="사진 설명"
-                      className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none"
-                    />
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* ---- 출력 ---- */}
-      <Card className="p-card-padding flex flex-wrap items-center gap-2">
-        <Button onClick={handleExport} disabled={busy || items.length === 0}>
-          <Icon name="picture_as_pdf" className="text-lg" />
-          {busy ? "만들고 있습니다…" : "PDF 출력"}
-        </Button>
-        <Button variant="ghost" onClick={handleMail} disabled={busy || items.length === 0}>
-          <Icon name="mail" className="text-lg" />
-          메일로 전송
-        </Button>
-        {/* 새로고침하면 작성 중이던 내용이 사라지므로, 잠깐 자리를 비울 때 눌러 둔다 */}
-        <Button
-          variant="ghost"
-          onClick={() => void handleSaveDraft()}
-          disabled={draftBusy || items.length === 0}
-        >
-          <Icon name="save" className="text-lg" />
-          {draftBusy ? "저장 중…" : "임시저장"}
-        </Button>
-        <span className="text-sm text-on-surface-variant">
-          A4 {pages.length}페이지 · 사진 {photos.length}장
-        </span>
-        {archiveEnabled ? (
-          <span className="text-xs text-on-surface-variant ml-auto flex items-center gap-1">
-            <Icon name="cloud_done" className="text-sm" />
-            출력하면 보관함에도 저장됩니다
-          </span>
-        ) : (
-          <span className="text-xs text-on-surface-variant ml-auto flex items-center gap-1">
-            <Icon name="info" className="text-sm" />
-            보관함 미설정 — PDF 다운로드만 됩니다
-          </span>
-        )}
-        {notice && (
-          <p className="w-full text-sm font-bold text-status-success flex items-center gap-1.5">
-            <Icon name="check_circle" className="text-base" />
-            {notice}
-          </p>
-        )}
-      </Card>
-
-      {/* ---- A4 미리보기 ----
-          실제 출력과 같은 DOM 을 그대로 PDF 로 만든다. 화면에서는 좁은 창에 맞게
-          가로 스크롤로 보여주되, 축소(transform)는 걸지 않는다 —
-          html2canvas 가 축소된 상태를 그대로 캡처해 버리기 때문이다. */}
-      <section>
-        <h2 className="text-headline-md text-on-surface mb-3">A4 미리보기</h2>
-        <div className="overflow-x-auto rounded-2xl bg-surface-container-high p-4">
-          <div className="flex flex-col gap-6 w-max">
-            {pages.map((pageItems, pageIndex) => (
-              <div key={pageIndex} className="shadow-lg">
-                {mode === "fault" ? (
-                  <FaultA4Page
-                    ref={(el) => {
-                      pageRefs.current[pageIndex] = el;
-                    }}
-                    title={title}
-                    items={pageItems as PhotoItem[]}
-                    pageIndex={pageIndex}
-                    summary={faultSummary}
-                  />
-                ) : (
-                  <A4Page
-                    ref={(el) => {
-                      pageRefs.current[pageIndex] = el;
-                    }}
-                    // 매뉴얼은 표제부 표가 제목을 품으므로 가운데 큰 제목을 따로 두지 않는다
-                    title={mode === "manual" ? undefined : title}
-                    letterhead={
-                      renderLetterhead
-                        ? renderLetterhead(pageIndex + 1, pages.length, title)
-                        : mode === "report"
-                          ? <PageBanner />
-                          : undefined
-                    }
-                    items={pageItems}
-                    numbered={numbered}
-                    startIndex={pageIndex * PHOTOS_PER_PAGE}
-                    summary={pageIndex === 0 ? firstPageSummary : undefined}
-                  />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       {editingPhoto && (
         <PhotoEditorModal
