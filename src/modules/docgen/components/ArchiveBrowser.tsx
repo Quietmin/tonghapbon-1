@@ -67,6 +67,13 @@ const DOC_TYPE_BADGE: Record<DocMode, string> = {
   report: "bg-surface-container-highest text-on-surface-variant",
 };
 
+/** [수정] 이 가는 작성 화면 — 종류마다 주소가 다르다 */
+const EDIT_PATH: Record<DocMode, string> = {
+  manual: "/manual/new",
+  fault: "/failure/new",
+  report: "/docgen/photo-report",
+};
+
 function formatBytes(n: number | null): string {
   if (!n) return "-";
   if (n < 1024) return `${n} B`;
@@ -676,6 +683,20 @@ export default function ArchiveBrowser({
                           <Icon name="open_in_new" className="text-base" />
                           열기
                         </button>
+                        {/*
+                          source_id 가 있는 행만 — 03-docgen-sources.sql 을 실행한
+                          뒤에 작성된 문서만 다시 채워 넣을 원본을 갖고 있다. 예전
+                          문서는 PDF 뿐이라 이 버튼 자체를 보여주지 않는다.
+                        */}
+                        {r.source_id && (
+                          <Link
+                            href={`${EDIT_PATH[r.doc_type]}?edit=${r.source_id}`}
+                            className="inline-flex items-center gap-1 text-on-surface-variant font-bold hover:underline hover:text-on-surface whitespace-nowrap"
+                          >
+                            <Icon name="edit" className="text-base" />
+                            수정
+                          </Link>
+                        )}
                         {canDelete && (
                           <button
                             type="button"

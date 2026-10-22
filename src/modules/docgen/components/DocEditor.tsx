@@ -14,6 +14,7 @@ import { fitFaultPageLayout, fitReportPageLayout } from "../lib/fitPageLayout";
 import { composePreview, readImageFile } from "../lib/imageEdit";
 import { isDocgenSupabaseConfigured } from "../lib/supabase";
 import { saveToArchive, type SaveMeta } from "../lib/archive";
+import { loadDocumentSource, saveDocumentSource } from "../lib/source";
 import { isTextItem, type DocItem, type PhotoItem } from "../lib/types";
 import {
   clearDraft,
@@ -230,9 +231,72 @@ export default function DocEditor({
   const draftExtraRef = useRef(draftExtra);
   draftExtraRef.current = draftExtra;
 
+  // 지금 고치고 있는 버전. null 이면 새 문서 — 다음 저장이 새 lineage 로 시작한다.
+  // 값이 있으면 다음 저장이 이 lineage 를 물려받고 이 id 를 revises 로 남긴다.
+  const [editingSource, setEditingSource] = useState<{ id: string; lineageId: string } | null>(
+    null,
+  );
+  const [loadingSource, setLoadingSource] = useState(false);
+
+  async function loadFromArchive(sourceId: string) {
+    setLoadingSource(true);
+    setError(null);
+    try {
+      const source = await loadDocumentSource(sourceId);
+      // 저장해 둔 File 로 blob URL 을 다시 만든다 (handleRestoreDraft 와 같은 절차)
+      const restored: DocItem[] = await Promise.all(
+        source.items.map(async (it): Promise<DocItem> => {
+          if (it.kind === "text") return { id: it.id, kind: "text", body: it.body };
+          const { url, width, height } = await readImageFile(it.file);
+          return {
+            id: it.id,
+            file: it.file,
+            url,
+            width: width || it.width,
+            height: height || it.height,
+            strokes: it.strokes ?? [],
+            previewUrl: (it.strokes?.length ?? 0) > 0 ? null : url,
+            desc: it.desc,
+            rotation: it.rotation ?? 0,
+          };
+        }),
+      );
+      setFileName(source.fileName);
+      setAuthor(source.author);
+      setItems(restored);
+      onRestoreMeta?.(source.meta);
+      setEditingSource({ id: source.id, lineageId: source.lineageId });
+      setNotice(
+        `"${source.title}" 을(를) 불러왔습니다. 고친 뒤 출력하면 새 버전으로 보관함에 쌓입니다(이 버전은 그대로 남습니다).`,
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? `문서를 불러오지 못했습니다: ${e.message}`
+          : "문서를 불러오지 못했습니다.",
+      );
+    } finally {
+      setLoadingSource(false);
+    }
+  }
+
   // 들어올 때 한 번만 확인한다. 이어서 쓸지는 사용자가 고른다 — 조용히 되살리면
   // 새 문서를 쓰려던 사람이 남의 내용 위에 덮어쓰게 된다.
+  // ?edit= 으로 들어왔으면 그게 우선이다 — 임시저장 배너까지 같이 뜨면 뭘
+  // 골라야 할지 헷갈린다.
   useEffect(() => {
+    /*
+     * 보관함 [수정] 으로 들어오면 주소에 ?edit=<source id> 가 붙는다
+     * (ArchiveBrowser 참고). useSearchParams() 대신 여기서 직접 읽는 이유: 이
+     * 페이지들은 정적으로 미리 그려지는데, useSearchParams() 를 쓰면 Suspense
+     * 경계가 따로 필요해져 세 페이지(사진대장·매뉴얼·고장 보고서)를 전부 고쳐야
+     * 한다. 렌더 중이 아니라 effect 안에서 읽으므로 서버 렌더와도 부딪히지 않는다.
+     */
+    const editSourceId = new URLSearchParams(window.location.search).get("edit");
+    if (editSourceId) {
+      void loadFromArchive(editSourceId);
+      return;
+    }
     if (!isDraftEnabled()) return;
     let cancelled = false;
     void peekDraft(mode).then((m) => {
@@ -615,18 +679,48 @@ export default function DocEditor({
       return;
     }
 
+    /*
+     * "수정 가능한 원본"(사진 + 모든 입력값)을 PDF 와 별개로 저장한다. 03
+     * (supabase/docgen/03-docgen-sources.sql)을 아직 안 돌린 프로젝트에서는
+     * 테이블이 없어 이 호출이 그냥 실패한다 — 조용히 넘긴다. PDF 보관은 03 과
+     * 무관하게 그대로 되어야 하므로, 실패해도 사용자에게 경고를 띄우지 않고
+     * link 없이(= 이 버전엔 [수정] 버튼이 안 뜨는 채로) 계속 진행한다.
+     */
+    let sourceLink: { lineageId: string; sourceId: string } | undefined;
+    try {
+      const saved = await saveDocumentSource({
+        mode,
+        fileName: title,
+        title,
+        author,
+        meta: { ...(saveMetaRef.current ?? {}), ...(draftExtraRef.current ?? {}) },
+        items,
+        editingFrom: editingSource ?? undefined,
+      });
+      sourceLink = { lineageId: saved.lineageId, sourceId: saved.id };
+      // 같은 자리에서 또 출력하면(예: PDF 출력 뒤 메일로 전송도 누르는 경우는
+      // 없지만) 이어서 그 버전을 고치는 셈이 되도록 갱신해 둔다.
+      setEditingSource({ id: saved.id, lineageId: saved.lineageId });
+    } catch (e) {
+      console.error("원본 저장 실패(03-docgen-sources.sql 미실행일 수 있음):", e);
+    }
+
     try {
       const blob = await renderPagesToBlob(pages);
       const photoCount = items.filter((it) => !("kind" in it)).length;
-      await saveToArchive(blob, {
-        ...saveMeta,
-        doc_type: mode,
-        file_name: title,
-        title,
-        author_name: author.trim() || undefined,
-        page_count: pages.length,
-        photo_count: photoCount,
-      });
+      await saveToArchive(
+        blob,
+        {
+          ...saveMeta,
+          doc_type: mode,
+          file_name: title,
+          title,
+          author_name: author.trim() || undefined,
+          page_count: pages.length,
+          photo_count: photoCount,
+        },
+        sourceLink,
+      );
       setNotice(
         mailWindow
           ? "PDF 를 내려받고 보관함에도 저장했습니다. 열린 Gmail 화면에서 첨부파일로 추가해 주세요."
@@ -721,6 +815,20 @@ export default function DocEditor({
         tone="solid"
         action={headingAction}
       />
+
+      {/* ---- 보관함에서 불러오는 중 ----
+          ?edit= 으로 들어왔을 때만 뜬다. 사진을 Storage 에서 내려받는 동안이라
+          장수에 따라 몇 초 걸릴 수 있다. */}
+      {loadingSource && (
+        <Card className="p-card-padding" lift={false}>
+          <div className="flex items-center gap-3">
+            <Icon name="cloud_download" className="text-primary text-2xl" />
+            <p className="text-title-sm text-on-surface">
+              보관함에서 불러오는 중입니다… 사진이 많으면 잠시 걸릴 수 있습니다.
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* ---- 이어서 작성 안내 ----
           조용히 되살리지 않고 물어본다 — 새로 쓰려던 사람이 예전 내용 위에

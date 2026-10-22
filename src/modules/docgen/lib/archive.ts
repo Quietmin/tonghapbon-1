@@ -40,6 +40,12 @@ export interface ArchiveRow {
   branch: string | null;
   facility: string | null;
   fault_content: string | null;
+  /**
+   * "수정 가능한 원본"이 있으면(source.ts) 채워진다. 03-docgen-sources.sql 을
+   * 실행하기 전에 저장된 행은 둘 다 null — 그 행은 [수정] 버튼을 못 그린다.
+   */
+  lineage_id: string | null;
+  source_id: string | null;
 }
 
 /** 저장 시 함께 넣는 메타 — documents 테이블 컬럼명과 맞춘다 */
@@ -108,8 +114,17 @@ async function uploadWithRetry(basePath: string, pdfBlob: Blob): Promise<string>
 /**
  * PDF 를 스토리지에 올리고 documents 행을 만든다.
  * 실패하면 올라간 파일을 되돌려 고아 파일이 남지 않게 한다(원본과 동일).
+ *
+ * link 는 source.ts 가 같은 출력 과정에서 저장한 "수정 가능한 원본" 행과
+ * 이 PDF 행을 이어 준다 — 보관함이 [수정] 버튼을 그릴지는 이 두 컬럼이
+ * 채워졌는지로 판단한다. 03-docgen-sources.sql 을 실행하지 않았으면(컬럼이
+ * 없으면) link 를 넘기지 않으면 그만이다 — PDF 저장 자체는 그대로 된다.
  */
-export async function saveToArchive(pdfBlob: Blob, meta: SaveMeta): Promise<void> {
+export async function saveToArchive(
+  pdfBlob: Blob,
+  meta: SaveMeta,
+  link?: { lineageId: string; sourceId: string },
+): Promise<void> {
   const client = getDocgenSupabase();
   if (!client) throw new Error("보관함이 설정되지 않았습니다.");
 
@@ -133,6 +148,7 @@ export async function saveToArchive(pdfBlob: Blob, meta: SaveMeta): Promise<void
     author_name: meta.author_name?.trim() || null,
     pdf_path: path,
     pdf_bytes: pdfBlob.size,
+    ...(link ? { lineage_id: link.lineageId, source_id: link.sourceId } : {}),
   });
 
   if (error) {

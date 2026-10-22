@@ -32,6 +32,15 @@ export const DOCGEN_BUCKET = "docgen-documents";
 /** 전용 보관함 테이블 */
 export const DOCGEN_TABLE = "docgen_documents";
 
+/**
+ * "수정 가능한 원본"(사진 파일 + 모든 입력값) 전용 버킷·테이블.
+ * 완성 PDF(위 DOCGEN_BUCKET/DOCGEN_TABLE)와는 별개로 둔다 — PDF 는 그림이라
+ * 되돌릴 수 없지만, 여기 있는 사진·값은 작성 화면에 그대로 다시 채워 넣을 수
+ * 있다. supabase/docgen/03-docgen-sources.sql 을 실행해야 동작한다.
+ */
+export const DOCGEN_SOURCE_BUCKET = "docgen-sources";
+export const DOCGEN_SOURCE_TABLE = "docgen_document_sources";
+
 let cached: SupabaseClient | null = null;
 
 function env() {
