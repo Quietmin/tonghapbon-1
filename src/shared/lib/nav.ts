@@ -40,7 +40,8 @@ export const NAV_GROUPS: NavGroup[] = [
     // 설비관리 = 기존 "오버홀 공정관리" 챕터 (이름만 바꿈).
     // 설비 마스터를 기준 데이터로 두고, 그 설비들의 오버홀을
     // 계약 전(보수계획 수립) → 계약 후(공정관리) 순서로 관리한다.
-    // /overhaul 화면들은 지사별 독립 운영이라 지사 관문(BranchGate)을 지난다.
+    // 지사별 독립 운영 — /overhaul은 지사 관문(BranchGate)을 지나고,
+    // /equipment는 전 지사 개요에서 지사를 고른다 (같은 oh_branch 쿠키를 공유).
     key: "equipment",
     label: "설비관리",
     short: "설비",

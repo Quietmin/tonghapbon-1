@@ -1,5 +1,6 @@
 import { query, queryOne, execute, transaction } from "@/shared/lib/db";
 import { ensureEquipments } from "@/shared/lib/equipment";
+import { normalizeEquipmentName } from "@/shared/lib/equipmentMeta";
 import { parseCycle, type ParsedPlanItem, type ParsedCycle } from "./maintenancePlanParser";
 import { detectGradePattern } from "./gradePattern";
 import { judge, isOverhaulScope, type Classification, type JudgeResult } from "./maintenanceJudge";
@@ -69,10 +70,18 @@ export async function saveParsedPlan(params: {
   // 설비 마스터에도 반영 — 대분류를 설비명으로 쓴다.
   // (계획 엑셀의 "기기명"은 개별 태그 단위라 설비 마스터의 단위와 다르다.
   //  세 모듈이 공유하는 설비 마스터에는 대분류 수준으로 올려둔다.)
-  const categories = [...new Set(items.map((i) => i.category).filter((c): c is string => !!c))];
-  const equipMap = await ensureEquipments(
-    categories.map((c) => ({ name: c, field: field ?? undefined })),
-  );
+  // 엑셀 대분류의 머리 번호("1. ")는 떼고 등록한다 — 마스터가 번호로 오염되면 안 된다.
+  // 설비 마스터는 지사에 속하므로 업로드의 지사를 따른다 (지사 없으면 등록 생략).
+  const categories = [
+    ...new Set(
+      items
+        .map((i) => (i.category ? normalizeEquipmentName(i.category) : ""))
+        .filter((c): c is string => !!c),
+    ),
+  ];
+  const equipMap = branch
+    ? await ensureEquipments(categories.map((c) => ({ name: c, branch, field: field ?? undefined })))
+    : new Map<string, string>();
 
   // 639건을 한 건씩 INSERT하면 왕복이 그만큼 쌓여 25초가 걸렸다.
   // 여러 행을 한 문장으로 묶어 보내 왕복 수를 줄인다.
@@ -91,7 +100,7 @@ export async function saveParsedPlan(params: {
       );
       values.push(
         source.id,
-        it.category ? (equipMap.get(it.category.trim().toLowerCase()) ?? null) : null,
+        it.category ? (equipMap.get(normalizeEquipmentName(it.category).toLowerCase()) ?? null) : null,
         it.category,
         it.subCategory,
         it.name,
@@ -189,18 +198,24 @@ export interface PlanItemInput {
   branch?: string | null;
 }
 
-async function linkEquipment(category: string | null | undefined, field: string | null | undefined) {
-  const name = category?.trim();
-  if (!name) return null;
+async function linkEquipment(
+  category: string | null | undefined,
+  field: string | null | undefined,
+  branch: string | null | undefined,
+) {
+  // 엑셀 대분류의 머리 번호("1. ")는 떼고 등록한다 (saveParsedPlan과 같은 규칙)
+  const name = category ? normalizeEquipmentName(category) : "";
+  // 설비 마스터는 지사에 속한다 — 지사를 모르면 연결하지 않는다 (계획 저장은 그대로).
+  if (!name || !branch) return null;
   const { ensureEquipment } = await import("@/shared/lib/equipment");
-  return ensureEquipment({ name, field: field ?? undefined });
+  return ensureEquipment({ name, branch, field: field ?? undefined });
 }
 
 export async function createManualPlanItem(input: PlanItemInput): Promise<{ id: string }> {
   const name = input.name?.trim();
   if (!name) throw new Error("기기명을 입력하세요.");
 
-  const equipmentId = await linkEquipment(input.category, input.field);
+  const equipmentId = await linkEquipment(input.category, input.field, input.branch);
   const cycle = parseCycle(input.cycleRaw ?? null);
 
   const row = await queryOne<{ id: string }>(
@@ -235,7 +250,12 @@ export async function updatePlanItem(id: string, patch: PlanItemInput): Promise<
   const name = patch.name?.trim();
   if (!name) throw new Error("기기명을 입력하세요.");
 
-  const equipmentId = await linkEquipment(patch.category, patch.field);
+  // 수정에서는 지사를 옮기지 않으므로 행이 이미 갖고 있는 지사를 그대로 쓴다.
+  const current = await queryOne<{ branch: string | null }>(
+    `select branch from maintenance_plan where id = $1`,
+    [id],
+  );
+  const equipmentId = await linkEquipment(patch.category, patch.field, current?.branch);
   const cycle = parseCycle(patch.cycleRaw ?? null);
 
   await execute(

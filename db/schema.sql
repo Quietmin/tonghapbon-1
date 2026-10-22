@@ -57,16 +57,23 @@ create table if not exists equipment (
   type         text,
   -- 분야: 기계 / 전기 / 제어 / 전산
   field        text,
-  -- 지사 — 단일 사업장 운영이지만 고장이력이 지사값을 쓰므로 일반 필드로 보존
+  -- 지사 — 유지보수 업무가 지사별 독립 운영이라 설비 마스터도 지사에 속한다.
+  -- 화면은 지사를 먼저 고르고(oh_branch 쿠키) 그 지사의 설비만 본다.
   branch       text,
   note         text,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
 
--- 설비명은 업로드/등록 시 upsert의 기준이 되므로 대소문자·공백 무시 유일성을 건다.
-create unique index if not exists equipment_name_key
-  on equipment (lower(btrim(name)));
+-- 지사 개념 도입 전에 쌓인 행은 양산지사 것이다 (overhaul_project 백필과 같은 근거).
+update equipment set branch = '양산지사' where branch is null;
+
+-- 설비명은 업로드/등록 시 upsert의 기준. 지사별 독립 운영이라 유일성은 지사 안에서만
+-- 건다 — 양산지사의 HRSG와 파주지사의 HRSG는 다른 설비다. 전역 유일이던 옛 인덱스는 걷어낸다.
+drop index if exists equipment_name_key;
+create unique index if not exists equipment_branch_name_key
+  on equipment (branch, lower(btrim(name)));
+create index if not exists equipment_branch_idx on equipment (branch);
 create index if not exists equipment_name_trgm
   on equipment using gin (name gin_trgm_ops);
 
@@ -79,6 +86,9 @@ create trigger equipment_set_updated_at before update on equipment
 create table if not exists device (
   id           uuid primary key default gen_random_uuid(),
   equipment_id uuid references equipment(id) on delete cascade,
+  -- 소속 설비의 지사를 행마다 중복 보관 — maintenance_plan과 같은 이유(join 회피)이고,
+  -- 태그 유일성을 지사 단위로 걸기 위한 키이기도 하다. 쓰기는 항상 설비에서 복사한다.
+  branch       text,
   tag          text not null,
   -- 정규화 태그: 대문자화 + 하이픈/공백/언더스코어 제거.
   -- "PIT-7610", "pit 7610", "PIT7610" 을 같은 태그로 취급하기 위한 것.
@@ -90,7 +100,16 @@ create table if not exists device (
   created_at   timestamptz not null default now()
 );
 
-create unique index if not exists device_tag_norm_key on device (tag_norm);
+-- 기존 테이블에도 반영 (idempotent). 기존 기기의 지사는 소속 설비를 따른다.
+alter table device add column if not exists branch text;
+update device d set branch = e.branch
+  from equipment e
+ where d.equipment_id = e.id and d.branch is null;
+
+-- 태그 유일성도 지사 안에서만 — 챗봇의 태그 정확일치 검색은 지사가 정해진 뒤 이뤄진다.
+drop index if exists device_tag_norm_key;
+create unique index if not exists device_branch_tag_key on device (branch, tag_norm);
+create index if not exists device_tag_norm_idx on device (tag_norm);
 create index if not exists device_equipment_idx on device (equipment_id);
 create index if not exists device_tag_trgm on device using gin (tag gin_trgm_ops);
 
@@ -608,6 +627,43 @@ alter table overhaul_task
 
 create index if not exists overhaul_task_statement_item_idx
   on overhaul_task (statement_item_id);
+
+
+-- ── 설비 마스터 이름 정리 (일회성 백필, idempotent) ──────────────────────────
+-- 계획 엑셀 대분류의 머리 번호("1. 발전설비", "10) 비상전원설비")가 설비명에
+-- 그대로 들어와 마스터를 오염시켰다. 이제 등록 경로가 번호를 떼므로
+-- (normalizeEquipmentName), 이미 들어간 행도 같은 규칙으로 정리한다.
+-- 번호를 떼고 나서 같은 (지사, 이름)이 되는 행은 하나로 합치고, 참조하던
+-- 계획·작업·고장이력·기기는 남는 행으로 옮겨 붙인다. 정리가 끝나면 번호 달린
+-- 행이 없으므로 다시 실행해도 아무 일도 하지 않는다.
+-- equipment를 참조하는 테이블들이 모두 정의된 뒤에 돌아야 해서 파일 끝에 둔다.
+do $$
+declare
+  r record;
+  keep uuid;
+  clean text;
+begin
+  for r in select id, name, branch from equipment where name ~ '^\s*\d+\s*[.)]' loop
+    clean := btrim(regexp_replace(r.name, '^\s*\d+\s*[.)]\s*', ''));
+    if clean = '' then continue; end if;
+
+    select e.id into keep from equipment e
+     where e.branch is not distinct from r.branch
+       and lower(btrim(e.name)) = lower(clean)
+       and e.id <> r.id
+     limit 1;
+
+    if keep is null then
+      update equipment set name = clean where id = r.id;
+    else
+      update maintenance_plan set equipment_id = keep where equipment_id = r.id;
+      update overhaul_task    set equipment_id = keep where equipment_id = r.id;
+      update failure_history  set equipment_id = keep where equipment_id = r.id;
+      update device           set equipment_id = keep where equipment_id = r.id;
+      delete from equipment where id = r.id;
+    end if;
+  end loop;
+end $$;
 
 
 -- ============================================================================
