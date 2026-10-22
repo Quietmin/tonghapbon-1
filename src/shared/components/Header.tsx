@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Icon, Avatar } from "./ui";
+import { Icon } from "./ui";
 import { NAV_GROUPS, isActive } from "@/shared/lib/nav";
-import { useChatbotDock } from "./ChatbotDock";
 import { useSidebar } from "./SidebarState";
 
 export default function Header() {
   const pathname = usePathname();
-  const dock = useChatbotDock();
   const sidebar = useSidebar();
   // 대표 경로 밖의 하위 메뉴도 챕터 소속이다 (설비관리의 /overhaul 화면들)
   const group = NAV_GROUPS.find(
@@ -36,6 +34,19 @@ export default function Header() {
         >
           <Icon name={sidebar.open ? "menu_open" : "menu"} />
         </button>
+        {/*
+          한국지역난방공사 로고 — 출력물 머리말(Letterhead)이 쓰는 바로 그 파일이다.
+          화면과 문서가 같은 로고를 쓰므로 한쪽만 바뀌는 일이 없다.
+          width/height 를 적어 두면 이미지가 늦게 와도 글자가 밀리지 않는다.
+        */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+        <img
+          src="/manual-logo.gif"
+          alt="한국지역난방공사"
+          width={393}
+          height={327}
+          className="h-9 w-auto shrink-0"
+        />
         <h2 className="text-2xl font-black text-primary tracking-tight truncate">유지보수 마스터</h2>
         {group && (
           <>
@@ -57,24 +68,24 @@ export default function Header() {
             <span className="hidden sm:inline">처음 화면</span>
           </Link>
         )}
-        {/* 도크를 완전히 숨겼을 때 다시 부르는 통로 — 항상 여기 있다 */}
-        <button
-          type="button"
-          onClick={dock.open}
-          aria-label="정비 챗봇 열기"
-          title="정비 챗봇 열기"
-          className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
-            dock.state === "open"
-              ? "bg-primary-container text-on-primary"
-              : "hover:bg-surface-container-low text-on-surface-variant"
-          }`}
-        >
-          <Icon name="smart_toy" />
-        </button>
-        <button className="w-9 h-9 hidden sm:flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors">
-          <Icon name="notifications" />
-        </button>
-        <Avatar name="사용" size="w-8 h-8" className="border border-outline-variant" />
+        {/*
+          "깨끗한 에너지로 세상을 따뜻하게" 띠 — 출력물 오른쪽 위에 들어가는 것과
+          같은 파일이라, 화면 머리와 문서 머리가 같은 모양으로 맞는다.
+          568x80 이라 32px 높이면 227px 를 먹는다. 폰 화면에서는 제목을 밀어내므로
+          sm 부터 보이고, 넓어질수록 한 단계씩 키운다.
+
+          챗봇 버튼은 여기서 뺐다 — 도크에 '완전히 숨김' 단계가 없어서 우하단
+          말풍선이 늘 떠 있고, 사이드바에도 [정비 챗봇 열기]가 있다. 들어갈 길이
+          둘이나 남아 있으므로 머리줄까지 차지할 이유가 없다.
+        */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+        <img
+          src="/banner.png"
+          alt="깨끗한 에너지로 세상을 따뜻하게"
+          width={568}
+          height={80}
+          className="hidden sm:block h-7 lg:h-8 w-auto shrink-0 ml-1"
+        />
       </div>
     </header>
   );

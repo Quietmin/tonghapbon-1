@@ -118,7 +118,6 @@ export const NAV_GROUPS: NavGroup[] = [
  * 줄로만 남겨 둔다. (오버홀 공정관리는 설비관리 챕터의 정식 메뉴가 되어 여기서 뺐다)
  */
 export const HIDDEN_ROUTES: NavItem[] = [
-  { href: "/docgen/photo-report", label: "사진대장 만들기", icon: "photo_library" },
   { href: "/docgen/archive", label: "보관함 전체 조회", icon: "inventory_2" },
   { href: "/failure/dashboard", label: "고장이력 (미구현)", icon: "history" },
   { href: "/chatbot", label: "정비 챗봇 전체화면", icon: "smart_toy" },
