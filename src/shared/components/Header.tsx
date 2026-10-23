@@ -35,19 +35,22 @@ export default function Header() {
           <Icon name={sidebar.open ? "menu_open" : "menu"} />
         </button>
         {/*
-          한국지역난방공사 로고 — 출력물 머리말(Letterhead)이 쓰는 바로 그 파일이다.
-          화면과 문서가 같은 로고를 쓰므로 한쪽만 바뀌는 일이 없다.
-          width/height 를 적어 두면 이미지가 늦게 와도 글자가 밀리지 않는다.
+          PIMS 브랜드 마크 — 출력물 머리말(Letterhead.tsx)은 한국지역난방공사
+          로고(manual-logo.gif)를 그대로 쓰므로 화면 쪽 마크만 바꿔도 문서에는
+          영향이 없다. width/height 를 적어 두면 이미지가 늦게 와도 글자가 밀리지
+          않는다.
         */}
         {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
         <img
-          src="/manual-logo.gif"
-          alt="한국지역난방공사"
-          width={393}
-          height={327}
+          src="/pims-icon.png"
+          alt="PIMS"
+          width={239}
+          height={240}
           className="h-9 w-auto shrink-0"
         />
-        <h2 className="text-2xl font-black text-primary tracking-tight truncate">유지보수 마스터</h2>
+        <h2 className="text-base sm:text-lg font-black text-primary tracking-tight truncate">
+          플랜트 지능형 관리시스템
+        </h2>
         {group && (
           <>
             <span className="hidden sm:inline text-outline-variant">/</span>
