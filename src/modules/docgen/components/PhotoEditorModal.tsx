@@ -498,7 +498,7 @@ export default function PhotoEditorModal({
           type="button"
           onClick={handleSave}
           disabled={busy || !ready}
-          className="text-white text-sm font-bold px-3 py-1.5 rounded-lg bg-primary disabled:opacity-40"
+          className="text-on-primary text-sm font-bold px-3 py-1.5 rounded-lg bg-primary disabled:opacity-40"
         >
           저장
         </button>

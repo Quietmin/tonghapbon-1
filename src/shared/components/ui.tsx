@@ -27,7 +27,7 @@ export function Card({
   ...rest
 }: { lift?: boolean } & HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`glass-card rounded-[24px] ${lift ? "" : "no-lift"} ${className}`} {...rest}>
+    <div className={`glass-card rounded-xl ${lift ? "" : "no-lift"} ${className}`} {...rest}>
       {children}
     </div>
   );
@@ -227,7 +227,8 @@ export function Button({
 }: { variant?: keyof typeof BUTTON_STYLE } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${BUTTON_STYLE[variant]} ${className}`}
+      // DESIGN.md 시그니처: 버튼은 각지지 않은 6px(rounded-sm), 굵기는 500(semibold)까지만 — 700(font-bold)은 "브랜드가 깨지는" 굵기다.
+      className={`px-4 py-2.5 rounded-sm font-semibold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${BUTTON_STYLE[variant]} ${className}`}
       {...rest}
     >
       {children}
@@ -254,7 +255,7 @@ export function ButtonLink({
   return (
     <Link
       href={href}
-      className={`px-4 py-2.5 rounded-xl font-bold text-sm inline-flex items-center justify-center gap-2 transition-all ${BUTTON_STYLE[variant]} ${className}`}
+      className={`px-4 py-2.5 rounded-sm font-semibold text-sm inline-flex items-center justify-center gap-2 transition-all ${BUTTON_STYLE[variant]} ${className}`}
     >
       {children}
     </Link>
