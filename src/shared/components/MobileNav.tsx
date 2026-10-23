@@ -30,7 +30,12 @@ export default function MobileNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-glass backdrop-blur-xl border-t border-border-subtle flex justify-around items-center z-50 print:hidden">
+    // min-h-16(고정 h-16 아님) + 안전영역 padding — 홈버튼이 없는 아이폰(설치해서
+    // 쓸 때 특히)은 화면 맨 아래에 제스처로 홈 가는 밀어올리기 구역이 있다. 탭을
+    // 거기 바짝 붙이면 손가락이 걸리거나 시스템 제스처와 겹친다. viewport-fit=cover
+    // (layout.tsx) 를 켜 둬야 env(safe-area-inset-bottom) 가 0 이 아닌 실제 값을
+    // 준다 — 둘이 짝이다.
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 min-h-16 pb-[env(safe-area-inset-bottom)] bg-surface-glass backdrop-blur-xl border-t border-border-subtle flex justify-around items-center z-50 print:hidden">
       {TABS.map((tab) => {
         // 홈은 정확히 일치할 때만 — 아니면 모든 경로에서 홈이 활성으로 보인다
         const active =

@@ -22,7 +22,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       <Sidebar />
       <main
-        className={`flex-1 w-full min-h-screen flex flex-col pb-24 md:pb-12 transition-[margin-left] duration-200 ease-out ${
+        // 아래 여백(pb-24)은 폰 하단탭(h-16=64px)을 피하려고 둔 것 — 하단탭이
+        // 이제 안전영역만큼 더 커질 수 있어(MobileNav 참고) 그만큼을 같이 더한다.
+        // 그러지 않으면 안전영역이 있는 기기에서 본문 맨 아래 한 줄이 탭에 가려진다.
+        className={`flex-1 w-full min-h-screen flex flex-col pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-12 transition-[margin-left] duration-200 ease-out ${
           sidebar.open ? "md:ml-[280px]" : "md:ml-0"
         }`}
       >

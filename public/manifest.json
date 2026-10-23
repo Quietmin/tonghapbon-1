@@ -16,8 +16,8 @@
   ],
   "shortcuts": [
     { "name": "고장보고서 작성", "short_name": "고장작성", "url": "/failure/new" },
-    { "name": "고장보고서 조회", "short_name": "고장조회", "url": "/failure/archive" },
+    { "name": "고장보고서 조회", "short_name": "고장조회", "url": "/failure" },
     { "name": "매뉴얼 작성", "short_name": "매뉴얼작성", "url": "/manual/new" },
-    { "name": "매뉴얼 조회", "short_name": "매뉴얼조회", "url": "/manual/archive" }
+    { "name": "매뉴얼 조회", "short_name": "매뉴얼조회", "url": "/manual" }
   ]
 }
