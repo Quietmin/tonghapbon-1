@@ -1,18 +1,35 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Button, Icon } from "@/shared/components/ui";
 
 /**
  * 보관함 [열기] — 전에는 서명 URL 을 새 탭으로 바로 열었는데(window.open), 폰
  * 브라우저에 따라 미리 보여주지 않고 곧장 다운로드 창부터 뜨는 경우가 있었다.
- * 그 대신 앱 안에서 iframe 으로 미리 보여주고, 받고 싶으면 따로 [다운로드]를
- * 누르게 한다 — 요청하신 "미리보기 먼저, 다운로드는 그다음" 그대로다.
+ * iframe + 브라우저 내장 PDF 뷰어로 바꿨더니 PC 크롬/엣지에서는 됐지만, 홈
+ * 화면에 설치한 PWA(iOS WKWebView 등)는 내장 PDF 뷰어 자체가 없어서 iframe
+ * 안이 그냥 빈 화면이 된다 — 네이티브 뷰어에 기대지 않고 pdf.js 로 직접
+ * 페이지를 캔버스에 그려서 모든 환경에서 똑같이 보이게 한다.
  *
- * previewUrl 은 Content-Disposition: inline 서명 URL(브라우저 내장 PDF 뷰어로
- * 열림), downloadUrl 은 download:true 로 다시 받은 서명 URL(곧장 저장 창이
- * 뜬다) — archive.ts 의 getSignedUrl 주석 참고. 같은 파일이지만 서버가 다르게
- * 응답하도록 URL 자체가 다르다.
+ * pdf.js 는 fetch 로 PDF 바이트를 직접 받아온다(이미지 태그나 iframe 네비게이션과
+ * 달리 CORS 의 제약을 받는다) — Supabase Storage 서명 URL 은 access-control
+ * -allow-origin: * 를 내려줘서 문제없다(확인됨).
  */
+
+type PdfJsModule = typeof import("pdfjs-dist");
+
+let pdfjsPromise: Promise<PdfJsModule> | null = null;
+function loadPdfJs(): Promise<PdfJsModule> {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import("pdfjs-dist").then((mod) => {
+      // CDN을 쓰면 오프라인/사내망에서 깨질 수 있어 워커를 public/ 에 같이 배포해 둔다.
+      mod.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+      return mod;
+    });
+  }
+  return pdfjsPromise;
+}
+
 export default function PdfPreviewModal({
   title,
   previewUrl,
@@ -24,6 +41,65 @@ export default function PdfPreviewModal({
   downloadUrl: string;
   onClose: () => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pagesRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let doc: any = null;
+
+    (async () => {
+      try {
+        setStatus("loading");
+        const pdfjs = await loadPdfJs();
+        doc = await pdfjs.getDocument(previewUrl).promise;
+        if (cancelled) return;
+
+        const host = pagesRef.current;
+        if (!host) return;
+        host.replaceChildren();
+
+        // 뷰포트 폭에 맞춰 1배로 그리고, 고해상도 화면에서는 선명하도록 픽셀비를
+        // 곱해서 캔버스 실제 해상도를 올린다(화면 표시 크기는 CSS 로 100%만 유지).
+        const targetWidth = Math.min(host.clientWidth || 800, 900);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+          if (cancelled) return;
+          const page = await doc.getPage(pageNum);
+          const unscaled = page.getViewport({ scale: 1 });
+          const cssScale = targetWidth / unscaled.width;
+          const viewport = page.getViewport({ scale: cssScale * dpr });
+
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(viewport.width);
+          canvas.height = Math.round(viewport.height);
+          canvas.style.width = "100%";
+          canvas.style.height = "auto";
+          canvas.style.display = "block";
+          canvas.className = "rounded shadow-sm bg-white";
+          host.appendChild(canvas);
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+          await page.render({ canvasContext: ctx, viewport }).promise;
+        }
+
+        if (!cancelled) setStatus("ready");
+      } catch (e) {
+        console.error("PDF 미리보기 렌더 실패", e);
+        if (!cancelled) setStatus("error");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      doc?.destroy?.();
+    };
+  }, [previewUrl]);
+
   return (
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center p-2 sm:p-4 bg-black/60"
@@ -55,22 +131,26 @@ export default function PdfPreviewModal({
           </button>
         </div>
 
-        {/* 일부 브라우저·보안 설정은 iframe 안에서 PDF 를 못 그릴 수 있다 — 그때를
-            대비해 "새 탭에서 열기"를 늘 함께 보여 준다(숨겨 둔 비상구가 아니라
-            눈에 보이는 대안이어야 실제로 쓰인다). */}
-        <div className="px-3 py-1.5 border-b border-border-subtle shrink-0">
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noopener"
-            className="text-xs text-primary font-bold hover:underline inline-flex items-center gap-1"
-          >
-            <Icon name="open_in_new" className="text-sm" />
-            여기서 안 보이면 새 탭에서 열기
-          </a>
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto bg-surface-container">
+          {status === "loading" && (
+            <p className="py-10 text-center text-sm text-on-surface-variant">PDF 불러오는 중…</p>
+          )}
+          {status === "error" && (
+            <div className="py-10 text-center text-sm text-on-surface-variant px-4">
+              <p className="mb-3">미리보기를 불러오지 못했습니다.</p>
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener"
+                className="text-primary font-bold hover:underline inline-flex items-center gap-1"
+              >
+                <Icon name="open_in_new" className="text-sm" />
+                새 탭에서 열기
+              </a>
+            </div>
+          )}
+          <div ref={pagesRef} className="flex flex-col items-center gap-2 p-2 sm:p-4 max-w-3xl mx-auto" />
         </div>
-
-        <iframe src={previewUrl} title={title} className="flex-1 min-h-0 w-full bg-surface-container" />
       </div>
     </div>
   );
