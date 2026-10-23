@@ -633,7 +633,81 @@ export default function ArchiveBrowser({
             desc="사진대장·매뉴얼·고장 보고서를 만들고 [PDF 출력]을 누르면 여기에 쌓입니다."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/*
+              폰 폭(md 미만) 전용 카드 목록. 데스크톱 표를 그대로 욱여넣으면
+              9칸짜리 표가 손바닥만 한 칸 안에서 또 옆으로 스크롤해야 하고(그
+              안에서 또 스크롤 — 이중 스크롤), 파일명은 한 글자씩 세로로 줄바꿈돼
+              버린다. PC 표는 그대로 두고(hidden md:block), 폰에서는 같은 행
+              데이터를 카드 한 장으로 다시 짠다 — 버튼도 손가락으로 누르기 좋게
+              커진다.
+            */}
+            <ul className="md:hidden flex flex-col gap-3">
+              {rows.map((r) => (
+                <li
+                  key={r.id}
+                  className="rounded-2xl border border-border-subtle p-4 flex flex-col gap-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span
+                      className={`inline-block shrink-0 px-2 py-0.5 rounded-full text-xs font-bold ${
+                        DOC_TYPE_BADGE[r.doc_type] ?? "bg-surface-container-highest text-on-surface-variant"
+                      }`}
+                    >
+                      {MODE_LABELS[r.doc_type] ?? r.doc_type}
+                    </span>
+                    <span className="text-xs text-on-surface-variant whitespace-nowrap">
+                      {new Date(r.created_at).toLocaleDateString("ko-KR")}
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-bold text-on-surface break-keep">{r.file_name}</p>
+
+                  <p className="text-xs text-on-surface-variant">
+                    {[r.branch, r.field, r.author_name].filter(Boolean).join(" · ") || "-"}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    사진 {r.photo_count}장 · {formatBytes(r.pdf_bytes)}
+                  </p>
+
+                  <div className="flex items-center gap-1 pt-2 mt-1 border-t border-border-subtle">
+                    <button
+                      type="button"
+                      onClick={() => void open(r)}
+                      className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-primary active:bg-surface-container-high"
+                    >
+                      <Icon name="open_in_new" className="text-lg" />
+                      <span className="text-xs font-bold">열기</span>
+                    </button>
+                    {r.source_id && (
+                      <Link
+                        href={`${EDIT_PATH[r.doc_type]}?edit=${r.source_id}`}
+                        className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-on-surface-variant active:bg-surface-container-high"
+                      >
+                        <Icon name="edit" className="text-lg" />
+                        <span className="text-xs font-bold">수정</span>
+                      </Link>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => askPassword(r)}
+                        disabled={deletingId === r.id}
+                        className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-status-error active:bg-surface-container-high disabled:opacity-40"
+                      >
+                        <Icon name="delete" className="text-lg" />
+                        <span className="text-xs font-bold">
+                          {deletingId === r.id ? "지우는 중…" : "삭제"}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* md 이상 — 원래 표. 그대로 둔다. */}
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-on-surface-variant border-b border-border-subtle">
@@ -714,7 +788,8 @@ export default function ArchiveBrowser({
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </Card>
 
