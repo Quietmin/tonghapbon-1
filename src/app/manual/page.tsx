@@ -14,11 +14,8 @@ export default function ManualHomePage() {
       heading={{
         title: "매뉴얼 조회",
         desc: "출력한 매뉴얼 PDF가 자동 저장됩니다. 지사·분야·매뉴얼 종류·작성자·파일명으로 찾아보세요.",
-        bullets: [
-          "출력한 매뉴얼 PDF 자동 저장",
-          "지사·분야·종류·작성자·파일명으로 검색",
-          "열기로 미리보기, 수정으로 재작성",
-        ],
+        // 모바일은 타이틀만 — 빈 배열이면 ScreenHeader가 desc·bullets 모두 생략한다
+        bullets: [],
       }}
       headingAction={
         <ButtonLink href="/manual/new">

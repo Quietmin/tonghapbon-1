@@ -15,31 +15,35 @@ export default function HomePage() {
         모바일 첫 화면 — 데스크톱의 "중앙 허브" 카드 목록 대신, 로고 + 타이틀을
         가운데 크게 놓고 세 챕터를 깔끔한 세로 목록 하나로 둔다. 아이콘은 하단탭과
         같은 이유로 없앤다: 챕터가 셋뿐이라 글자만으로도 더 또렷하다.
+        min-h 로 전체를 세로 가운데 두는 이유: 콘텐츠가 로고+타이틀+카드 3장뿐이라
+        위쪽에 그냥 쌓아 두면 아래쪽이 텅 비어 화면 위로 쏠려 보인다.
       */}
-      <section className="md:hidden flex flex-col items-center pt-6 pb-2 text-center">
-        {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
-        <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-20 w-auto" />
-        <h1 className="mt-3 text-title-sm font-black text-on-surface tracking-tight">
-          플랜트 지능형 관리시스템
-        </h1>
-      </section>
+      <div className="md:hidden flex flex-col items-center justify-center gap-10 min-h-[75dvh] text-center">
+        <div className="flex flex-col items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+          <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-24 w-auto" />
+          <h1 className="mt-4 text-2xl font-black text-on-surface tracking-tight">
+            플랜트 지능형 관리시스템
+          </h1>
+        </div>
 
-      <section className="md:hidden flex flex-col gap-3 mt-4">
-        {NAV_GROUPS.map((group) => (
-          <Link
-            key={group.key}
-            href={group.root}
-            className="glass-card rounded-xl flex items-center gap-4 p-4 overflow-hidden"
-          >
-            <span className={`w-1 self-stretch rounded-full shrink-0 ${ACCENT_BAR[group.accent]}`} />
-            <span className="flex-1 min-w-0">
-              <span className="block text-title-sm font-bold text-on-surface">{group.label}</span>
-              <span className="block text-xs text-on-surface-variant mt-0.5 truncate">{group.desc}</span>
-            </span>
-            <Icon name="chevron_right" className="text-xl text-on-surface-variant shrink-0" />
-          </Link>
-        ))}
-      </section>
+        <div className="w-full flex flex-col gap-5">
+          {NAV_GROUPS.map((group) => (
+            <Link
+              key={group.key}
+              href={group.root}
+              className="glass-card rounded-xl flex items-center gap-4 p-4 overflow-hidden"
+            >
+              <span className={`w-1 self-stretch rounded-full shrink-0 ${ACCENT_BAR[group.accent]}`} />
+              <span className="flex-1 min-w-0 text-left">
+                <span className="block text-title-sm font-bold text-on-surface">{group.label}</span>
+                <span className="block text-xs text-on-surface-variant mt-0.5 truncate">{group.desc}</span>
+              </span>
+              <Icon name="chevron_right" className="text-xl text-on-surface-variant shrink-0" />
+            </Link>
+          ))}
+        </div>
+      </div>
 
       {/* 데스크톱 첫 화면 — 챕터 카드 + 하위 메뉴 알약 목록이 있는 기존 "중앙 허브" */}
       <div className="hidden md:block">

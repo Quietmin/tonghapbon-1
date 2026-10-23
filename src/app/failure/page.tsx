@@ -17,11 +17,8 @@ export default function FailureHomePage() {
       heading={{
         title: "고장보고서 조회",
         desc: "출력한 고장 보고서 PDF가 자동 저장됩니다. 지사·분야·설비명·고장내용·작성자·파일명으로 찾아보세요.",
-        bullets: [
-          "출력한 고장 보고서 PDF 자동 저장",
-          "지사·분야·설비명·고장내용·작성자로 검색",
-          "열기로 미리보기, 수정으로 재작성",
-        ],
+        // 모바일은 타이틀만 — 빈 배열이면 ScreenHeader가 desc·bullets 모두 생략한다
+        bullets: [],
       }}
       headingAction={
         <ButtonLink href="/failure/new" variant="tertiary">

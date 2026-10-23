@@ -9,15 +9,23 @@ const ACCENT_ACTIVE = {
   tertiary: "bg-tertiary text-on-tertiary",
 } as const;
 
+/** 좁은 그리드 칸에 맞추려고 이 탭 안에서만 쓰는 짧은 이름. nav.ts 의 label 은
+ *  사이드바 등 다른 곳에서 그대로 "설비 마스터"로 읽혀야 하므로 안 건드린다. */
+const MOBILE_LABEL_OVERRIDE: Record<string, string> = {
+  "/equipment": "메인",
+};
+
 /**
  * 모바일 전용 — 지금 들어와 있는 챕터(설비관리·매뉴얼관리·고장관리)의 하위
- * 화면 목록을 헤더 바로 아래 가로 스크롤 띠로 고정해 둔다.
+ * 화면 목록을 헤더 바로 아래 고정해 둔다.
  *
  * 데스크톱은 이미 사이드바가 이 역할을 한다(챕터를 펼치면 같은 목록이
- * 보인다) — 그래서 이 바는 md:hidden 이다. 설비관리처럼 하위 화면이 많은
- * 챕터(설비 마스터·보수계획·전체 현황·회차 관리·대시보드·업로드 분석·작업
- * 관리·공정표·실적입력·보고서)를 폰에서 오갈 때, 뒤로가기 없이 탭 하나로
- * 바로 다음 화면으로 넘어가게 하기 위해서다.
+ * 보인다) — 그래서 이 바는 md:hidden 이다.
+ *
+ * 하위 화면이 많은 챕터(설비관리 10개)는 좌우로 넘기게 하지 않고 6개씩
+ * 2행 그리드로 깔아 화면 안에서 전부 보이게 한다. 하위 화면이 2~3개뿐인
+ * 챕터(매뉴얼관리·고장관리)는 그리드로 벌리면 어색하게 떠 보이므로 가운데
+ * 정렬한 알약 한 줄로 둔다.
  *
  * Shell.tsx 에서 Header 바로 아래, 모든 페이지에 공통으로 둔다 — 챕터 바깥
  * 화면(홈 등)에서는 activeGroup 이 null 이라 아무것도 그리지 않는다.
@@ -32,25 +40,29 @@ export default function ChapterSubNav() {
   const items = group.items.filter((it) => !it.desktopOnly);
   if (items.length <= 1) return null;
 
+  // 넉넉히 들어갈 때만 6열 그리드 — 적을 때 그리드를 쓰면 칸이 남아 어색하다.
+  const dense = items.length > 4;
+
   return (
     <nav
-      className="md:hidden sticky top-16 z-30 -mx-gutter px-gutter py-2 bg-surface-glass backdrop-blur-xl border-b border-border-subtle overflow-x-auto no-scrollbar"
+      className="md:hidden sticky top-16 z-30 -mx-gutter px-gutter py-2 bg-surface-glass backdrop-blur-xl border-b border-border-subtle"
       aria-label={`${group.label} 하위 화면`}
     >
-      <div className="flex gap-1.5 w-max">
+      <div className={dense ? "grid grid-cols-6 gap-1" : "flex flex-wrap justify-center gap-1.5"}>
         {items.map((item) => {
           const active = isActive(pathname, item);
+          const label = MOBILE_LABEL_OVERRIDE[item.href] ?? item.label;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
-                active
-                  ? ACCENT_ACTIVE[group.accent]
-                  : "bg-surface-container-high text-on-surface-variant"
-              }`}
+              className={`text-center leading-tight transition-colors ${
+                dense
+                  ? "px-1 py-1.5 rounded-md text-[11px] font-bold"
+                  : "px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+              } ${active ? ACCENT_ACTIVE[group.accent] : "bg-surface-container-high text-on-surface-variant"}`}
             >
-              {item.label}
+              {label}
             </Link>
           );
         })}

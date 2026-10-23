@@ -270,7 +270,9 @@ export function ButtonLink({
  *
  * 모바일은 아이콘을 빼고 타이틀을 가운데로, 설명 문단 대신 개조식 bullet
  * 목록(bullets)을 보여준다 — 폭이 좁을수록 문단보다 짧게 끊어진 목록이
- * 한눈에 들어온다. bullets 가 없으면 desc 문단을 그대로 가운데 정렬해 쓴다.
+ * 한눈에 들어온다. bullets 를 안 넘기면(undefined) desc 문단을 그대로 가운데
+ * 정렬해 쓰고, 빈 배열([])로 넘기면 설명 자체를 아예 그리지 않는다 — 타이틀
+ * 하나만 또렷하게 남기고 싶은 조회·작성 화면이 이 경우다.
  */
 export function ScreenHeader({
   icon,
@@ -295,8 +297,9 @@ export function ScreenHeader({
     <section className="pt-2 flex flex-col gap-4">
       {/* 모바일 */}
       <div className="md:hidden text-center">
-        <h1 className="text-title-sm font-black text-on-surface">{title}</h1>
-        {bullets ? (
+        <h1 className="text-2xl font-black text-on-surface">{title}</h1>
+        {bullets === undefined && <p className="text-sm text-on-surface-variant mt-2">{desc}</p>}
+        {bullets && bullets.length > 0 && (
           <ul className="mt-2 inline-block text-left">
             {bullets.map((b) => (
               <li key={b} className="flex gap-1.5 text-sm text-on-surface-variant py-0.5">
@@ -305,10 +308,8 @@ export function ScreenHeader({
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-sm text-on-surface-variant mt-2">{desc}</p>
         )}
-        {action && <div className="mt-3 [&>*]:w-full">{action}</div>}
+        {action && <div className="mt-5 [&>*]:w-full">{action}</div>}
       </div>
 
       {/* 데스크톱 */}
