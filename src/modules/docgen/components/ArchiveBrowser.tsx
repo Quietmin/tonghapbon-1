@@ -12,6 +12,7 @@ import {
   type Accent,
 } from "@/shared/components/ui";
 import { isDocgenSupabaseConfigured } from "../lib/supabase";
+import PdfPreviewModal from "./PdfPreviewModal";
 import {
   deleteFromArchive,
   getSignedUrl,
@@ -388,12 +389,34 @@ export default function ArchiveBrowser({
     }
   }
 
+  // 열려 있는 미리보기 — null 이면 닫힌 상태
+  const [pdfPreview, setPdfPreview] = useState<{
+    title: string;
+    previewUrl: string;
+    downloadUrl: string;
+  } | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+
+  /*
+   * 전에는 새 탭으로 바로 열었는데(window.open), 폰 브라우저에 따라 미리
+   * 보여주지 않고 곧장 다운로드 창부터 떴다. 그 대신 앱 안에서 모달로 미리
+   * 보여준다 — 두 서명 URL 을 따로 받는다: 하나는 inline(미리보기), 하나는
+   * download:true(그 모달의 [다운로드] 버튼용). 미리 둘 다 받아 두면 모달을
+   * 연 채로 다운로드를 눌렀을 때 한 번 더 기다리지 않는다.
+   */
   async function open(row: ArchiveRow) {
+    setOpeningId(row.id);
+    setError(null);
     try {
-      const url = await getSignedUrl(row.pdf_path);
-      window.open(url, "_blank", "noopener");
+      const [previewUrl, downloadUrl] = await Promise.all([
+        getSignedUrl(row.pdf_path),
+        getSignedUrl(row.pdf_path, 3600, { download: true }),
+      ]);
+      setPdfPreview({ title: row.file_name, previewUrl, downloadUrl });
     } catch (e) {
       setError(e instanceof Error ? e.message : "PDF 를 열지 못했습니다.");
+    } finally {
+      setOpeningId(null);
     }
   }
 
@@ -674,10 +697,13 @@ export default function ArchiveBrowser({
                     <button
                       type="button"
                       onClick={() => void open(r)}
-                      className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-primary active:bg-surface-container-high"
+                      disabled={openingId === r.id}
+                      className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-primary active:bg-surface-container-high disabled:opacity-40"
                     >
                       <Icon name="open_in_new" className="text-lg" />
-                      <span className="text-xs font-bold">열기</span>
+                      <span className="text-xs font-bold">
+                        {openingId === r.id ? "여는 중…" : "열기"}
+                      </span>
                     </button>
                     {r.source_id && (
                       <Link
@@ -752,10 +778,11 @@ export default function ArchiveBrowser({
                         <button
                           type="button"
                           onClick={() => void open(r)}
-                          className="inline-flex items-center gap-1 text-primary font-bold hover:underline whitespace-nowrap"
+                          disabled={openingId === r.id}
+                          className="inline-flex items-center gap-1 text-primary font-bold hover:underline whitespace-nowrap disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
                         >
                           <Icon name="open_in_new" className="text-base" />
-                          열기
+                          {openingId === r.id ? "여는 중…" : "열기"}
                         </button>
                         {/*
                           source_id 가 있는 행만 — 03-docgen-sources.sql 을 실행한
@@ -860,6 +887,15 @@ export default function ArchiveBrowser({
             </div>
           </form>
         </div>
+      )}
+
+      {pdfPreview && (
+        <PdfPreviewModal
+          title={pdfPreview.title}
+          previewUrl={pdfPreview.previewUrl}
+          downloadUrl={pdfPreview.downloadUrl}
+          onClose={() => setPdfPreview(null)}
+        />
       )}
     </>
   );

@@ -264,14 +264,26 @@ export async function listArchive(filter: ListFilter = {}): Promise<ArchiveRow[]
   return (data ?? []) as ArchiveRow[];
 }
 
-/** 비공개 버킷이므로 서명 URL 로 열어야 한다 (기본 1시간) */
-export async function getSignedUrl(path: string, seconds = 3600): Promise<string> {
+/**
+ * 비공개 버킷이므로 서명 URL 로 열어야 한다 (기본 1시간).
+ *
+ * download 를 안 주면(기본) 서버가 Content-Disposition: inline 으로 응답해서
+ * 브라우저 내장 PDF 뷰어로 바로 열린다 — 미리보기용. download: true 를 주면
+ * 서버가 Content-Disposition: attachment 로 응답해 곧장 저장 창이 뜬다 —
+ * [다운로드] 버튼용. 같은 파일이라도 둘은 다른 서명 URL 이다(쿼리에 다른
+ * 파라미터가 붙는다).
+ */
+export async function getSignedUrl(
+  path: string,
+  seconds = 3600,
+  options?: { download?: boolean },
+): Promise<string> {
   const client = getDocgenSupabase();
   if (!client) throw new Error("보관함이 설정되지 않았습니다.");
 
   const { data, error } = await client.storage
     .from(DOCGEN_BUCKET)
-    .createSignedUrl(path, seconds);
+    .createSignedUrl(path, seconds, options);
   if (error) throw error;
   return data.signedUrl;
 }
