@@ -25,6 +25,9 @@ export default function HomePage() {
           <h1 className="mt-4 text-2xl font-black text-on-surface tracking-tight">
             플랜트 지능형 관리시스템
           </h1>
+          <p className="mt-1 text-xs font-semibold text-on-surface-variant tracking-wide">
+            Plant Inteligence Management System
+          </p>
         </div>
 
         <div className="w-full flex flex-col gap-5">
