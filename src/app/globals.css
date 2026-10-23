@@ -30,24 +30,24 @@
   --color-on-surface-variant: #707070;
   --color-inverse-surface: #1c1c1c;
   --color-inverse-on-surface: #ffffff;
-  --color-surface-tint: #3ecf8e;
+  --color-surface-tint: #28366b;
 
   /*
-   * 에메랄드 그린 — 이 앱의 유일한 시그니처 포인트색(DESIGN.md primary).
-   * on-primary 를 흰색이 아니라 거의 검정(#171717)으로 둔 것은 실수가 아니다
-   * — "초록 위에 흰 글씨를 쓰지 않는다"가 DESIGN.md의 핵심 규칙이다. 초록이
-   * 밝아서 흰 글씨는 대비가 약하고, 진한 글씨라야 "불이 들어온 버튼"처럼
-   * 또렷하게 읽힌다.
+   * 남색 — 이 앱의 시그니처 포인트색(DESIGN.md의 "단색 포인트" 틀은 유지하되
+   * 색相만 에메랄드 그린에서 남색으로 바꿨다). 남색은 그 자체로 충분히
+   * 어두워서 에메랄드 때와 반대로 on-primary 를 다시 흰색으로 둔다 — 짙은
+   * 바탕엔 흰 글씨가 또렷하다(DESIGN.md 의 "밝은 포인트색엔 짙은 글씨" 규칙은
+   * 포인트색이 밝을 때만 적용되는 예외였다).
    */
-  --color-primary: #3ecf8e;
-  --color-primary-container: #24b47e;
-  --color-primary-fixed: #d6f5e6;
-  --color-primary-fixed-dim: #a6e8c6;
-  --color-on-primary: #171717;
-  --color-on-primary-container: #171717;
-  --color-on-primary-fixed: #0b3324;
-  --color-on-primary-fixed-variant: #1a5c3f;
-  --color-inverse-primary: #86e0b4;
+  --color-primary: #28366b;
+  --color-primary-container: #1c2850;
+  --color-primary-fixed: #dde3f5;
+  --color-primary-fixed-dim: #aab7e0;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #ffffff;
+  --color-on-primary-fixed: #15204a;
+  --color-on-primary-fixed-variant: #28366b;
+  --color-inverse-primary: #8fa0e0;
 
   --color-secondary: #707070;
   --color-secondary-container: #ededed;
