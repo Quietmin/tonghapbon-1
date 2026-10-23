@@ -267,11 +267,16 @@ export function ButtonLink({
  *
  * 작성과 조회가 같은 자리·같은 모양이라, 바뀌는 건 아이콘과 칩 채도뿐이다:
  * 꽉 찬 칩이면 작성(쓰는 화면), 연한 칩이면 조회(찾는 화면). 색은 챕터를 말한다.
+ *
+ * 모바일은 아이콘을 빼고 타이틀을 가운데로, 설명 문단 대신 개조식 bullet
+ * 목록(bullets)을 보여준다 — 폭이 좁을수록 문단보다 짧게 끊어진 목록이
+ * 한눈에 들어온다. bullets 가 없으면 desc 문단을 그대로 가운데 정렬해 쓴다.
  */
 export function ScreenHeader({
   icon,
   title,
   desc,
+  bullets,
   accent = "primary",
   tone = "solid",
   action,
@@ -279,6 +284,7 @@ export function ScreenHeader({
   icon: string;
   title: string;
   desc: string;
+  bullets?: string[];
   accent?: Accent;
   /** solid = 작성, soft = 조회 */
   tone?: "solid" | "soft";
@@ -286,19 +292,40 @@ export function ScreenHeader({
   action?: ReactNode;
 }) {
   return (
-    <section className="pt-2 flex flex-wrap items-start justify-between gap-4">
-      <div className="flex items-start gap-4 min-w-0">
-        <div
-          className={`w-12 h-12 mt-1 rounded-2xl shrink-0 flex items-center justify-center ${ACCENT_STYLE[accent][tone]}`}
-        >
-          <Icon name={icon} className="text-2xl" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-display-lg text-on-surface">{title}</h1>
-          <p className="text-body-md text-on-surface-variant mt-2">{desc}</p>
-        </div>
+    <section className="pt-2 flex flex-col gap-4">
+      {/* 모바일 */}
+      <div className="md:hidden text-center">
+        <h1 className="text-title-sm font-black text-on-surface">{title}</h1>
+        {bullets ? (
+          <ul className="mt-2 inline-block text-left">
+            {bullets.map((b) => (
+              <li key={b} className="flex gap-1.5 text-sm text-on-surface-variant py-0.5">
+                <span className="text-on-surface-variant/50">·</span>
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-on-surface-variant mt-2">{desc}</p>
+        )}
+        {action && <div className="mt-3 [&>*]:w-full">{action}</div>}
       </div>
-      {action && <div className="shrink-0 max-md:w-full [&>*]:max-md:w-full">{action}</div>}
+
+      {/* 데스크톱 */}
+      <div className="hidden md:flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-4 min-w-0">
+          <div
+            className={`w-12 h-12 mt-1 rounded-2xl shrink-0 flex items-center justify-center ${ACCENT_STYLE[accent][tone]}`}
+          >
+            <Icon name={icon} className="text-2xl" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-display-lg text-on-surface">{title}</h1>
+            <p className="text-body-md text-on-surface-variant mt-2">{desc}</p>
+          </div>
+        </div>
+        {action && <div className="shrink-0 max-md:w-full [&>*]:max-md:w-full">{action}</div>}
+      </div>
     </section>
   );
 }

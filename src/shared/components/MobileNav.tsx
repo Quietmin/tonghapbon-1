@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Icon } from "./ui";
 import { NAV_GROUPS, isActive, type NavItem } from "@/shared/lib/nav";
 
 // 모바일에서는 하위 메뉴까지 담을 공간이 없어 홈 + 메인 메뉴 3개만 노출한다.
 // 챗봇은 탭이 아니라 떠 있는 도크(ChatbotDock)라 여기 없다 — 그래서 탭이 4개로
 // 줄어 앱 하단탭 그대로의 모양이 된다.
 const TABS = [
-  { href: "/", label: "홈", icon: "home", accent: "primary" as const, items: [] as NavItem[] },
+  { href: "/", label: "홈", accent: "primary" as const, items: [] as NavItem[] },
   ...NAV_GROUPS.map((g) => ({
     href: g.root,
-    label: g.short ?? g.label,
-    icon: g.icon,
+    // 아이콘을 없애고 글자만 쓰므로 줄인 이름(short) 대신 온전한 이름을 쓴다 —
+    // "설비"보다 "설비관리"가 한눈에 또렷하다.
+    label: g.label,
     // 켜진 탭을 챕터 색으로 — 데스크톱 사이드바와 같은 색이라 기기를 옮겨도 같게 읽힌다
     accent: g.accent,
     // 대표 경로 밖의 하위 메뉴(설비관리의 /overhaul 화면들)에서도 탭이 켜지도록
@@ -48,13 +48,15 @@ export default function MobileNav() {
           <Link
             key={tab.href}
             href={tab.href}
-            // min-w-0 + truncate — short 를 안 넣은 항목이 생겨도 하단바가 넘치지 않게 한다
-            className={`flex flex-col items-center gap-0.5 px-1 min-w-0 flex-1 ${
+            // 아이콘 없이 글자만 — 세로로 쌓던 두 줄(아이콘+캡션)이 한 줄로 줄어
+            // 글자를 더 키울 여유가 생겼다. min-w-0 + truncate 로 넘침만 막는다.
+            className={`flex items-center justify-center px-1 min-w-0 flex-1 h-full ${
               active ? TAB_ACTIVE[tab.accent] : "text-on-surface-variant"
             }`}
           >
-            <Icon name={tab.icon} className="text-xl" />
-            <span className="text-[10px] font-semibold truncate max-w-full">{tab.label}</span>
+            <span className={`text-sm truncate max-w-full ${active ? "font-bold" : "font-semibold"}`}>
+              {tab.label}
+            </span>
           </Link>
         );
       })}

@@ -31,6 +31,21 @@ export const MODE_PLACEHOLDERS: Record<DocMode, string> = {
   fault: "예: 고장 보고서",
 };
 
+/** 작성 화면 모바일 타이틀 아래 개조식 요약 (ScreenHeader bullets) */
+export const MODE_WRITE_BULLETS: Record<DocMode, string[]> = {
+  report: ["사진 추가·설명 입력만으로 A4 문서 자동 구성", "저장 후 보관함에서 다시 열어 수정 가능"],
+  manual: [
+    "사진 추가·설명 입력만으로 A4 매뉴얼 자동 구성",
+    "목적·준비물·주의사항·내용 4개 항목으로 정리",
+    "저장 후 보관함에서 다시 열어 수정 가능",
+  ],
+  fault: [
+    "사진 추가·설명 입력만으로 A4 고장 보고서 자동 구성",
+    "고장 요약부터 조치사항까지 한 번에 정리",
+    "저장 후 보관함에서 다시 열어 수정 가능",
+  ],
+};
+
 export const BRANCHES = [
   "중앙지사", "강남지사", "파주지사", "삼송지사", "고양사업소", "화성지사",
   "동탄지사", "판교지사", "광교지사", "용인지사", "분당사업소", "평택지사",

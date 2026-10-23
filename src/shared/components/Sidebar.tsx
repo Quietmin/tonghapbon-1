@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ACCENT_STYLE, Icon } from "./ui";
-import { NAV_GROUPS, isActive, type NavGroup } from "@/shared/lib/nav";
+import { NAV_GROUPS, activeGroup, isActive, type NavGroup } from "@/shared/lib/nav";
 import { useChatbotDock } from "./ChatbotDock";
 import { useSidebar } from "./SidebarState";
 
@@ -20,17 +20,6 @@ const GROUP_ACTIVE = {
 /** 펼쳐 둔 챕터 — 새로고침해도 유지한다 */
 const STORAGE_KEY = "sidebar-open-groups";
 
-/** 지금 보고 있는 화면이 속한 챕터 (대표 경로 밖의 하위 메뉴까지 본다) */
-function activeGroupKey(pathname: string): NavGroup["key"] | null {
-  const g = NAV_GROUPS.find(
-    (group) =>
-      pathname === group.root ||
-      pathname.startsWith(`${group.root}/`) ||
-      group.items.some((it) => isActive(pathname, it)),
-  );
-  return g?.key ?? null;
-}
-
 export default function Sidebar() {
   const pathname = usePathname();
   const dock = useChatbotDock();
@@ -41,7 +30,7 @@ export default function Sidebar() {
    * pathname 을 보므로 첫 렌더가 어긋나지 않는다. 저장값은 마운트 뒤에 덮어쓴다.
    */
   const [openKeys, setOpenKeys] = useState<NavGroup["key"][]>(() => {
-    const key = activeGroupKey(pathname);
+    const key = activeGroup(pathname)?.key ?? null;
     return key ? [key] : [];
   });
 
@@ -72,7 +61,7 @@ export default function Sidebar() {
    * 펼쳐 둔 것일 수 있다.
    */
   useEffect(() => {
-    const key = activeGroupKey(pathname);
+    const key = activeGroup(pathname)?.key ?? null;
     if (!key) return;
     setOpenKeys((prev) => {
       if (prev.includes(key)) return prev;
@@ -167,15 +156,14 @@ export default function Sidebar() {
                 한 버튼에 둘을 묶으면 "메뉴만 보려는데 화면이 바뀌는" 일이 생긴다.
               */}
               <div
-                className={`flex items-center justify-between rounded-lg font-bold text-body-md ${
+                className={`flex items-center justify-between rounded-lg font-bold text-title-sm ${
                   groupActive ? GROUP_ACTIVE[group.accent] : "text-on-surface"
                 }`}
               >
                 <Link
                   href={group.root}
-                  className="flex items-center gap-3 min-w-0 flex-1 px-4 py-2.5 rounded-lg hover:bg-surface-container-high transition-colors"
+                  className="flex items-center min-w-0 flex-1 px-4 py-2.5 rounded-lg hover:bg-surface-container-high transition-colors"
                 >
-                  <Icon name={group.icon} className="text-lg shrink-0" />
                   <span className="truncate">{group.label}</span>
                 </Link>
                 {hasItems && (

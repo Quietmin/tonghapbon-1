@@ -128,3 +128,19 @@ export function isActive(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
+
+/**
+ * 지금 보고 있는 화면이 속한 챕터 — 대표 경로(root) 밖의 하위 메뉴까지 본다
+ * (예: 설비관리 챕터의 /overhaul/* 화면들). 사이드바(Sidebar.tsx)와 모바일
+ * 챕터 서브내비(ChapterSubNav.tsx)가 같은 판정을 쓰도록 여기 하나로 둔다.
+ */
+export function activeGroup(pathname: string): NavGroup | null {
+  return (
+    NAV_GROUPS.find(
+      (group) =>
+        pathname === group.root ||
+        pathname.startsWith(`${group.root}/`) ||
+        group.items.some((it) => isActive(pathname, it)),
+    ) ?? null
+  );
+}

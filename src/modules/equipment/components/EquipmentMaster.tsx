@@ -71,7 +71,33 @@ export default function EquipmentMaster() {
   if (view === "overview" || !branch) {
     return (
       <>
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        {/* 모바일 — 챕터 이름("설비 관리")을 가운데, 설명은 개조식 bullet로 */}
+        <div className="md:hidden text-center pt-2">
+          <h1 className="text-title-sm font-black text-on-surface">설비 관리</h1>
+          <ul className="mt-2 inline-block text-left">
+            {[
+              "지사별 최근 오버홀 현황 확인",
+              "지사 선택 시 장기 보수계획·설비정보 관리",
+              "선택한 지사는 보수계획·회차·실적까지 연동",
+            ].map((b) => (
+              <li key={b} className="flex gap-1.5 text-sm text-on-surface-variant py-0.5">
+                <span className="text-on-surface-variant/50">·</span>
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+          {branch && (
+            <div className="mt-3">
+              <Button variant="ghost" className="w-full" onClick={() => setView("branch")}>
+                <Icon name="arrow_forward" className="text-base" />
+                {branch} 계속 보기
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* 데스크톱 */}
+        <div className="hidden md:flex md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-display-lg text-on-surface pt-2">설비 마스터</h1>
             <p className="text-body-md text-on-surface-variant mt-2">
@@ -95,7 +121,24 @@ export default function EquipmentMaster() {
   // ── 지사 선택 후: 지사 띠 + 장기 계획 + 설비 CRUD ────────────────────────
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      {/* 모바일 */}
+      <div className="md:hidden text-center pt-2">
+        <h1 className="text-title-sm font-black text-on-surface">설비 관리</h1>
+        <ul className="mt-2 inline-block text-left">
+          {[
+            "지사의 장기 보수계획·설비 기준정보 관리",
+            "직접 등록 또는 엑셀 업로드로 설비 자동 등록",
+          ].map((b) => (
+            <li key={b} className="flex gap-1.5 text-sm text-on-surface-variant py-0.5">
+              <span className="text-on-surface-variant/50">·</span>
+              <span>{b}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* 데스크톱 */}
+      <div className="hidden md:flex md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-display-lg text-on-surface pt-2">설비 마스터</h1>
           <p className="text-body-md text-on-surface-variant mt-2">

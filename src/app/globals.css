@@ -156,6 +156,15 @@ body {
   font-family: var(--font-mono);
 }
 
+/* 모바일 챕터 서브내비(ChapterSubNav) — 가로 스크롤은 되지만 막대는 숨긴다 */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .material-symbols-outlined {
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
   user-select: none;

@@ -176,7 +176,7 @@ export interface ArchiveBrowserProps {
    */
   fixedType?: DocMode;
   /** 화면 상단 제목·설명. 챕터 랜딩에 끼울 때는 넘기지 않는다 */
-  heading?: { title: string; desc: string };
+  heading?: { title: string; desc: string; bullets?: string[] };
   /**
    * 챕터 색 (고장관리는 tertiary). 넘기지 않으면 보고 있는 종류에서 고른다 —
    * 보관함 전체 조회처럼 종류가 섞인 화면은 파랑이다.
@@ -452,6 +452,7 @@ export default function ArchiveBrowser({
           icon="inventory_2"
           title={heading.title}
           desc={heading.desc}
+          bullets={heading.bullets}
           accent={tone}
           // 연한 칩 = 조회. 작성 화면은 같은 색 꽉 찬 칩이라 둘이 바로 갈린다
           tone="soft"

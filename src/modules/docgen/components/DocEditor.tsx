@@ -7,6 +7,7 @@ import {
   MODE_LABELS,
   MODE_PLACEHOLDERS,
   MODE_TITLES,
+  MODE_WRITE_BULLETS,
   PHOTOS_PER_PAGE,
   type DocMode,
 } from "../lib/constants";
@@ -810,6 +811,7 @@ export default function DocEditor({
         icon="edit_note"
         title={`${MODE_TITLES[mode]} 작성`}
         desc={`사진을 추가하고 설명을 적으면 A4 규격 ${label} 문서를 자동으로 구성합니다. 최대 ${MAX_PHOTOS}장.`}
+        bullets={MODE_WRITE_BULLETS[mode]}
         accent={accent}
         // 꽉 찬 칩 = 작성. 같은 챕터의 조회 화면은 같은 색 연한 칩이다
         tone="solid"

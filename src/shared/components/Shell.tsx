@@ -2,6 +2,7 @@
 
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import ChapterSubNav from "./ChapterSubNav";
 import MobileNav from "./MobileNav";
 import ChatbotDock from "./ChatbotDock";
 import { useSidebar } from "./SidebarState";
@@ -30,6 +31,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         }`}
       >
         <Header />
+        <ChapterSubNav />
         <div className="p-gutter max-w-content mx-auto w-full space-y-gutter">{children}</div>
       </main>
       <MobileNav />
