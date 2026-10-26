@@ -31,7 +31,11 @@ export const EQUIPMENT_FIELDS = ["기계", "전기", "제어", "전산"] as cons
  * "1호기 HRSG"처럼 번호 뒤에 . ) 가 없는 이름은 건드리지 않는다.
  * 설비 마스터에 번호 달린 이름이 쌓이는 걸 막는 유일한 관문이므로,
  * 대분류로 설비를 만들거나 찾는 모든 곳이 이 함수를 거쳐야 한다.
+ *
+ * 구분자 뒤가 숫자면 머리 번호가 아니라 소수점으로 본다 — 그냥 떼면
+ * "6.9kV SWGR 고압반"이 "9kV SWGR 고압반"으로 망가진다. 머리 번호에는
+ * 항상 공백이나 한글·영문이 뒤따른다("4. 6.9kV …", "1.발전설비").
  */
 export function normalizeEquipmentName(raw: string): string {
-  return raw.replace(/^\s*\d+\s*[.)]\s*/, "").trim();
+  return raw.replace(/^\s*\d+\s*[.)](?=\s|\D)\s*/, "").trim();
 }
