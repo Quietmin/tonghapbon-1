@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, Icon, Button, EmptyState, StatusChip } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState } from "@/shared/components/ui";
 import { exportDesignStatement } from "../lib/statementExporter";
 import StatementArchive from "./StatementArchive";
 
@@ -389,13 +389,28 @@ export default function MaintenancePlan() {
               <li key={src.id} className="flex items-center gap-3 py-3">
                 <Icon name="description" className="text-on-surface-variant" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-on-surface truncate">{src.file_name}</p>
+                  <a
+                    href={`/api/overhaul/plan/file?id=${src.id}`}
+                    download={src.file_name}
+                    title="원본 엑셀 내려받기"
+                    className="text-sm font-bold text-on-surface truncate block hover:text-primary hover:underline"
+                  >
+                    {src.file_name}
+                  </a>
                   <p className="text-xs text-on-surface-variant">
                     설비 {src.item_count.toLocaleString()}건 · 시트 {src.sheet_count}개
                     {src.field ? ` · ${src.field}` : ""} ·{" "}
                     {src.uploaded_at.slice(0, 16).replace("T", " ")}
                   </p>
                 </div>
+                <a
+                  href={`/api/overhaul/plan/file?id=${src.id}`}
+                  download={src.file_name}
+                  title="원본 엑셀 내려받기"
+                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
+                >
+                  <Icon name="download" className="text-lg" />
+                </a>
                 <button
                   onClick={() => removeSource(src.id, src.file_name)}
                   className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
@@ -719,7 +734,9 @@ export default function MaintenancePlan() {
                         </td>
                         <td className="py-3 pr-card-padding text-sm whitespace-nowrap">
                           {r.isOverhaul ? (
-                            <StatusChip status="완료" />
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
+                              O/H
+                            </span>
                           ) : (
                             <span className="text-on-surface-variant">{r.method || "—"}</span>
                           )}

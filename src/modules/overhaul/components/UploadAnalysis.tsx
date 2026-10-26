@@ -446,13 +446,28 @@ export default function UploadAnalysis() {
                 >
                   <Icon name="description" className="text-on-surface-variant" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-on-surface truncate">{s.file_name}</p>
+                    <a
+                      href={`/api/overhaul/sources/file?id=${s.id}`}
+                      download={s.file_name}
+                      title="원본 엑셀 내려받기"
+                      className="text-sm font-bold text-on-surface truncate block hover:text-primary hover:underline"
+                    >
+                      {s.file_name}
+                    </a>
                     <p className="text-xs text-on-surface-variant">
                       작업항목 {s.task_count}건
                       {s.field_hint ? ` · 분야 ${s.field_hint} 지정` : ""} ·{" "}
                       {s.uploaded_at.slice(0, 16).replace("T", " ")}
                     </p>
                   </div>
+                  <a
+                    href={`/api/overhaul/sources/file?id=${s.id}`}
+                    download={s.file_name}
+                    title="원본 엑셀 내려받기"
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
+                  >
+                    <Icon name="download" className="text-lg" />
+                  </a>
                   <button
                     onClick={() => removeSource(s.id, s.file_name)}
                     className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"

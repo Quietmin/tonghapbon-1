@@ -57,13 +57,15 @@ export async function saveParsedPlan(params: {
   branch: string | null;
   sheetCount: number;
   items: ParsedPlanItem[];
+  /** 업로드한 엑셀 원본 — 목록에서 다시 내려받기 위해 보관 */
+  fileData?: Uint8Array | null;
 }): Promise<{ sourceId: string; itemCount: number }> {
-  const { fileName, field, branch, sheetCount, items } = params;
+  const { fileName, field, branch, sheetCount, items, fileData } = params;
 
   const source = await queryOne<{ id: string }>(
-    `insert into maintenance_plan_source (file_name, field, branch, sheet_count, item_count)
-     values ($1, $2, $3, $4, $5) returning id`,
-    [fileName, field, branch, sheetCount, items.length],
+    `insert into maintenance_plan_source (file_name, field, branch, sheet_count, item_count, file_data)
+     values ($1, $2, $3, $4, $5, $6) returning id`,
+    [fileName, field, branch, sheetCount, items.length, fileData ?? null],
   );
   if (!source) throw new Error("업로드 이력을 저장하지 못했습니다.");
 
@@ -380,7 +382,10 @@ export function summarize(rows: JudgedPlanRow[]): PlanSummary {
       const m = r.method || "(미지정)";
       s.nonOverhaulByMethod[m] = (s.nonOverhaulByMethod[m] || 0) + 1;
     }
-    if (r.judge.needsDecision) s.needsDecisionCount++;
+    // O/H 항목만 센다 — 배너가 "선택 탭에서 확인하세요"라고 안내하는데, 선택 탭은
+    // O/H만 보여주기 때문. O/H 외(경상정비 등)는 어차피 수량산출 대상이 아니라
+    // 사용자가 판단할 일도 없다.
+    if (r.judge.needsDecision && r.isOverhaul) s.needsDecisionCount++;
   }
   return s;
 }

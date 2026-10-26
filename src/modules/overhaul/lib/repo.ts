@@ -183,13 +183,15 @@ export async function saveAnalysis(params: {
   fileName: string;
   fieldHint?: string | null;
   tasks: ParsedTask[];
+  /** 업로드한 엑셀 원본 — 목록에서 다시 내려받기 위해 보관 */
+  fileData?: Uint8Array | null;
 }): Promise<{ sourceId: string; taskCount: number; linkedStatementItems: number }> {
-  const { projectId, fileName, fieldHint, tasks } = params;
+  const { projectId, fileName, fieldHint, tasks, fileData } = params;
 
   const source = await queryOne<{ id: string }>(
-    `insert into overhaul_source (project_id, file_name, field_hint, task_count)
-     values ($1, $2, $3, $4) returning id`,
-    [projectId, fileName, fieldHint ?? null, tasks.length],
+    `insert into overhaul_source (project_id, file_name, field_hint, task_count, file_data)
+     values ($1, $2, $3, $4, $5) returning id`,
+    [projectId, fileName, fieldHint ?? null, tasks.length, fileData ?? null],
   );
   if (!source) throw new Error("업로드 이력을 저장하지 못했습니다.");
 
