@@ -45,6 +45,7 @@ export async function POST(req: Request) {
           fileName: file.name,
           fieldHint,
           tasks: analysis.tasks,
+          fileData: buf,
         });
         sourceId = saved.sourceId;
         linkedStatementItems = saved.linkedStatementItems;

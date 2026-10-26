@@ -54,7 +54,14 @@ function YearCell({ cell, isThisYear }: { cell: LongTermCell; isThisYear: boolea
   return <div className={base + (isThisYear ? " ring-1 ring-primary/40" : "")} />;
 }
 
-export default function LongTermPlan({ branch }: { branch: string }) {
+export default function LongTermPlan({
+  branch,
+  fieldFilter,
+}: {
+  branch: string;
+  /** 분야 필터 — null이면 전체. 분야가 비어 있는 행(마스터 미등록 등)은 전체에서만 보인다. */
+  fieldFilter?: string | null;
+}) {
   const [data, setData] = useState<LongTermPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +82,8 @@ export default function LongTermPlan({ branch }: { branch: string }) {
   }, [branch]);
 
   const th = "py-3 text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest";
+
+  const rows = data ? (fieldFilter ? data.rows.filter((r) => r.field === fieldFilter) : data.rows) : [];
 
   return (
     <Card lift={false} className="p-card-padding">
@@ -112,11 +121,15 @@ export default function LongTermPlan({ branch }: { branch: string }) {
 
       {!data && !error ? (
         <p className="py-10 text-center text-sm text-on-surface-variant">불러오는 중…</p>
-      ) : data && data.rows.length === 0 ? (
+      ) : data && rows.length === 0 ? (
         <EmptyState
           icon="calendar_month"
-          title="계획할 설비가 없습니다"
-          desc="설비를 추가하거나 보수계획 엑셀을 올리면 여기에 연도별 계획이 나타납니다."
+          title={fieldFilter && data.rows.length ? `${fieldFilter} 분야 설비가 없습니다` : "계획할 설비가 없습니다"}
+          desc={
+            fieldFilter && data.rows.length
+              ? "분야를 전체로 바꾸거나, 설비 목록에서 분야를 지정해 보세요."
+              : "설비를 추가하거나 보수계획 엑셀을 올리면 여기에 연도별 계획이 나타납니다."
+          }
         />
       ) : data ? (
         <div className="overflow-x-auto mt-3">
@@ -146,7 +159,7 @@ export default function LongTermPlan({ branch }: { branch: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border-subtle">
-              {data.rows.map((r) => (
+              {rows.map((r) => (
                 <tr key={r.equipmentId ?? `plan:${r.name}`} className="hover:bg-surface-container-low transition-colors">
                   <td className="py-2.5 sticky left-0 z-10 bg-surface-container-lowest text-sm font-bold text-on-surface">
                     <span className="flex items-center gap-2">

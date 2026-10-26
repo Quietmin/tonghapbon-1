@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Icon } from "@/shared/components/ui";
+import { EQUIPMENT_FIELDS } from "@/shared/lib/equipmentMeta";
 import BranchOverview from "./BranchOverview";
 import LongTermPlan from "./LongTermPlan";
 import EquipmentCrud from "./EquipmentCrud";
@@ -24,6 +25,8 @@ export default function EquipmentMaster() {
   const [switching, setSwitching] = useState(false);
   /** 설비 CRUD가 바뀌면 장기 계획 표를 다시 그리기 위한 키 */
   const [planVersion, setPlanVersion] = useState(0);
+  /** 분야(기계·전기·제어…) 필터 — null이면 전체. 장기 계획·설비 목록에 함께 적용된다. */
+  const [fieldFilter, setFieldFilter] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -125,6 +128,27 @@ export default function EquipmentMaster() {
         <span className="text-xs text-on-surface-variant">
           설비·보수계획·회차·실적이 이 지사 것만 보입니다
         </span>
+        <span className="h-5 w-px bg-border-subtle hidden md:block" aria-hidden />
+        <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1.5 text-label-caps uppercase text-on-surface-variant">
+            <Icon name="category" className="text-base" />
+            분야
+          </span>
+          {[null, ...EQUIPMENT_FIELDS].map((f) => (
+            <button
+              key={f ?? "all"}
+              type="button"
+              onClick={() => setFieldFilter(f)}
+              className={`px-2.5 h-7 rounded-full text-xs font-bold border transition-colors ${
+                fieldFilter === f
+                  ? "bg-primary text-on-primary border-primary"
+                  : "bg-surface-container-lowest text-on-surface-variant border-border-subtle hover:border-primary hover:text-primary"
+              }`}
+            >
+              {f ?? "전체"}
+            </button>
+          ))}
+        </span>
         <button
           type="button"
           onClick={() => setView("overview")}
@@ -134,9 +158,13 @@ export default function EquipmentMaster() {
         </button>
       </div>
 
-      <LongTermPlan key={`${branch}:${planVersion}`} branch={branch} />
+      <LongTermPlan key={`${branch}:${planVersion}`} branch={branch} fieldFilter={fieldFilter} />
 
-      <EquipmentCrud key={branch} onChanged={() => setPlanVersion((v) => v + 1)} />
+      <EquipmentCrud
+        key={branch}
+        fieldFilter={fieldFilter}
+        onChanged={() => setPlanVersion((v) => v + 1)}
+      />
     </>
   );
 }
