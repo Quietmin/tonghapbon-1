@@ -66,12 +66,16 @@ const BAR_STYLE = {
 } as const;
 type BarColor = keyof typeof BAR_STYLE;
 
-const FIELD_BAR: Record<string, BarColor> = { 기계: "primary", 전기: "success", 제어: "info" };
-
+/**
+ * 막대·퍼센트 색 — 범례와 1:1로 맞춘다. 초록은 완료, 빨강은 지연만 뜻한다.
+ *
+ * 분야별 색(전기=초록)을 쓰면 0%인 전기 작업이 초록으로 칠해져 "완료"로 읽힌다.
+ * 분야는 그룹 머리의 칩으로 이미 구분되므로 막대 색까지 쓰지 않는다.
+ */
 function barColorOf(row: Row): BarColor {
   if (row.actual >= 100) return "success";
   if (row.behind) return "error";
-  return FIELD_BAR[row.field ?? ""] ?? "primary";
+  return "primary";
 }
 
 /** 기간 눈금 생성 (약 6~8개) */
@@ -477,6 +481,9 @@ export default function Schedule() {
                           g.list.map((r) => {
                             const barColor = barColorOf(r);
                             const labelOff = Math.max(r.sch.endOff, r.actualBar?.endOff || 0);
+                            // 계획 종료일이 며칠 지났는지 — 날짜를 다시 파싱하지 않고
+                            // 서버가 준 오프셋끼리 빼서 구한다 (시간대 영향 없음)
+                            const overdueDays = data.todayOff - r.sch.endOff;
                             return (
                               <div
                                 key={r.id}
@@ -491,11 +498,23 @@ export default function Schedule() {
                                     <p className="text-xs font-medium text-on-surface truncate group-hover:text-primary transition-colors">
                                       {r.name}
                                     </p>
-                                    {r.actual >= 100 && (
+                                    {r.actual >= 100 ? (
                                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-success/15 text-status-success shrink-0 flex items-center gap-0.5">
                                         <Icon name="check" className="text-[10px]" /> 완료
                                       </span>
-                                    )}
+                                    ) : r.behind ? (
+                                      <span
+                                        title={
+                                          overdueDays > 0
+                                            ? `계획 종료일(${r.sch.plannedEndStr})에서 ${overdueDays}일 지났습니다`
+                                            : "오늘까지 나갔어야 할 계획 진도보다 뒤처졌습니다"
+                                        }
+                                        className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-error/15 text-status-error shrink-0 flex items-center gap-0.5"
+                                      >
+                                        <Icon name="warning" className="text-[10px]" />
+                                        {overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
+                                      </span>
+                                    ) : null}
                                     <button
                                       title="계획일정 조정"
                                       onClick={(e) => {
