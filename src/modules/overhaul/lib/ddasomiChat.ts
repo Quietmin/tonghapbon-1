@@ -20,12 +20,16 @@ export interface DdasomiReply {
  * askFn(message, snapshot) => Promise<{ ok:true, answer:string } | null> — 보통 chatbotAI.askDdasomi.
  * askFn이 없거나 실패(null)해도 항상 안전하게 로컬 규칙(answerQuestion) 응답으로 대체된다.
  *
- * 실적 수정/삭제 요청이나 데이터 없음 안내는 GPT에 보내지 않고 즉시 처리한다 — GPT는 실제로 아무 것도
- * 수행할 수 없으므로, 이런 요청을 보내면 "삭제했다"처럼 실제로 하지 않은 일을 한 것처럼 답할 위험이 있다.
+ * 실적 수정/삭제 요청은 GPT에 보내지 않고 즉시 거절한다 — GPT는 실제로 아무 것도 수행할 수 없으므로,
+ * 이런 요청을 보내면 "삭제했다"처럼 실제로 하지 않은 일을 한 것처럼 답할 위험이 있다.
+ *
+ * 공정 데이터가 없는 경우(no_data)에도 GPT에 보낸다 — 데이터가 없어도 일반 질문·정비 지식·시스템 사용법에는
+ * 답할 수 있어야 하기 때문이다(해커톤 시연 요구). 수치를 지어내지 않도록 하는 규칙은 서버 프롬프트
+ * (api/overhaul/chatbot/route.ts)가 담당하며, GPT가 꺼져 있거나 실패하면 기존 로컬 안내문으로 대체된다.
  */
 export async function getDdasomiReply(message: string, snapshot: ChatbotSnapshot, askFn?: AskFn): Promise<DdasomiReply> {
   const local = answerQuestion(message, snapshot);
-  if (local.kind === "refused" || local.kind === "no_data") {
+  if (local.kind === "refused") {
     return { text: toDdasomiText(local), kind: local.kind, suggestions: local.suggestions };
   }
 

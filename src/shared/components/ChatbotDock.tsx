@@ -183,17 +183,31 @@ export default function ChatbotDock() {
 
   if (state === "bubble") {
     return (
-      <button
-        type="button"
-        onClick={() => setState("open")}
-        aria-label="정비 챗봇 열기 (따소미)"
-        // 모바일은 하단탭(h-16) 위로 올린다
-        className="print:hidden fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[200] w-14 h-14 rounded-full bg-primary shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center overflow-hidden"
-      >
-        <span className="ddasomi-face-crop w-full h-full">
-          <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img ddasomi-idle-anim" />
-        </span>
-      </button>
+      // 모바일은 하단탭(h-16) 위로 올린다
+      <div className="print:hidden fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[200] flex flex-col items-end gap-3">
+        {/* 말풍선 — 버튼과 같이 눌리도록 클릭 영역을 공유한다 */}
+        <button
+          type="button"
+          onClick={() => setState("open")}
+          aria-hidden="true"
+          tabIndex={-1}
+          className="ddasomi-speech-bubble mr-6 md:mr-7"
+        >
+          따소미에게
+          <br />
+          뭐든지 물어봐!
+        </button>
+        <button
+          type="button"
+          onClick={() => setState("open")}
+          aria-label="정비 챗봇 열기 (따소미)"
+          className="w-28 h-28 rounded-full bg-primary shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center overflow-hidden"
+        >
+          <span className="ddasomi-face-crop w-full h-full">
+            <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img ddasomi-idle-anim" />
+          </span>
+        </button>
+      </div>
     );
   }
 

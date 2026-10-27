@@ -125,3 +125,55 @@
     transform: none !important;
   }
 }
+
+/* 플로팅 버튼 위 말풍선 — "따소미에게 뭐든지 물어봐!" (흰 바탕, 주황 테두리, 아래로 향한 꼬리).
+   꼬리는 ::before(테두리색)·::after(흰색)를 2px 어긋나게 겹쳐서 테두리가 꼬리까지 이어지게 한다. */
+.ddasomi-speech-bubble {
+  position: relative;
+  padding: 10px 16px;
+  border: 2px solid #f58a1f;
+  border-radius: 16px;
+  background: #fff;
+  color: #2b3a67;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  animation: ddasomi-bubble-bob 3s ease-in-out infinite;
+}
+.ddasomi-speech-bubble::before,
+.ddasomi-speech-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  transform: translateX(-50%);
+}
+.ddasomi-speech-bubble::before {
+  bottom: -12px;
+  border-top: 12px solid #f58a1f;
+}
+.ddasomi-speech-bubble::after {
+  bottom: -9px;
+  border-top: 12px solid #fff;
+}
+@keyframes ddasomi-bubble-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ddasomi-speech-bubble {
+    animation: none;
+  }
+}

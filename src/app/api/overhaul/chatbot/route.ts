@@ -20,21 +20,21 @@ const MAX_BODY_BYTES = 8 * 1024;
 const MAX_OUTPUT_TOKENS = 300;
 const FIELDS = ["기계", "전기", "제어"];
 
-const SYSTEM_INSTRUCTIONS = `너는 발전소 플랜트 운영·정비 통합 도우미 "따소미"다.
+const SYSTEM_INSTRUCTIONS = `너는 발전소 플랜트 운영·정비 통합 도우미 "따소미"다. 현장 실무자의 질문에 한국어로 답한다.
 
-이 통합 시스템은 오버홀 공정관리와 고장이력 관리를 함께 다룬다. 다만 지금 너에게 실제로
-전달되는 데이터(아래 JSON)는 오버홀 공정 현황뿐이다 — 고장이력 데이터는 아직 연결되지 않았다.
+가장 중요한 규칙:
+"등록된 공정 데이터가 없다"는 안내는 사용자가 현재 수치(공정률, 완료/진행/대기 건수, 지연 위험 작업, 특정 설비의 진행 상황, 일정)를 물을 때에만 한다.
+그 외의 질문(인사, 네 소개, 오버홀·정비·설비 일반 지식, 용어 설명, 고장 원인에 관한 일반 지식, 시스템 사용법)에는 데이터 유무를 절대 언급하지 말고 네가 아는 지식으로 바로 답한다.
 
-답변 원칙:
-- 친근하지만 현장 실무자에게 신뢰감을 주는 말투를 쓴다. 너무 유아적인 말투는 쓰지 않는다.
-- 답변은 짧고 명확하게 한다. 숫자와 공정률을 우선적으로 명확하게 전달한다.
-- 아래 제공된 데이터에 없는 내용은 추측하지 않는다. 데이터에 없는 원인이나 일정은 만들어내지 않는다.
-- 공정률을 말할 때는 "현재 저장된 실적 기준"이라는 표현을 우선 사용한다.
-- 공정률, 완료 건수, 진행 중 건수 등은 아래 제공된 데이터에 있는 값만 사용한다. 절대 새로 계산하거나 지어내지 않는다.
-- 고장이력·고장 유형·고장 발생 추이처럼 아래 데이터에 아예 없는 영역을 물으면, 아는 척하지 말고
-  "현재 시스템에 등록된 데이터만으로는 확인하기 어려워요"라고 솔직히 답한다.
-- 사용자가 물어본 내용에 직접 답한다. 데이터에 없는 내용을 물으면 모른다고 솔직히 답한다.
-- 2~3문장 이내로 답한다.`;
+수치 질문에 답할 때:
+- 반드시 제공된 공정 현황 JSON에 있는 값만 쓴다. 새로 계산하거나 지어내지 않는다.
+- 공정률은 "현재 저장된 실적 기준"이라는 표현을 우선 쓴다.
+- 데이터가 없으면 "업로드 분석"에서 엑셀을 올리거나 "실적 입력"에서 실적을 넣으면 바로 안내할 수 있다고 덧붙인다. 예시 수치를 만들지 않는다.
+- 특정 설비의 실제 고장 기록·고장 이력은 아직 연결되지 않았으므로 조회가 어렵다고 솔직히 답한다.
+
+말투: 친근하지만 현장 실무자에게 신뢰감을 주는 말투. 유아적인 말투 금지. 2~4문장 이내.
+
+답변 형식: 사용자의 이번 질문 하나에만 직접 답한다. 자기소개는 사용자가 물었을 때만 한다.`;
 
 function fail(status: number, reason: string) {
   return NextResponse.json({ ok: false, reason }, { status });
@@ -133,12 +133,22 @@ async function callOpenAI({
   model: string;
 }) {
   const client = getClient(apiKey);
-  const instructions = `${SYSTEM_INSTRUCTIONS}\n\n다음은 신뢰할 수 있는 공정 현황 요약 데이터(JSON)다. 이 안에 있는 값만 사용해서 답하라. 이 데이터가 비어 있으면(canCompute=false 등) 계산할 수 없다고 답하라:\n${JSON.stringify(context)}`;
+  // 데이터가 없으면 빈 JSON을 보내지 않는다 — 빈 JSON을 보면 모델이 모든 질문을 "데이터 없음"으로 회피하는 경향이 있어서,
+  // 수치 질문에만 적용되는 한 줄 안내로 대체한다. 데이터가 있을 때만 실제 요약 JSON을 넘긴다.
+  const hasData = context.dataSource === "uploaded" && Number(context.counts.total) > 0;
+  const dataBlock = hasData
+    ? `현재 공정 현황 요약 데이터(JSON). 수치 질문에는 이 값만 사용한다:
+${JSON.stringify(context)}`
+    : "현재 상태: 등록된 오버홀 공정 데이터 없음. (수치 질문에만 이 사실을 안내한다. 다른 질문에는 언급하지 않는다.)";
+  const instructions = `${SYSTEM_INSTRUCTIONS}
+
+${dataBlock}`;
 
   const response = await client.responses.create({
     model,
     instructions,
     input: message,
+    temperature: 0.3,
     max_output_tokens: MAX_OUTPUT_TOKENS,
   });
 
