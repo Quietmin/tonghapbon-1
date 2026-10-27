@@ -1,4 +1,5 @@
 import { ButtonLink, Icon, ScreenHeader } from "@/shared/components/ui";
+import { getCurrentUser } from "@/shared/lib/currentUser";
 import StatusBoard from "@/modules/status/components/StatusBoard";
 
 export const metadata = { title: "현황 조회 — 유지보수 마스터" };
@@ -9,8 +10,11 @@ export const metadata = { title: "현황 조회 — 유지보수 마스터" };
  * (미완료·조치중·추후 조치 예정·조치완료)를 갱신한다. 챕터 첫 화면이 곧 조회인 구조는
  * 매뉴얼관리·고장관리와 같다 — 등록으로는 제목 줄의 버튼(PC)이나 모바일 챕터 서브내비의
  * 탭으로 간다.
+ *
+ * 처음에는 내 지사·내 부서(처음 접속 시 고른 값)로 걸러서 보여 준다.
  */
-export default function StatusPage() {
+export default async function StatusPage() {
+  const user = await getCurrentUser();
   return (
     <>
       <ScreenHeader
@@ -29,7 +33,7 @@ export default function StatusPage() {
           </ButtonLink>
         }
       />
-      <StatusBoard />
+      <StatusBoard initialBranch={user.branch ?? ""} initialDepartment={user.department ?? ""} />
     </>
   );
 }

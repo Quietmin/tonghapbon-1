@@ -28,30 +28,27 @@ const SELECT_CLASS =
  * 목록은 아직 조치가 필요한 것(미완료 → 조치중 → 추후 조치 예정)부터, 같은 상태 안에서는
  * 최근 등록순으로 정렬돼 온다(서버 정렬). 조치 상태가 표의 첫 열이다. 행을 누르면 갱신 창이 열려 상태·조치 내용·예정일을
  * 바꾼다. 위쪽 상태 칩은 건수를 보여 주며 누르면 그 상태만 걸러 본다.
- * 지사는 설비관리·처음 화면에서 고른 지사(쿠키)로 처음 걸러 두고, '전체 지사'로 넓힐 수 있다.
+ * 처음에는 내 지사·내 부서(처음 접속 시 고른 값)로 걸러 두고, '전체 지사'·'전체 부서'로 넓힐 수 있다.
  */
-export default function StatusBoard() {
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  /** 쿠키의 지사를 읽어 기본 필터에 반영한 뒤에야 첫 조회를 한다(두 번 조회하지 않게) */
-  const [ready, setReady] = useState(false);
+export default function StatusBoard({
+  initialBranch,
+  initialDepartment,
+}: {
+  /** 내 지사·부서(처음 접속 시 고른 값) — 처음에는 이 조건으로 걸러 보여 준다 */
+  initialBranch: string;
+  initialDepartment: string;
+}) {
+  const [filters, setFilters] = useState<Filters>({
+    ...EMPTY_FILTERS,
+    branch: initialBranch,
+    department: initialDepartment,
+  });
   const [rows, setRows] = useState<StatusIssueRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<StatusIssueRow | null>(null);
   const reqSeq = useRef(0);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const json = await (await fetch("/api/overhaul/branch")).json();
-        if (json.ok && json.branch) setFilters((f) => ({ ...f, branch: json.branch }));
-      } catch {
-        /* 못 읽으면 전체 지사로 둔다 */
-      }
-      setReady(true);
-    })();
-  }, []);
 
   const load = useCallback(async (f: Filters) => {
     const seq = ++reqSeq.current;
@@ -75,10 +72,9 @@ export default function StatusBoard() {
 
   // 필터가 바뀌면 다시 조회한다. 검색어는 타이핑마다 요청하지 않도록 잠깐 기다린다
   useEffect(() => {
-    if (!ready) return;
     const t = setTimeout(() => void load(filters), filters.q ? 250 : 0);
     return () => clearTimeout(t);
-  }, [ready, filters, load]);
+  }, [filters, load]);
 
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((f) => ({ ...f, [key]: value }));

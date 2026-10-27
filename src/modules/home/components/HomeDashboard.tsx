@@ -8,7 +8,7 @@ import {
   type RecentEntry,
   type RiskItem,
 } from "../lib/dashboard";
-import { BranchGrid, BranchSelect } from "./BranchControls";
+import { BranchGrid } from "./BranchControls";
 
 /**
  * PC 처음 화면 — 선택한 지사의 설비관리 현황 대시보드.
@@ -214,22 +214,12 @@ function Shortcuts() {
   );
 }
 
-function Header({
-  title,
-  sub,
-  branch,
-}: {
-  title: string;
-  sub?: React.ReactNode;
-  branch?: string;
-}) {
+/** 지사·부서는 헤더의 "강남지사 · 운영부" 칩에서 바꾼다 — 여기에는 따로 두지 않는다 */
+function Header({ title, sub }: { title: string; sub?: React.ReactNode }) {
   return (
-    <section className="pt-2 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-display-lg text-on-surface">{title}</h1>
-        {sub && <p className="text-body-md text-on-surface-variant mt-2">{sub}</p>}
-      </div>
-      {branch && <BranchSelect branch={branch} />}
+    <section className="pt-2">
+      <h1 className="text-display-lg text-on-surface">{title}</h1>
+      {sub && <p className="text-body-md text-on-surface-variant mt-2">{sub}</p>}
     </section>
   );
 }
@@ -333,7 +323,6 @@ export default async function HomeDashboard() {
         <Header
           title={`${branch} 현황`}
           sub={project ? `${project.name} · 아직 등록된 작업이 없습니다` : "아직 등록된 회차가 없습니다"}
-          branch={branch}
         />
         <Card lift={false} className="p-0">
           <EmptyState
@@ -374,7 +363,6 @@ export default async function HomeDashboard() {
       <Header
         title={`${branch} 현황`}
         sub={[project.name, period, dday].filter(Boolean).join(" · ")}
-        branch={branch}
       />
       <Kpis stats={stats} equipmentCount={equipmentCount} deviceCount={deviceCount} />
       <section className="grid gap-gutter lg:grid-cols-2">

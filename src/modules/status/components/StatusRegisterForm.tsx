@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button, Card, Icon } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
 import { DEPARTMENTS } from "../lib/constants";
@@ -29,26 +29,24 @@ const EMPTY: FormState = {
  * 설비명·이슈 내용·담당부서·작성자(+지사)를 적어 등록하면 현황 조회에 '미완료'로
  * 올라가고, 유지보수 담당자가 거기서 조치 상태를 갱신한다. 폰에서도 쓰므로 한 열로 쌓는다.
  *
- * 지사는 설비관리·처음 화면에서 고른 지사(쿠키)로 미리 채운다 — 매번 다시 고르지 않게.
+ * 지사·담당부서는 내 지사·부서(처음 접속 시 고른 값)로 미리 채운다 — 매번 다시 고르지 않게.
  */
-export default function StatusRegisterForm() {
-  const [form, setForm] = useState<FormState>(EMPTY);
+export default function StatusRegisterForm({
+  initialBranch,
+  initialDepartment,
+}: {
+  /** 내 지사·부서(처음 접속 시 고른 값) — 지사·담당부서를 미리 채운다 */
+  initialBranch: string;
+  initialDepartment: string;
+}) {
+  const [form, setForm] = useState<FormState>({
+    ...EMPTY,
+    branch: initialBranch,
+    department: initialDepartment,
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<FormState | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const json = await (await fetch("/api/overhaul/branch")).json();
-        if (json.ok && json.branch) {
-          setForm((f) => (f.branch ? f : { ...f, branch: json.branch }));
-        }
-      } catch {
-        /* 지사를 못 읽어도 직접 고르면 된다 */
-      }
-    })();
-  }, []);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));

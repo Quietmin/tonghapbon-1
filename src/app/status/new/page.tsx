@@ -1,13 +1,15 @@
 import { ButtonLink, Icon, ScreenHeader } from "@/shared/components/ui";
+import { getCurrentUser } from "@/shared/lib/currentUser";
 import StatusRegisterForm from "@/modules/status/components/StatusRegisterForm";
 
 export const metadata = { title: "현황 등록 — 유지보수 마스터" };
 
 /**
  * 현황 등록 — 운영 근무자가 이슈가 생긴 설비를 알리는 화면.
- * 등록하면 현황 조회에 '미완료'로 올라간다.
+ * 등록하면 현황 조회에 '미완료'로 올라간다. 지사·담당부서는 내 지사·부서로 미리 채워진다.
  */
-export default function StatusNewPage() {
+export default async function StatusNewPage() {
+  const user = await getCurrentUser();
   return (
     <>
       <ScreenHeader
@@ -25,7 +27,7 @@ export default function StatusNewPage() {
           </ButtonLink>
         }
       />
-      <StatusRegisterForm />
+      <StatusRegisterForm initialBranch={user.branch ?? ""} initialDepartment={user.department ?? ""} />
     </>
   );
 }

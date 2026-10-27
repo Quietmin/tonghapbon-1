@@ -33,29 +33,6 @@ function useBranchSwitch() {
   return { pick, switching };
 }
 
-/** 머리줄의 "지사 변경" 셀렉트 */
-export function BranchSelect({ branch }: { branch: string }) {
-  const { pick, switching } = useBranchSwitch();
-  return (
-    <label className="inline-flex items-center gap-2 text-sm text-on-surface-variant">
-      <Icon name="apartment" className="text-base" />
-      <span className="font-bold">지사 변경</span>
-      <select
-        value={branch}
-        disabled={switching}
-        onChange={(e) => void pick(e.target.value)}
-        className="h-9 px-3 rounded-lg bg-surface-container-lowest border border-border-subtle text-sm font-bold text-on-surface outline-none focus:border-primary disabled:opacity-50"
-      >
-        {SORTED.map((b) => (
-          <option key={b} value={b}>
-            {b}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 /** 지사를 아직 고르지 않았을 때 대시보드 자리에 뜨는 선택 화면 */
 export function BranchGrid() {
   const { pick, switching } = useBranchSwitch();
