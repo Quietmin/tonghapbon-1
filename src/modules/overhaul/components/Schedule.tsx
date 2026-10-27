@@ -218,10 +218,10 @@ export default function Schedule() {
           <EmptyState
             icon="calendar_view_week"
             title="공정표를 생성할 작업이 없습니다"
-            desc="먼저 업로드 분석에서 설계내역서를 올려 작업항목을 만드세요."
+            desc="먼저 엑셀 등록 탭에서 설계내역서를 올려 작업항목을 만드세요."
             action={
               <Link
-                href="/overhaul/upload"
+                href="/overhaul/tasks/upload"
                 className="px-4 py-2.5 rounded-xl font-bold text-sm inline-flex items-center gap-2 bg-primary text-on-primary hover:opacity-90"
               >
                 업로드 분석으로
@@ -336,7 +336,7 @@ export default function Schedule() {
         <Card lift={false} className="p-card-padding">
           <div className="flex items-center gap-3">
             <Icon name="event_busy" className="text-status-warning" />
-            <Link href="/overhaul/upload" className="text-primary text-sm font-semibold hover:underline">
+            <Link href="/overhaul/tasks/upload" className="text-primary text-sm font-semibold hover:underline">
               계약기간 설정하러 가기
             </Link>
           </div>

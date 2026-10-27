@@ -597,7 +597,7 @@ export default function PerformanceEntry() {
           <EmptyState
             icon="edit_note"
             title="입력할 작업이 없습니다"
-            desc="먼저 업로드 분석에서 설계내역서를 올려 작업항목을 만드세요."
+            desc="먼저 작업·공정의 엑셀 등록 탭에서 설계내역서를 올려 작업항목을 만드세요."
           />
         </Card>
       </>
