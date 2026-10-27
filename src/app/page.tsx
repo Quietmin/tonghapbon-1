@@ -44,6 +44,7 @@ export default function HomePage() {
         메뉴에서 감춘 화면들. 완전히 지우지 않았으므로 여기 작은 줄로만 남겨
         URL 을 외우지 않고도 들어갈 수 있게 한다.
       */}
+      {HIDDEN_ROUTES.length > 0 && (
       <section className="pt-2">
         <p className="text-xs font-bold text-on-surface-variant mb-2">그 외 화면</p>
         <div className="flex flex-wrap gap-1.5">
@@ -59,6 +60,7 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+      )}
     </>
   );
 }
