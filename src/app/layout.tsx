@@ -8,7 +8,7 @@ import PwaRegister from "@/shared/components/PwaRegister";
 export const metadata: Metadata = {
   title: "유지보수 마스터 — 설비·고장·매뉴얼 통합",
   description:
-    "설비 마스터 위에서 고장 보고서와 현장 매뉴얼을 작성·조회하고, 정비 챗봇을 어느 화면에서나 함께 씁니다.",
+    "설비 마스터 위에서 고장이력과 현장 매뉴얼을 작성·조회하고, 정비 챗봇을 어느 화면에서나 함께 씁니다.",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "PIMS" },
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },

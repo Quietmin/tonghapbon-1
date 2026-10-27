@@ -131,7 +131,18 @@ export default function PdfPreviewModal({
           </button>
         </div>
 
-        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto bg-surface-container">
+        {/*
+          overflow-y 만 auto 로 주면 overflow-x 는 기본값(visible)인데, 브라우저는
+          "둘 중 하나가 visible 이 아니면 나머지도 auto 로 본다"는 규칙이 있어
+          overflow-x 도 조용히 스크롤 가능해진다 — 캔버스 폭이 반올림 등으로
+          컨테이너보다 1px 만 넘어도 좌우로 밀리는 "흔들림"이 생긴다. 명시적으로
+          hidden 을 줘서 세로로만 고정한다(터치 패닝도 pan-y 로 한 번 더 막는다).
+        */}
+        <div
+          ref={scrollRef}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-surface-container"
+          style={{ touchAction: "pan-y" }}
+        >
           {status === "loading" && (
             <p className="py-10 text-center text-sm text-on-surface-variant">PDF 불러오는 중…</p>
           )}

@@ -23,7 +23,7 @@ const CHOICES = [
   {
     href: "/failure/new",
     icon: "warning",
-    title: "고장 보고서 만들기",
+    title: "고장이력 만들기",
     desc: "고장 요약과 관련 사진을 정리하는 핫라인 메모",
   },
 ];
