@@ -31,6 +31,14 @@ const TAB_ACTIVE_CHIP = {
   tertiary: "bg-tertiary-fixed",
 } as const;
 
+/**
+ * "매뉴얼관리"만 다른 탭보다 한 글자 길어 한 줄로는 비좁다. 그 한 탭만 두 줄로
+ * 접고 글자를 살짝 줄인다 — 나머지 세 탭은 원래 크기·한 줄 그대로 둔다.
+ */
+const TWO_LINE_LABEL: Record<string, string> = {
+  "/manual": "매뉴얼\n관리",
+};
+
 export default function MobileNav() {
   const pathname = usePathname();
 
@@ -49,6 +57,7 @@ export default function MobileNav() {
             : pathname === tab.href ||
               pathname.startsWith(`${tab.href}/`) ||
               tab.items.some((it) => isActive(pathname, it));
+        const twoLine = TWO_LINE_LABEL[tab.href];
         return (
           <Link
             key={tab.href}
@@ -59,13 +68,17 @@ export default function MobileNav() {
           >
             {/* 글자 색뿐 아니라 옅은 배경 칩도 같이 켜서 "지금 여기" 를 또렷하게 한다 */}
             <span
-              className={`px-3 py-1.5 rounded-full text-sm truncate max-w-full transition-colors ${
+              className={`px-3 py-1.5 max-w-full text-center transition-colors ${
+                twoLine
+                  ? "rounded-2xl text-xs leading-tight whitespace-pre-line"
+                  : "rounded-full text-sm truncate"
+              } ${
                 active
                   ? `${TAB_ACTIVE[tab.accent]} ${TAB_ACTIVE_CHIP[tab.accent]} font-bold`
                   : "text-on-surface-variant font-semibold"
               }`}
             >
-              {tab.label}
+              {twoLine ?? tab.label}
             </span>
           </Link>
         );

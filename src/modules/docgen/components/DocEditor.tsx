@@ -218,6 +218,41 @@ export default function DocEditor({
     return () => el.removeEventListener("wheel", onWheel);
   }, [previewScale]);
 
+  // 두 손가락 오므리기/펴기로 확대·축소 — 모바일엔 Ctrl+휠이 없으니 핀치로 같은
+  // zoom 상태를 조절한다. 두 손가락일 때만 preventDefault 해서, 한 손가락 스크롤
+  // (칸 안 세로/가로 이동)과 브라우저 페이지 전체 핀치 줌은 그대로 건드리지 않는다.
+  useEffect(() => {
+    const el = previewContainerRef.current;
+    if (!el) return;
+    let startDist = 0;
+    let startZoom = 1;
+    const distance = (touches: TouchList) =>
+      Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      startDist = distance(e.touches);
+      startZoom = zoom ?? previewScale;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || startDist <= 0) return;
+      e.preventDefault();
+      setZoom(clampZoom(startZoom * (distance(e.touches) / startDist)));
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) startDist = 0;
+    };
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [zoom, previewScale]);
+
   const archiveEnabled = isDocgenSupabaseConfigured();
   const label = MODE_LABELS[mode];
 
@@ -791,7 +826,7 @@ export default function DocEditor({
         type="text"
         value={author}
         onChange={(e) => setAuthor(e.target.value)}
-        placeholder="예: 김영섭"
+        placeholder="이름을 입력하세요."
         className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
       />
     </div>
@@ -886,30 +921,45 @@ export default function DocEditor({
             {sections}
           </Card>
 
-          {/* ---- 사진 추가 ---- */}
+          {/* ---- 사진 추가 ----
+              세 버튼(사진 추가·촬영·텍스트 칸 추가)은 같은 폭으로 나란히 두고,
+              장수 안내는 그 아래 줄로 뺐다 — flex-wrap 으로 한 줄에 욱여넣으면 폰
+              폭에서 버튼이 줄마다 다른 개수로 깨져 보였다. 아이콘을 글자 위로 올려
+              세로로 쌓는 이유도 같다 — 좁은 칸에서 "텍스트 칸 추가" 같은 긴 이름이
+              한 글자씩 꺾여 보이지 않게 한다. */}
           <Card className="p-card-padding">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={() => fileInputRef.current?.click()} disabled={items.length >= MAX_PHOTOS}>
+            <div className="flex items-stretch gap-2">
+              <Button
+                className="flex-1 !flex-col !gap-1 !px-1"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={items.length >= MAX_PHOTOS}
+              >
                 <Icon name="add_photo_alternate" className="text-lg" />
-                사진 추가
+                <span className="text-xs leading-tight">사진 추가</span>
               </Button>
               {/* 촬영은 폰에서만 의미가 있어 모바일 폭에서만 보인다 */}
               <Button
                 variant="ghost"
-                className="md:hidden"
+                className="flex-1 !flex-col !gap-1 !px-1 md:hidden"
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={items.length >= MAX_PHOTOS}
               >
                 <Icon name="photo_camera" className="text-lg" />
-                촬영
+                <span className="text-xs leading-tight">촬영</span>
               </Button>
               {allowTextItems && (
-                <Button variant="ghost" onClick={addTextItem}>
+                <Button
+                  variant="ghost"
+                  className="flex-1 !flex-col !gap-1 !px-1"
+                  onClick={addTextItem}
+                >
                   <Icon name="text_fields" className="text-lg" />
-                  텍스트 칸 추가
+                  <span className="text-xs leading-tight">텍스트 칸 추가</span>
                 </Button>
               )}
-              <span className="text-sm text-on-surface-variant ml-auto">
+            </div>
+            <div className="mt-2 text-right">
+              <span className="text-sm text-on-surface-variant">
                 {items.length} / {MAX_PHOTOS}
               </span>
               <input
@@ -1063,25 +1113,32 @@ export default function DocEditor({
             )}
           </Card>
 
-          {/* ---- 출력 ---- */}
+          {/* ---- 출력 ----
+              세 버튼은 같은 폭으로 나란히 — flex-wrap 으로 가운데 모으면 폭이
+              좁은 폰에서 두 개는 한 줄, 하나는 다음 줄로 떨어져 보였다. grid 로
+              묶어 셋이 항상 한 줄에 나란히 있게 한다. */}
           <Card className="p-card-padding flex flex-col gap-3">
-            {/* 세 버튼은 한가운데 — 안내 문구와 섞어 왼쪽으로 치우쳐 있던 것을
-                따로 떼어, 넉넉한 간격을 두고 폭 가운데로 모았다. */}
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {/* 새로고침하면 작성 중이던 내용이 사라지므로, 잠깐 자리를 비울 때 눌러 둔다 */}
               <Button
                 variant="ghost"
+                className="w-full"
                 onClick={() => void handleSaveDraft()}
                 disabled={draftBusy || items.length === 0}
               >
                 <Icon name="save" className="text-lg" />
                 {draftBusy ? "저장 중…" : "임시저장"}
               </Button>
-              <Button onClick={handleExport} disabled={busy || items.length === 0}>
+              <Button className="w-full" onClick={handleExport} disabled={busy || items.length === 0}>
                 <Icon name="picture_as_pdf" className="text-lg" />
                 {busy ? "만들고 있습니다…" : "PDF 출력"}
               </Button>
-              <Button variant="ghost" onClick={handleMail} disabled={busy || items.length === 0}>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={handleMail}
+                disabled={busy || items.length === 0}
+              >
                 <Icon name="mail" className="text-lg" />
                 메일로 전송
               </Button>

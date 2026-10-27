@@ -12,7 +12,7 @@ import SortedSelect, {
   TimeField,
   UnitField,
 } from "./SortedSelect";
-import { BRANCHES, DEFAULT_BRANCH, FAULT_FIELDS } from "../lib/constants";
+import { BRANCHES, FAULT_FIELDS } from "../lib/constants";
 import { ButtonLink, Icon } from "@/shared/components/ui";
 import {
   formatDateTime,
@@ -39,7 +39,8 @@ import {
  *  recover_at / action_taken / outage_*).
  */
 export default function FaultReportEditor() {
-  const [branch, setBranch] = useState(DEFAULT_BRANCH);
+  // 지사는 기본값을 두지 않는다 — 고르지 않고 지나쳐도 조용히 찍히는 값이 되면 안 된다.
+  const [branch, setBranch] = useState("");
   const [field, setField] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
   const [facility, setFacility] = useState("");
@@ -236,7 +237,7 @@ export default function FaultReportEditor() {
       onRestoreMeta={(m) => {
         const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
         const num = (v: unknown) => (typeof v === "number" ? String(v) : "");
-        setBranch(str(m.branch, DEFAULT_BRANCH));
+        setBranch(str(m.branch));
         setField(str(m.field));
         setOccurredAt(str(m.occurred_at));
         setRecoverAt(str(m.recover_at));
@@ -386,7 +387,7 @@ export default function FaultReportEditor() {
 
           <SectionHeading
             accent="tertiary"
-            title="상황(운전자/목격자 진술 포함)"
+            title="상황"
             trailing={
               <InlineCheck
                 id="faultSituationNone"
@@ -396,6 +397,8 @@ export default function FaultReportEditor() {
               />
             }
           />
+          {/* 제목 줄에 괄호까지 넣으면 "해당없음" 체크와 겹쳐 잘려 보인다 — 따로 한 줄로 뺀다 */}
+          <p className="text-xs text-on-surface-variant -mt-1 mb-2">운전자·목격자 진술 포함</p>
           {/* 지우지 않고 잠가 둔다 — 체크를 풀면 적어 둔 내용이 그대로 돌아와야 한다 */}
           <div className={situationNone ? "opacity-45 pointer-events-none" : undefined}>
             <TextAreaField
@@ -463,7 +466,7 @@ export default function FaultReportEditor() {
 
           <SectionHeading accent="tertiary" title="2. 관련 사진" />
           <p className="text-xs text-on-surface-variant leading-relaxed">
-            아래에서 추가하는 사진이 등록한 순서대로 이 항목의 내용으로 출력됩니다.
+            추가한 사진이 등록 순서대로 출력됩니다.
           </p>
         </div>
       }

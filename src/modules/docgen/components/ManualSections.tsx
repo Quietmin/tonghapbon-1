@@ -261,8 +261,7 @@ export function ManualSectionsFields({
 
       <SectionHead number={4} label="내용" />
       <p className="text-xs text-on-surface-variant leading-relaxed">
-        아래에서 추가하는 사진과 텍스트가 등록한 순서대로 번호를 달고 이 항목의 내용으로
-        출력됩니다.
+        추가한 사진·텍스트가 등록 순서대로 번호를 달고 출력됩니다.
       </p>
     </div>
   );

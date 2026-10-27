@@ -47,6 +47,47 @@ export default function SortedSelect({
   );
 }
 
+/**
+ * 가나다순 정렬 없이 넘긴 순서 그대로 쓰는 셀렉트 (개정번호 1~10처럼 순서 자체가
+ * 뜻이 있는 값). SortedSelect 와 모양만 같고 sortKorean 을 거치지 않는다.
+ */
+export function PlainSelect({
+  id,
+  label,
+  values,
+  value,
+  onChange,
+  placeholder = "선택",
+}: {
+  id: string;
+  label: string;
+  values: string[];
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-xs font-bold text-on-surface-variant">
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+      >
+        <option value="">{placeholder}</option>
+        {values.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 /** 체크 한 칸 — 고장 보고서의 "열공급 중단 없음"처럼 켜고 끄는 값에 쓴다 */
 export function CheckField({
   id,
