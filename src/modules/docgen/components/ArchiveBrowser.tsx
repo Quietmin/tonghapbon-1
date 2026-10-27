@@ -448,7 +448,7 @@ export default function ArchiveBrowser({
               실행하세요.
             </p>
             <p className="text-sm text-on-surface-variant mt-2">
-              설정하지 않아도 사진대장·매뉴얼·고장이력의{" "}
+              설정하지 않아도 사진대장·매뉴얼·고장 보고서의{" "}
               <strong>PDF 생성과 다운로드는 그대로 됩니다.</strong>
             </p>
           </div>
@@ -666,7 +666,7 @@ export default function ArchiveBrowser({
           <EmptyState
             icon="inventory_2"
             title="문서가 없습니다"
-            desc="사진대장·매뉴얼·고장이력을 만들고 [PDF 출력]을 누르면 여기에 쌓입니다."
+            desc="사진대장·매뉴얼·고장 보고서를 만들고 [PDF 출력]을 누르면 여기에 쌓입니다."
           />
         ) : (
           <>

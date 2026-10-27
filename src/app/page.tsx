@@ -15,7 +15,7 @@ const ACCENT_BAR = {
 const MOBILE_SUMMARY: Record<(typeof NAV_GROUPS)[number]["key"], string> = {
   equipment: "설비 마스터 기반 오버홀 관리",
   manual: "매뉴얼 조회 · 작성",
-  failure: "고장이력 조회 · 작성",
+  failure: "고장보고서 조회 · 작성",
 };
 
 export default function HomePage() {

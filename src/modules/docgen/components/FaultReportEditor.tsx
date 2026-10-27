@@ -208,7 +208,7 @@ export default function FaultReportEditor() {
       headingAction={
         <ButtonLink href="/failure" variant="tertiary">
           <Icon name="inventory_2" className="text-lg" />
-          고장이력 조회
+          고장보고서 조회
         </ButtonLink>
       }
       saveMeta={{

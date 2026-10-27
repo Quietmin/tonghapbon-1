@@ -48,8 +48,16 @@ export default function Header() {
           height={240}
           className="h-9 w-auto shrink-0"
         />
+        {/*
+          폰 폭에서는 챕터 안에 들어와 있으면("설비관리"/"매뉴얼관리"/"고장관리")
+          그 챕터 이름을 타이틀 자리에 바로 보여준다 — "플랜트 지능형
+          관리시스템"이라는 일반 문구보다 지금 어디 있는지가 더 쓸모 있다.
+          데스크톱(sm 이상)은 건드리지 않는다 — 일반 타이틀 + 아래 "/ 챕터명"
+          브레드크럼이 이미 같은 정보를 보여주고 있다.
+        */}
         <h2 className="text-base sm:text-lg font-black text-primary tracking-tight truncate">
-          플랜트 지능형 관리시스템
+          <span className="sm:hidden">{group ? group.label : "플랜트 지능형 관리시스템"}</span>
+          <span className="hidden sm:inline">플랜트 지능형 관리시스템</span>
         </h2>
         {group && (
           <>

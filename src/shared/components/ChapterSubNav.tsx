@@ -45,7 +45,11 @@ export default function ChapterSubNav() {
 
   return (
     <nav
-      className={`md:hidden sticky top-16 z-30 -mx-gutter px-gutter bg-surface-glass backdrop-blur-xl border-b border-border-subtle ${
+      // px-gutter 만 쓴다(mx 없이) — Shell.tsx 에서 이 바는 패딩 없는 <main> 의
+      // 바로 아래 자식이라 이미 뷰포트 폭 그대로다. 예전에 -mx-gutter 로 패딩을
+      // "상쇄"하려 했는데, 상쇄할 패딩이 애초에 없어서 반대로 양옆 24px씩
+      // 뷰포트 밖으로 새어나가 버렸다 — 그 24px이 좌우로 살짝 움직이는 여지였다.
+      className={`md:hidden sticky top-16 z-30 px-gutter bg-surface-glass backdrop-blur-xl border-b border-border-subtle ${
         dense ? "py-2" : "py-3"
       }`}
       aria-label={`${group.label} 하위 화면`}
