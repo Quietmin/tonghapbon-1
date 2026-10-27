@@ -121,19 +121,6 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* 어느 화면에서든 첫 화면으로 돌아가는 버튼 */}
-      <Link
-        href="/"
-        className={`${LINK_BASE} mb-3 shrink-0 ${
-          pathname === "/"
-            ? "bg-primary-container text-on-primary font-bold"
-            : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-        }`}
-      >
-        <Icon name="home" className="text-lg" />
-        <span>처음 화면으로</span>
-      </Link>
-
       {/* 메인 메뉴 3개 — 화살표를 눌러 각각 펼치고 접는다 */}
       <nav className="flex-1 flex flex-col gap-1">
         {NAV_GROUPS.map((group) => {

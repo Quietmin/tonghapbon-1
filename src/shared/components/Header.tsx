@@ -40,6 +40,17 @@ export default function Header() {
           영향이 없다. width/height 를 적어 두면 이미지가 늦게 와도 글자가 밀리지
           않는다.
         */}
+        {/*
+          PIMS 아이콘 + 제목은 처음 화면으로 가는 링크다. PC 에서는 사이드바의 [처음 화면으로]
+          탭과 헤더의 [처음 화면] 알약을 없앴으므로, 사이드바를 숨겨 둔 때도 홈으로 돌아가는
+          길이 여기 하나는 늘 남아 있어야 한다. (폰은 오른쪽 홈 버튼을 그대로 둔다)
+        */}
+        <Link
+          href="/"
+          aria-label="처음 화면으로"
+          title="처음 화면으로"
+          className="flex items-center gap-3 sm:gap-4 min-w-0"
+        >
         {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
         <img
           src="/pims-icon.png"
@@ -60,6 +71,7 @@ export default function Header() {
           <span className="sm:hidden">{group ? group.label : "플랜트 지능형 관리시스템"}</span>
           <span className="hidden sm:inline">플랜트 지능형 관리시스템</span>
         </h2>
+        </Link>
         {group && (
           <>
             <span className="hidden sm:inline text-outline-variant">/</span>
@@ -74,7 +86,8 @@ export default function Header() {
         {pathname !== "/" && (
           <Link
             href="/"
-            className="h-9 px-3 flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors"
+            // 폰 전용 — PC 는 위의 PIMS 아이콘·제목 링크가 같은 일을 한다
+            className="md:hidden h-9 px-3 flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors"
           >
             <Icon name="home" className="text-base" />
             <span className="hidden sm:inline">처음 화면</span>
