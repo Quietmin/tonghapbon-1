@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, Icon, Button, EmptyState, StatusChip } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState } from "@/shared/components/ui";
 import { exportDesignStatement } from "../lib/statementExporter";
 import StatementArchive from "./StatementArchive";
 
@@ -200,6 +200,11 @@ export default function MaintenancePlan() {
 
   const rows = data?.rows ?? [];
 
+  // 목록 페이지네이션 — 수백 건을 한 번에 그리면 스크롤이 끝이 없다.
+  // 기본 10개씩, 페이지당 개수는 아래 표 하단에서 바꾼다.
+  const [pageSize, setPageSize] = useState<number | "all">(10);
+  const [page, setPage] = useState(1);
+
   const visible = useMemo(() => {
     const kw = q.trim().toLowerCase();
     return rows.filter((r) => {
@@ -219,6 +224,21 @@ export default function MaintenancePlan() {
     });
   }, [rows, tab, q, field]);
 
+  // 탭·검색·분야·페이지 크기가 바뀌면 1페이지로 — 남은 페이지 번호가 범위를 벗어난다
+  useEffect(() => {
+    setPage(1);
+  }, [tab, q, field, pageSize]);
+
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(visible.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () =>
+      pageSize === "all"
+        ? visible
+        : visible.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [visible, safePage, pageSize],
+  );
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -227,8 +247,10 @@ export default function MaintenancePlan() {
       return next;
     });
 
-  const toggleAllVisible = () => {
-    const ids = visible.map((r) => r.id);
+  /** 주어진 행 묶음을 통째로 선택/해제 — 머리글 체크박스(이 페이지)와
+   *  하단 "검색결과 전체 선택"(필터 결과 전부)이 같이 쓴다 */
+  const toggleAll = (list: { id: string }[]) => {
+    const ids = list.map((r) => r.id);
     const allOn = ids.every((id) => selected.has(id));
     setSelected((prev) => {
       const next = new Set(prev);
@@ -317,7 +339,7 @@ export default function MaintenancePlan() {
   return (
     <>
       <div>
-        <h1 className="text-display-lg text-on-surface pt-2">보수계획 수립</h1>
+        <h1 className="text-display-lg text-on-surface pt-2">오버홀 수량산출</h1>
         <p className="text-body-md text-on-surface-variant mt-2">
           설비별 중장기 유지보수 관리계획을 한 번 등록하면, 연도만 고르면 그 해에 보수할 대상을
           시스템이 점검주기로 판정합니다. 확정한 목록은 수량산출서 엑셀로 뽑아 시공사에 전달합니다.
@@ -367,13 +389,28 @@ export default function MaintenancePlan() {
               <li key={src.id} className="flex items-center gap-3 py-3">
                 <Icon name="description" className="text-on-surface-variant" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-on-surface truncate">{src.file_name}</p>
+                  <a
+                    href={`/api/overhaul/plan/file?id=${src.id}`}
+                    download={src.file_name}
+                    title="원본 엑셀 내려받기"
+                    className="text-sm font-bold text-on-surface truncate block hover:text-primary hover:underline"
+                  >
+                    {src.file_name}
+                  </a>
                   <p className="text-xs text-on-surface-variant">
                     설비 {src.item_count.toLocaleString()}건 · 시트 {src.sheet_count}개
                     {src.field ? ` · ${src.field}` : ""} ·{" "}
                     {src.uploaded_at.slice(0, 16).replace("T", " ")}
                   </p>
                 </div>
+                <a
+                  href={`/api/overhaul/plan/file?id=${src.id}`}
+                  download={src.file_name}
+                  title="원본 엑셀 내려받기"
+                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
+                >
+                  <Icon name="download" className="text-lg" />
+                </a>
                 <button
                   onClick={() => removeSource(src.id, src.file_name)}
                   className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
@@ -608,15 +645,15 @@ export default function MaintenancePlan() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[980px]">
                   <thead>
-                    <tr className="text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest border-b border-border-subtle">
+                    <tr className="text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest border-b border-border-subtle">
                       <th className="py-3 pl-card-padding w-10">
                         {tab !== "참고" && (
                           <input
                             type="checkbox"
-                            checked={visible.length > 0 && visible.every((r) => selected.has(r.id))}
-                            onChange={toggleAllVisible}
+                            checked={paged.length > 0 && paged.every((r) => selected.has(r.id))}
+                            onChange={() => toggleAll(paged)}
                             className="w-4 h-4"
-                            title="보이는 항목 전체 선택"
+                            title="이 페이지 전체 선택"
                           />
                         )}
                       </th>
@@ -629,7 +666,7 @@ export default function MaintenancePlan() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-subtle">
-                    {visible.map((r) => (
+                    {paged.map((r) => (
                       <tr key={r.id} className="hover:bg-surface-container-low transition-colors">
                         <td className="py-3 pl-card-padding">
                           {tab !== "참고" && (
@@ -644,20 +681,20 @@ export default function MaintenancePlan() {
                         <td className="py-3 pr-3">
                           <div className="flex items-center gap-2 mb-0.5">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                              className={`px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold ${
                                 CLASS_STYLE[r.judge.classification]
                               }`}
                             >
                               {r.judge.classification}
                             </span>
                             {r.judge.needsDecision && (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-warning/15 text-status-warning flex items-center gap-1">
-                                <Icon name="help" className="text-[12px]" />
+                              <span className="px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/15 text-status-warning flex items-center gap-1">
+                                <Icon name="help" className="text-[12px] md:text-[13px]" />
                                 판단 필요
                               </span>
                             )}
                             {r.plannedGrade && (
-                              <span className="text-[11px] font-bold text-on-surface-variant">
+                              <span className="text-[11px] md:text-[12px] font-bold text-on-surface-variant">
                                 계획 {r.plannedGrade}급
                               </span>
                             )}
@@ -697,7 +734,9 @@ export default function MaintenancePlan() {
                         </td>
                         <td className="py-3 pr-card-padding text-sm whitespace-nowrap">
                           {r.isOverhaul ? (
-                            <StatusChip status="완료" />
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-primary/10 text-primary">
+                              O/H
+                            </span>
                           ) : (
                             <span className="text-on-surface-variant">{r.method || "—"}</span>
                           )}
@@ -708,10 +747,99 @@ export default function MaintenancePlan() {
                 </table>
               </div>
             )}
+
+            {/* 페이지네이션 — 페이지당 개수 · 검색결과 전체 선택 · 페이지 이동 */}
+            {visible.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-card-padding py-3 border-t border-border-subtle">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+                  <span>페이지당</span>
+                  <select
+                    value={String(pageSize)}
+                    onChange={(e) =>
+                      setPageSize(e.target.value === "all" ? "all" : Number(e.target.value))
+                    }
+                    className="h-8 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-sm font-bold outline-none focus:border-primary"
+                  >
+                    {[10, 20, 50, 100].map((n) => (
+                      <option key={n} value={n}>
+                        {n}개
+                      </option>
+                    ))}
+                    <option value="all">전체</option>
+                  </select>
+                  {tab !== "참고" && (
+                    <button
+                      type="button"
+                      onClick={() => toggleAll(visible)}
+                      className="ml-1 text-sm font-bold text-primary hover:underline"
+                    >
+                      {visible.every((r) => selected.has(r.id))
+                        ? "검색결과 전체 해제"
+                        : `검색결과 전체 선택 (${visible.length})`}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-on-surface-variant mr-2 font-mono-data">
+                    {pageSize === "all"
+                      ? `전체 ${visible.length}건`
+                      : `${(safePage - 1) * pageSize + 1}–${Math.min(
+                          safePage * pageSize,
+                          visible.length,
+                        )} / ${visible.length}건`}
+                  </span>
+                  {pageSize !== "all" && totalPages > 1 && (
+                    <>
+                      {(
+                        [
+                          { icon: "first_page", to: 1, off: safePage === 1 },
+                          { icon: "chevron_left", to: safePage - 1, off: safePage === 1 },
+                        ] as const
+                      ).map((b) => (
+                        <button
+                          key={b.icon}
+                          type="button"
+                          disabled={b.off}
+                          onClick={() => setPage(b.to)}
+                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                        >
+                          <Icon name={b.icon} className="text-base" />
+                        </button>
+                      ))}
+                      <span className="px-2 text-sm font-bold text-on-surface font-mono-data">
+                        {safePage} / {totalPages}
+                      </span>
+                      {(
+                        [
+                          { icon: "chevron_right", to: safePage + 1, off: safePage === totalPages },
+                          { icon: "last_page", to: totalPages, off: safePage === totalPages },
+                        ] as const
+                      ).map((b) => (
+                        <button
+                          key={b.icon}
+                          type="button"
+                          disabled={b.off}
+                          onClick={() => setPage(b.to)}
+                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                        >
+                          <Icon name={b.icon} className="text-base" />
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </Card>
 
-          {/* 확정 · 출력 */}
-          <Card className="p-card-padding" lift={false}>
+          {/* 확정 · 출력 — 이 화면의 본래 목적이라 스크롤해도 늘 보이도록
+              화면 아래에 붙여 둔다(sticky). 목록이 수백 줄이라 맨 밑에만
+              두면 주 기능이 묻힌다. */}
+          <Card
+            className="p-card-padding sticky bottom-4 z-20 border-2 border-primary/30 shadow-card-hover"
+            lift={false}
+          >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-title-sm text-on-surface">
@@ -719,7 +847,7 @@ export default function MaintenancePlan() {
                 </p>
                 <p className="text-sm text-on-surface-variant mt-1">
                   명칭·규격·수량·단위·등급·비고가 채워지고 <b>작업 시작일·종료일은 빈칸</b>으로
-                  나갑니다. 시공사가 그 칸을 채워 보내면 업로드 분석 화면에 넣어 공정관리를
+                  나갑니다. 시공사가 그 칸을 채워 보내면 작업·공정의 엑셀 등록 탭에 넣어 공정관리를
                   시작하세요.
                 </p>
                 <p className="text-sm text-on-surface-variant mt-1.5">
@@ -728,11 +856,31 @@ export default function MaintenancePlan() {
                   맞춰집니다.
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={confirmAndExport} disabled={!selected.size || !!busy}>
-                  <Icon name="table_view" className="text-base" />
+              <div className="flex flex-col items-stretch gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={confirmAndExport}
+                  disabled={!selected.size || !!busy}
+                  title={
+                    selected.size
+                      ? `선택한 ${selected.size}건으로 수량산출서를 만듭니다`
+                      : "위 목록에서 항목을 먼저 선택하세요"
+                  }
+                  className="flex items-center justify-center gap-2 h-14 px-7 rounded-xl bg-primary text-on-primary text-title-sm font-black shadow-card-hover transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:shadow-none"
+                >
+                  <Icon name="table_view" className="text-xl" />
                   {busy ? "만드는 중…" : "확정하고 엑셀 내보내기"}
-                </Button>
+                  {!!selected.size && !busy && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-on-primary/20 text-sm font-black">
+                      {selected.size}
+                    </span>
+                  )}
+                </button>
+                {!selected.size && (
+                  <p className="text-xs text-on-surface-variant text-center">
+                    위 목록에서 항목을 선택하세요
+                  </p>
+                )}
               </div>
             </div>
 

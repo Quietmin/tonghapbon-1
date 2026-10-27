@@ -11,7 +11,9 @@
  * 통합앱은 무인증이므로 author_id 는 항상 null 로 넣고, 작성자는 사용자가 직접
  * 입력한 이름(author_name)으로만 남는다.
  *
- * 삭제·수정은 제공하지 않는다 — 비로그인에서 열면 아무나 보관함을 비울 수 있다.
+ * 수정은 제공하지 않는다. 삭제는 supabase/docgen/02-docgen-delete.sql 을 실행한
+ * 프로젝트에서만 동작한다 — 그 파일을 실행하기 전까지 서버가 조용히 막는다
+ * (deleteFromArchive 주석 참고).
  */
 import { DOCGEN_BUCKET, DOCGEN_TABLE, getDocgenSupabase } from "./supabase";
 import type { DocMode } from "./constants";
@@ -38,6 +40,12 @@ export interface ArchiveRow {
   branch: string | null;
   facility: string | null;
   fault_content: string | null;
+  /**
+   * "수정 가능한 원본"이 있으면(source.ts) 채워진다. 03-docgen-sources.sql 을
+   * 실행하기 전에 저장된 행은 둘 다 null — 그 행은 [수정] 버튼을 못 그린다.
+   */
+  lineage_id: string | null;
+  source_id: string | null;
 }
 
 /** 저장 시 함께 넣는 메타 — documents 테이블 컬럼명과 맞춘다 */
@@ -106,8 +114,17 @@ async function uploadWithRetry(basePath: string, pdfBlob: Blob): Promise<string>
 /**
  * PDF 를 스토리지에 올리고 documents 행을 만든다.
  * 실패하면 올라간 파일을 되돌려 고아 파일이 남지 않게 한다(원본과 동일).
+ *
+ * link 는 source.ts 가 같은 출력 과정에서 저장한 "수정 가능한 원본" 행과
+ * 이 PDF 행을 이어 준다 — 보관함이 [수정] 버튼을 그릴지는 이 두 컬럼이
+ * 채워졌는지로 판단한다. 03-docgen-sources.sql 을 실행하지 않았으면(컬럼이
+ * 없으면) link 를 넘기지 않으면 그만이다 — PDF 저장 자체는 그대로 된다.
  */
-export async function saveToArchive(pdfBlob: Blob, meta: SaveMeta): Promise<void> {
+export async function saveToArchive(
+  pdfBlob: Blob,
+  meta: SaveMeta,
+  link?: { lineageId: string; sourceId: string },
+): Promise<void> {
   const client = getDocgenSupabase();
   if (!client) throw new Error("보관함이 설정되지 않았습니다.");
 
@@ -131,6 +148,7 @@ export async function saveToArchive(pdfBlob: Blob, meta: SaveMeta): Promise<void
     author_name: meta.author_name?.trim() || null,
     pdf_path: path,
     pdf_bytes: pdfBlob.size,
+    ...(link ? { lineage_id: link.lineageId, source_id: link.sourceId } : {}),
   });
 
   if (error) {
@@ -140,12 +158,69 @@ export async function saveToArchive(pdfBlob: Blob, meta: SaveMeta): Promise<void
   }
 }
 
+/**
+ * 보관함에서 문서를 지운다 — 행과 저장된 PDF 를 함께.
+ * 원본 legacy Photo-Report archive.js 의 deleteDocument() 를 그대로 옮겼다.
+ *
+ * ⚠️ RLS 는 "권한 없음"을 오류로 알려주지 않는다. using 조건에 맞지 않는 행은 그냥
+ * 0건 삭제로 끝나고 error 가 비어 있다. 그대로 두면 화면에는 "지웠습니다"가 뜨고
+ * 목록에서도 사라지는데 실제로는 남아 있어서, 다시 조회하면 되살아난 것처럼 보인다.
+ * 그래서 .select() 로 실제 지워진 행을 돌려받아 비어 있으면 직접 오류를 던진다.
+ *
+ * 파일 삭제도 마찬가지다. storage.remove() 는 실패해도 예외를 던지지 않고
+ * {data, error} 만 돌려주며, 삭제 정책이 없으면 error 조차 비어 있고 data 가 빈
+ * 배열로 온다. 지워진 개수까지 확인해서 호출한 쪽에 fileRemoved 로 알린다 —
+ * 행은 지웠는데 PDF 만 남는 경우를 조용히 넘기지 않기 위해서다.
+ *
+ * 순서는 행 → 파일이다. 파일을 먼저 지우면, 행 삭제가 막혔을 때 목록에는 남아
+ * 있는데 열면 깨지는 문서가 된다.
+ */
+export async function deleteFromArchive(
+  row: Pick<ArchiveRow, "id" | "pdf_path">,
+): Promise<{ fileRemoved: boolean }> {
+  const client = getDocgenSupabase();
+  if (!client) throw new Error("보관함이 설정되지 않았습니다.");
+
+  const { data, error } = await client
+    .from(DOCGEN_TABLE)
+    .delete()
+    .eq("id", row.id)
+    .select("id");
+
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error(
+      "삭제 권한이 없습니다 — 서버에 삭제 정책(RLS)이 없습니다. " +
+        "Supabase SQL Editor 에서 supabase/docgen/02-docgen-delete.sql 을 한 번 실행해 주세요.",
+    );
+  }
+
+  try {
+    const res = await client.storage.from(DOCGEN_BUCKET).remove([row.pdf_path]);
+    return { fileRemoved: !res.error && (res.data?.length ?? 0) > 0 };
+  } catch {
+    return { fileRemoved: false };
+  }
+}
+
+/**
+ * 조회 조건 — 원본 legacy Photo-Report archive.js 의 queryDocuments(filters) 와
+ * 같은 묶음이다. 고르는 값(지사·분야·매뉴얼 종류)은 정확히 일치로,
+ * 손으로 적는 값(설비명·고장내용·파일명·작성자)은 부분검색으로 찾는다
+ * (파일명·고장내용·설비명에는 pg_trgm 인덱스가 깔려 있다).
+ */
 export interface ListFilter {
   docType?: DocMode | "";
   branch?: string;
-  year?: string;
-  /** 파일명·고장내용·설비명 부분검색 (원본은 pg_trgm 인덱스를 깔아 둠) */
-  keyword?: string;
+  field?: string;
+  /** 매뉴얼 전용 */
+  manualType?: string;
+  /** 고장 보고서 전용 */
+  facility?: string;
+  faultContent?: string;
+  /** 부분검색 */
+  fileName?: string;
+  authorName?: string;
   /**
    * 최대 건수. 챕터 첫 화면의 "최근 문서" 요약처럼 몇 건만 필요할 때 쓴다 —
    * 200건을 받아 와서 잘라 쓰면 그만큼이 그냥 버려진다.
@@ -163,27 +238,52 @@ export async function listArchive(filter: ListFilter = {}): Promise<ArchiveRow[]
     .order("created_at", { ascending: false })
     .limit(filter.limit ?? 200);
 
+  const like = (v?: string) => {
+    const t = v?.trim();
+    return t ? `%${t}%` : null;
+  };
+
   if (filter.docType) q = q.eq("doc_type", filter.docType);
-  if (filter.branch) q = q.eq("branch", filter.branch);
-  if (filter.year) q = q.eq("year", Number(filter.year));
-  if (filter.keyword?.trim()) {
-    const kw = `%${filter.keyword.trim()}%`;
-    q = q.or(`file_name.ilike.${kw},fault_content.ilike.${kw},facility.ilike.${kw}`);
-  }
+  if (filter.manualType) q = q.eq("manual_type", filter.manualType);
+  if (filter.field) q = q.eq("field", filter.field);
+  // 지사는 목록에서 고르는 값이지만, 예전에 저장된 행에 공백 같은 흔들림이 있을 수
+  // 있어 원본처럼 부분일치로 찾는다 (정확히 일치로 두면 그런 행이 조용히 빠진다)
+  const branch = like(filter.branch);
+  if (branch) q = q.ilike("branch", branch);
+  const facility = like(filter.facility);
+  if (facility) q = q.ilike("facility", facility);
+  const faultContent = like(filter.faultContent);
+  if (faultContent) q = q.ilike("fault_content", faultContent);
+  const fileName = like(filter.fileName);
+  if (fileName) q = q.ilike("file_name", fileName);
+  const authorName = like(filter.authorName);
+  if (authorName) q = q.ilike("author_name", authorName);
 
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as ArchiveRow[];
 }
 
-/** 비공개 버킷이므로 서명 URL 로 열어야 한다 (기본 1시간) */
-export async function getSignedUrl(path: string, seconds = 3600): Promise<string> {
+/**
+ * 비공개 버킷이므로 서명 URL 로 열어야 한다 (기본 1시간).
+ *
+ * download 를 안 주면(기본) 서버가 Content-Disposition: inline 으로 응답해서
+ * 브라우저 내장 PDF 뷰어로 바로 열린다 — 미리보기용. download: true 를 주면
+ * 서버가 Content-Disposition: attachment 로 응답해 곧장 저장 창이 뜬다 —
+ * [다운로드] 버튼용. 같은 파일이라도 둘은 다른 서명 URL 이다(쿼리에 다른
+ * 파라미터가 붙는다).
+ */
+export async function getSignedUrl(
+  path: string,
+  seconds = 3600,
+  options?: { download?: boolean },
+): Promise<string> {
   const client = getDocgenSupabase();
   if (!client) throw new Error("보관함이 설정되지 않았습니다.");
 
   const { data, error } = await client.storage
     .from(DOCGEN_BUCKET)
-    .createSignedUrl(path, seconds);
+    .createSignedUrl(path, seconds, options);
   if (error) throw error;
   return data.signedUrl;
 }

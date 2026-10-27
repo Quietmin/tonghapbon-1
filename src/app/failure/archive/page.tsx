@@ -1,19 +1,10 @@
-import ArchiveBrowser from "@/modules/docgen/components/ArchiveBrowser";
-
-export const metadata = { title: "고장보고서 조회 — 유지보수 마스터" };
+import { redirect } from "next/navigation";
 
 /**
- * 고장보고서 조회 — 문서보관함 화면을 고장 보고서 종류로 고정해 보여 준다.
- * 검색 조건과 표 서식은 보관함 원본과 동일하다 (ArchiveBrowser 한 벌을 공유).
+ * 고장보고서 조회는 챕터 첫 화면(/failure)이 되었다.
+ * 같은 화면이 두 주소를 갖지 않도록 여기서는 넘기기만 한다 — 이미 공유했거나
+ * 즐겨찾기한 링크가 끊기지 않게 경로 자체는 남겨 둔다.
  */
-export default function FailureArchivePage() {
-  return (
-    <ArchiveBrowser
-      fixedType="fault"
-      heading={{
-        title: "고장보고서 조회",
-        desc: "출력한 고장 보고서 PDF가 자동 저장됩니다. 지사·연도·키워드(파일명·고장내용·설비명)로 찾아보세요.",
-      }}
-    />
-  );
+export default function FailureArchiveRedirect() {
+  redirect("/failure");
 }

@@ -285,7 +285,7 @@ export default function ProjectSettings() {
                   />
                   {p.name}
                   {isActive && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    <span className="text-[11px] md:text-[12px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                       보고 있는 회차
                     </span>
                   )}

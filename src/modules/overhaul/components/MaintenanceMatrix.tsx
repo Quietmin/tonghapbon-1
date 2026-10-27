@@ -249,7 +249,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 계약변경 등으로 보수하지 않음 (확인된 사실)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-on-surface-variant bg-surface-container-highest ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface-variant bg-surface-container-highest ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -261,7 +261,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 실적으로 확인된 보수${cell.done ? ` (${cell.done}급)` : ""}`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-on-primary ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-primary ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         } bg-status-success`}
       >
@@ -273,7 +273,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 관리계획 엑셀상 ${cell.planned}급 (실적 미확인)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-on-surface bg-primary/15 border border-primary/30 ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface bg-primary/15 border border-primary/30 ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -285,7 +285,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 과거 등급이 반복되는 패턴을 찾아 추정한 등급 (확정 아님 — 확인 권장)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-status-info border border-dashed border-status-info/50 ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-status-info border border-dashed border-status-info/50 ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -297,7 +297,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 반복 패턴이 확인되지 않아 등급을 추정할 수 없음 — 확인 필요`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-on-surface-variant border border-dashed border-outline-variant ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface-variant border border-dashed border-outline-variant ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -321,6 +321,10 @@ export default function MaintenanceMatrix() {
   const [q, setQ] = useState("");
   const [onlyAttention, setOnlyAttention] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(false);
+  /** 연도 축 — 기본은 기준년도 ±2년(5개년), 전체 이력이 필요할 때만 펼친다.
+      데이터는 이미 전체 연도로 받아 두므로 화면에서 열만 접는다(토글 즉시 반응). */
+  const [allYears, setAllYears] = useState(false);
+  const [baseYear, setBaseYear] = useState<number | null>(null);
   /** null = 폼 닫힘 · "new" = 추가 모드 · 그 외 = 그 행을 수정하는 모드 */
   const [formTarget, setFormTarget] = useState<MatrixRow | "new" | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -384,10 +388,18 @@ export default function MaintenanceMatrix() {
     });
   }, [data, field, q, onlyAttention]);
 
+  const center = baseYear ?? data?.thisYear ?? new Date().getFullYear();
+  const visibleYears = useMemo(() => {
+    if (!data) return [];
+    if (allYears) return data.years;
+    return data.years.filter((y) => y >= center - 2 && y <= center + 2);
+  }, [data, allYears, center]);
+
   const exportExcel = () => {
     if (!data) return;
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     exportMaintenanceMatrix({
+      // 화면이 5개년으로 접혀 있어도 엑셀은 전체 연도로 — 보관·보고용 원본이므로
       years: data.years,
       rows: visible,
       fileName: `설비별_장기보수현황_${field}_${stamp}.xlsx`,
@@ -520,6 +532,31 @@ export default function MaintenanceMatrix() {
           />
           <span className="text-sm font-semibold text-on-surface">사용중지 포함</span>
         </label>
+        <select
+          value={center}
+          disabled={allYears}
+          onChange={(e) => {
+            const y = Number(e.target.value);
+            setBaseYear(y === data.thisYear ? null : y);
+          }}
+          title="기준년도 — 이 해를 가운데에 두고 앞뒤 2년씩 보여줍니다"
+          className="h-11 px-3 rounded-xl bg-surface-container-low text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+        >
+          {data.years.map((y) => (
+            <option key={y} value={y}>
+              기준 {y}년{y === data.thisYear ? " (올해)" : ""}
+            </option>
+          ))}
+        </select>
+        <label className="flex items-center gap-2 px-4 h-11 rounded-xl bg-surface-container-low cursor-pointer whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={allYears}
+            onChange={(e) => setAllYears(e.target.checked)}
+            className="w-4 h-4"
+          />
+          <span className="text-sm font-semibold text-on-surface">전체 연도</span>
+        </label>
         <Button variant="ghost" onClick={exportExcel} disabled={!visible.length}>
           <Icon name="table_view" className="text-base" />
           엑셀로 내보내기
@@ -549,7 +586,7 @@ export default function MaintenanceMatrix() {
           <div className="overflow-x-auto">
             <table className="text-left border-collapse">
               <thead>
-                <tr className="text-on-surface-variant text-[11px] font-semibold uppercase tracking-widest border-b border-border-subtle">
+                <tr className="text-on-surface-variant text-[11px] md:text-[12px] font-semibold uppercase tracking-widest border-b border-border-subtle">
                   <th className="py-3 pl-card-padding pr-3 sticky left-0 bg-surface-container-lowest z-10 min-w-[220px]">
                     대분류 / 설비명
                   </th>
@@ -560,7 +597,7 @@ export default function MaintenanceMatrix() {
                   <th className="py-3 px-3 min-w-[90px]">준공년도</th>
                   <th className="py-3 px-3 min-w-[150px]">다음 예정 · 상태</th>
                   <th className="py-3 px-3 min-w-[80px]">관리</th>
-                  {data.years.map((y) => (
+                  {visibleYears.map((y) => (
                     <th
                       key={y}
                       className={`py-3 text-center w-11 font-mono-data ${
@@ -587,12 +624,12 @@ export default function MaintenanceMatrix() {
                     <td className="py-2 pl-card-padding pr-3 sticky left-0 bg-surface-container-lowest z-10">
                       <div className="flex items-center gap-1.5">
                         {r.field && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
+                          <span className="text-[10px] md:text-[12px] font-bold px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
                             {r.field}
                           </span>
                         )}
                         {!r.isActive && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-error/10 text-error">
+                          <span className="text-[10px] md:text-[12px] font-bold px-1.5 py-0.5 rounded bg-error/10 text-error">
                             사용중지
                           </span>
                         )}
@@ -600,7 +637,7 @@ export default function MaintenanceMatrix() {
                       <p className="font-semibold text-on-surface text-sm truncate max-w-[200px]">
                         {r.name}
                       </p>
-                      <p className="text-[11px] text-on-surface-variant truncate max-w-[200px]">
+                      <p className="text-[11px] md:text-[12px] text-on-surface-variant truncate max-w-[200px]">
                         {r.category ?? "—"}
                       </p>
                     </td>
@@ -659,11 +696,13 @@ export default function MaintenanceMatrix() {
                         </button>
                       </div>
                     </td>
-                    {r.cells.map((c) => (
-                      <td key={c.year} className="py-2 text-center">
-                        <GradeCell cell={c} isThisYear={c.year === data.thisYear} />
-                      </td>
-                    ))}
+                    {r.cells
+                      .filter((c) => allYears || (c.year >= center - 2 && c.year <= center + 2))
+                      .map((c) => (
+                        <td key={c.year} className="py-2 text-center">
+                          <GradeCell cell={c} isThisYear={c.year === data.thisYear} />
+                        </td>
+                      ))}
                   </tr>
                 ))}
               </tbody>

@@ -12,7 +12,7 @@ export default function DocgenArchivePage() {
     <ArchiveBrowser
       heading={{
         title: "보관함 조회",
-        desc: "출력한 PDF가 자동 저장됩니다. 로그인 없이 누구나 지사·연도·종류별로 지난 문서를 찾아볼 수 있습니다.",
+        desc: "출력한 PDF가 자동 저장됩니다. 로그인 없이 누구나 종류·지사·분야·작성자·파일명으로 지난 문서를 찾아볼 수 있습니다.",
       }}
     />
   );

@@ -11,7 +11,7 @@
  *
  * ⚠️ 캐시를 통째로 비우고 싶으면 CACHE_VERSION 을 올리세요.
  */
-var CACHE_VERSION = 'v1';
+var CACHE_VERSION = 'v2';
 var CACHE = 'plant-ops-' + CACHE_VERSION;
 
 /* 오프라인에서도 껍데기가 뜨도록 미리 받아 두는 것들.

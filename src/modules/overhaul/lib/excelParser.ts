@@ -116,9 +116,11 @@ const EQUIP_TO_FIELD: Record<string, string> = {
 // 4. 설비 자동 분류 (PRD 6.7)
 // ---------------------------------------------------------------------------
 const EQUIPMENT_RULES: { equipment: string; keywords: string[] }[] = [
+  // HRSG를 GT·ST보다 먼저 본다 — 공백을 지운 "hrsgtube" 같은 문자열에
+  // "gt"가 부분일치로 걸려서, 뒤에 두면 HRSG 작업이 GT로 분류된다.
+  { equipment: "HRSG", keywords: ["hrsg", "배열회수"] },
   { equipment: "GT", keywords: ["gt", "gasturbine", "가스터빈"] },
   { equipment: "ST", keywords: ["st", "steamturbine", "증기터빈"] },
-  { equipment: "HRSG", keywords: ["hrsg", "배열회수"] },
   { equipment: "DH", keywords: ["dh", "지역난방", "열공급"] },
   { equipment: "발전기", keywords: ["generator", "발전기"] },
   { equipment: "전기설비", keywords: ["차단기", "변압기", "mcc", "전동기", "breaker", "transformer", "motor", "수배전"] },
@@ -376,8 +378,13 @@ function analyzeSheet(
       continue;
     }
 
+    // 행 자체의 텍스트(작업명·규격·태그)로 먼저 분류하고, 시트명 힌트는 보조로만 쓴다.
+    // 시트명을 앞세우면 "기계 (GT·ST)" 같은 혼합 시트에서 변압기·DCS 작업까지
+    // 전부 GT로 쓸려 들어간다.
     const equipment =
-      classifyEquipment([hint, cleanName, spec, tag]) || (EQUIP_TO_FIELD[hint] ? hint : null);
+      classifyEquipment([cleanName, spec, tag]) ||
+      classifyEquipment([hint]) ||
+      (EQUIP_TO_FIELD[hint] ? hint : null);
     const field = classifyField(equipment, [hint, cleanName, spec, tag, fileName]);
 
     const issues: string[] = [];

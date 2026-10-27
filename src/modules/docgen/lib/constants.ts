@@ -13,10 +13,22 @@ export const MODE_LABELS: Record<DocMode, string> = {
   fault: "고장 보고서",
 };
 
+/**
+ * 화면 제목("매뉴얼 작성")에 쓰는 이름.
+ * MODE_LABELS 와 따로 두는 이유: 보관함 표의 '종류' 칸에는 "고장 보고서"라고
+ * 띄어 쓰는 게 읽기 좋은데, 메뉴와 제목은 "고장보고서 작성"으로 붙여 쓴다.
+ * 한쪽을 고치면 다른 쪽 표기가 함께 어긋나므로 이름을 나눠 둔다.
+ */
+export const MODE_TITLES: Record<DocMode, string> = {
+  report: "사진대장",
+  manual: "매뉴얼",
+  fault: "고장보고서",
+};
+
 export const MODE_PLACEHOLDERS: Record<DocMode, string> = {
   report: "예: 사진대장",
-  manual: "예: 현장 매뉴얼",
-  fault: "예: 고장 보고서",
+  manual: "제목을 입력하세요.",
+  fault: "제목을 입력하세요.",
 };
 
 export const BRANCHES = [
@@ -49,13 +61,6 @@ export function sortKorean(values: string[]): string[] {
   head.sort((a, b) => a.localeCompare(b, "ko"));
   return head.concat(tail);
 }
-
-/**
- * 지사는 대부분 양산지사에서 작성하므로 기본값으로 넣어 둔다.
- * 분야는 초기값을 두지 않는다 — 기본값이 들어가 있으면 고르지 않고 지나쳐도
- * 그 값이 그대로 문서에 찍혀, 틀린 분야가 조용히 출력된다. (원본 주석 유지)
- */
-export const DEFAULT_BRANCH = "양산지사";
 
 /** 사진 최대 장수 — 원본과 동일 */
 export const MAX_PHOTOS = 30;

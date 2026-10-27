@@ -49,6 +49,7 @@ export async function POST(req: Request) {
           branch,
           sheetCount: parsed.sheetCount,
           items: parsed.items,
+          fileData: buf,
         });
         sourceId = saved.sourceId;
       }

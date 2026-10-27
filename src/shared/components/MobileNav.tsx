@@ -2,28 +2,53 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Icon } from "./ui";
 import { NAV_GROUPS, isActive, type NavItem } from "@/shared/lib/nav";
 
-// 모바일에서는 하위 메뉴까지 담을 공간이 없어 홈 + 메인 메뉴 3개만 노출한다.
+// 모바일에서는 하위 메뉴까지 담을 공간이 없어 홈 + 메인 메뉴(챕터)만 노출한다.
 // 챗봇은 탭이 아니라 떠 있는 도크(ChatbotDock)라 여기 없다 — 그래서 탭이 4개로
 // 줄어 앱 하단탭 그대로의 모양이 된다.
 const TABS = [
-  { href: "/", label: "홈", icon: "home", items: [] as NavItem[] },
+  { href: "/", label: "홈", accent: "primary" as const, items: [] as NavItem[] },
   ...NAV_GROUPS.map((g) => ({
     href: g.root,
-    label: g.short ?? g.label,
-    icon: g.icon,
+    // 아이콘을 없애고 글자만 쓰므로 줄인 이름(short) 대신 온전한 이름을 쓴다 —
+    // "설비"보다 "설비관리"가 한눈에 또렷하다.
+    label: g.label,
+    // 켜진 탭을 챕터 색으로 — 데스크톱 사이드바와 같은 색이라 기기를 옮겨도 같게 읽힌다
+    accent: g.accent,
     // 대표 경로 밖의 하위 메뉴(설비관리의 /overhaul 화면들)에서도 탭이 켜지도록
     items: g.items,
   })),
 ];
 
+const TAB_ACTIVE = {
+  primary: "text-primary",
+  tertiary: "text-tertiary",
+} as const;
+
+const TAB_ACTIVE_CHIP = {
+  primary: "bg-primary-fixed",
+  tertiary: "bg-tertiary-fixed",
+} as const;
+
+/**
+ * "매뉴얼관리"만 다른 탭보다 한 글자 길어 한 줄로는 비좁다. 그 한 탭만 두 줄로
+ * 접고 글자를 살짝 줄인다 — 나머지 세 탭은 원래 크기·한 줄 그대로 둔다.
+ */
+const TWO_LINE_LABEL: Record<string, string> = {
+  "/manual": "매뉴얼\n관리",
+};
+
 export default function MobileNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-glass backdrop-blur-xl border-t border-border-subtle flex justify-around items-center z-50 print:hidden">
+    // min-h-16(고정 h-16 아님) + 안전영역 padding — 홈버튼이 없는 아이폰(설치해서
+    // 쓸 때 특히)은 화면 맨 아래에 제스처로 홈 가는 밀어올리기 구역이 있다. 탭을
+    // 거기 바짝 붙이면 손가락이 걸리거나 시스템 제스처와 겹친다. viewport-fit=cover
+    // (layout.tsx) 를 켜 둬야 env(safe-area-inset-bottom) 가 0 이 아닌 실제 값을
+    // 준다 — 둘이 짝이다.
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 min-h-16 pb-[env(safe-area-inset-bottom)] bg-surface-glass backdrop-blur-xl border-t border-border-subtle flex items-stretch gap-1 px-2 z-50 print:hidden">
       {TABS.map((tab) => {
         // 홈은 정확히 일치할 때만 — 아니면 모든 경로에서 홈이 활성으로 보인다
         const active =
@@ -32,17 +57,29 @@ export default function MobileNav() {
             : pathname === tab.href ||
               pathname.startsWith(`${tab.href}/`) ||
               tab.items.some((it) => isActive(pathname, it));
+        const twoLine = TWO_LINE_LABEL[tab.href];
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            // min-w-0 + truncate — short 를 안 넣은 항목이 생겨도 하단바가 넘치지 않게 한다
-            className={`flex flex-col items-center gap-0.5 px-1 min-w-0 flex-1 ${
-              active ? "text-primary" : "text-on-surface-variant"
-            }`}
+            // 아이콘 없이 글자만 — 세로로 쌓던 두 줄(아이콘+캡션)이 한 줄로 줄어
+            // 글자를 더 키울 여유가 생겼다. min-w-0 + truncate 로 넘침만 막는다.
+            className="flex items-center justify-center min-w-0 flex-1 py-2"
           >
-            <Icon name={tab.icon} className="text-xl" />
-            <span className="text-[10px] font-semibold truncate max-w-full">{tab.label}</span>
+            {/* 글자 색뿐 아니라 옅은 배경 칩도 같이 켜서 "지금 여기" 를 또렷하게 한다 */}
+            <span
+              className={`px-1.5 py-1.5 max-w-full text-center transition-colors ${
+                twoLine
+                  ? "rounded-2xl text-xs leading-tight whitespace-pre-line"
+                  : "rounded-full text-sm truncate"
+              } ${
+                active
+                  ? `${TAB_ACTIVE[tab.accent]} ${TAB_ACTIVE_CHIP[tab.accent]} font-bold`
+                  : "text-on-surface-variant font-semibold"
+              }`}
+            >
+              {twoLine ?? tab.label}
+            </span>
           </Link>
         );
       })}

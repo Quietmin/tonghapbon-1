@@ -1,0 +1,14 @@
+/**
+ * 부서 목록 — 지사(branches.ts)와 함께 "내 정보"(지사·부서)를 이루는 값이다.
+ *
+ * 현황관리의 담당부서 선택지이자, 처음 접속할 때 고르는 내 부서의 선택지다. 업무망에서
+ * 실제 로그인이 붙으면 이 목록은 조직 정보에서 오겠지만, 그때까지는 여기 한 곳이 기준이다.
+ * (DB 에는 부서 이름을 그대로 저장하므로 목록을 바꿔도 기존 행은 남는다)
+ */
+export const DEPARTMENTS = ["운영부", "계전부", "기계부", "공무부"] as const;
+
+export type Department = (typeof DEPARTMENTS)[number];
+
+export function isDepartment(v: unknown): v is Department {
+  return typeof v === "string" && (DEPARTMENTS as readonly string[]).includes(v);
+}

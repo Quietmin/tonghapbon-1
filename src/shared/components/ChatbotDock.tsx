@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   createContext,
@@ -203,7 +202,8 @@ export default function ChatbotDock() {
       role="dialog"
       aria-label="정비 챗봇"
       className={[
-        "print:hidden fixed z-[200] flex flex-col bg-surface-container border border-border-subtle shadow-2xl",
+        // 떠 있는 판이라 카드와 같은 흰색이어야 바탕 위에 올라앉은 것으로 읽힌다
+      "print:hidden fixed z-[200] flex flex-col bg-surface-container-lowest border border-border-subtle shadow-2xl",
         // 모바일: 하단 시트 (하단탭 위에 붙는다)
         "inset-x-0 bottom-16 h-[70vh] rounded-t-2xl",
         // 데스크톱: 우하단 패널
@@ -216,14 +216,6 @@ export default function ChatbotDock() {
         </span>
         <span className="text-title-sm text-on-surface flex-1 truncate">정비 챗봇 (따소미)</span>
 
-        <Link
-          href="/chatbot"
-          aria-label="전체화면으로 열기"
-          title="전체화면으로 열기"
-          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
-        >
-          <Icon name="open_in_full" className="text-base" />
-        </Link>
         <button
           type="button"
           onClick={() => setState("bubble")}

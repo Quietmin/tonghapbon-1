@@ -66,12 +66,16 @@ const BAR_STYLE = {
 } as const;
 type BarColor = keyof typeof BAR_STYLE;
 
-const FIELD_BAR: Record<string, BarColor> = { 기계: "primary", 전기: "success", 제어: "info" };
-
+/**
+ * 막대·퍼센트 색 — 범례와 1:1로 맞춘다. 초록은 완료, 빨강은 지연만 뜻한다.
+ *
+ * 분야별 색(전기=초록)을 쓰면 0%인 전기 작업이 초록으로 칠해져 "완료"로 읽힌다.
+ * 분야는 그룹 머리의 칩으로 이미 구분되므로 막대 색까지 쓰지 않는다.
+ */
 function barColorOf(row: Row): BarColor {
   if (row.actual >= 100) return "success";
   if (row.behind) return "error";
-  return FIELD_BAR[row.field ?? ""] ?? "primary";
+  return "primary";
 }
 
 /** 기간 눈금 생성 (약 6~8개) */
@@ -214,10 +218,10 @@ export default function Schedule() {
           <EmptyState
             icon="calendar_view_week"
             title="공정표를 생성할 작업이 없습니다"
-            desc="먼저 업로드 분석에서 설계내역서를 올려 작업항목을 만드세요."
+            desc="먼저 엑셀 등록 탭에서 설계내역서를 올려 작업항목을 만드세요."
             action={
               <Link
-                href="/overhaul/upload"
+                href="/overhaul/tasks/upload"
                 className="px-4 py-2.5 rounded-xl font-bold text-sm inline-flex items-center gap-2 bg-primary text-on-primary hover:opacity-90"
               >
                 업로드 분석으로
@@ -332,7 +336,7 @@ export default function Schedule() {
         <Card lift={false} className="p-card-padding">
           <div className="flex items-center gap-3">
             <Icon name="event_busy" className="text-status-warning" />
-            <Link href="/overhaul/upload" className="text-primary text-sm font-semibold hover:underline">
+            <Link href="/overhaul/tasks/upload" className="text-primary text-sm font-semibold hover:underline">
               계약기간 설정하러 가기
             </Link>
           </div>
@@ -402,7 +406,7 @@ export default function Schedule() {
               <div className="min-w-[760px]">
                 {/* 타임라인 헤더 */}
                 <div className="flex items-stretch border-b border-border-subtle pb-2 mb-2">
-                  <div className="w-[220px] shrink-0 text-[12px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end">
+                  <div className="w-[220px] shrink-0 text-[12px] md:text-[13px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end">
                     설비 / 작업
                   </div>
                   <div className="relative flex-1 h-8">
@@ -412,10 +416,10 @@ export default function Schedule() {
                         className="absolute top-0 bottom-0 flex flex-col items-center -translate-x-1/2"
                         style={{ left: pos(d) }}
                       >
-                        <span className="text-[10px] text-on-surface-variant whitespace-nowrap">
+                        <span className="text-[10px] md:text-[12px] text-on-surface-variant whitespace-nowrap">
                           {startDate ? ymd(addDays(toDate(startDate), d)).slice(5) : ""}
                         </span>
-                        <span className="text-[9px] text-on-surface-variant/60">D+{d}</span>
+                        <span className="text-[9px] md:text-[12px] text-on-surface-variant/60">D+{d}</span>
                       </div>
                     ))}
                   </div>
@@ -428,7 +432,7 @@ export default function Schedule() {
                     className="absolute top-0 bottom-0 w-px bg-status-error/70 z-10 pointer-events-none"
                     style={{ left: `calc(220px + (100% - 220px) * ${todayOff / total})` }}
                   >
-                    <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] font-bold text-status-error bg-surface px-1 rounded">
+                    <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] md:text-[12px] font-bold text-status-error bg-surface px-1 rounded">
                       오늘
                     </span>
                   </div>
@@ -464,7 +468,7 @@ export default function Schedule() {
                               />
                             </div>
                             <span
-                              className="absolute top-1/2 -translate-y-1/2 text-[10px] font-bold text-on-surface-variant"
+                              className="absolute top-1/2 -translate-y-1/2 text-[10px] md:text-[12px] font-bold text-on-surface-variant"
                               style={{ left: `calc(${pos(g.maxOff)} + 6px)` }}
                             >
                               {g.progress}%
@@ -477,6 +481,9 @@ export default function Schedule() {
                           g.list.map((r) => {
                             const barColor = barColorOf(r);
                             const labelOff = Math.max(r.sch.endOff, r.actualBar?.endOff || 0);
+                            // 계획 종료일이 며칠 지났는지 — 날짜를 다시 파싱하지 않고
+                            // 서버가 준 오프셋끼리 빼서 구한다 (시간대 영향 없음)
+                            const overdueDays = data.todayOff - r.sch.endOff;
                             return (
                               <div
                                 key={r.id}
@@ -491,11 +498,23 @@ export default function Schedule() {
                                     <p className="text-xs font-medium text-on-surface truncate group-hover:text-primary transition-colors">
                                       {r.name}
                                     </p>
-                                    {r.actual >= 100 && (
-                                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-success/15 text-status-success shrink-0 flex items-center gap-0.5">
-                                        <Icon name="check" className="text-[10px]" /> 완료
+                                    {r.actual >= 100 ? (
+                                      <span className="px-1.5 py-0.5 rounded-full text-[9px] md:text-[12px] font-bold bg-status-success/15 text-status-success shrink-0 flex items-center gap-0.5">
+                                        <Icon name="check" className="text-[10px] md:text-[12px]" /> 완료
                                       </span>
-                                    )}
+                                    ) : r.behind ? (
+                                      <span
+                                        title={
+                                          overdueDays > 0
+                                            ? `계획 종료일(${r.sch.plannedEndStr})에서 ${overdueDays}일 지났습니다`
+                                            : "오늘까지 나갔어야 할 계획 진도보다 뒤처졌습니다"
+                                        }
+                                        className="px-1.5 py-0.5 rounded-full text-[9px] md:text-[12px] font-bold bg-status-error/15 text-status-error shrink-0 flex items-center gap-0.5"
+                                      >
+                                        <Icon name="warning" className="text-[10px] md:text-[12px]" />
+                                        {overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
+                                      </span>
+                                    ) : null}
                                     <button
                                       title="계획일정 조정"
                                       onClick={(e) => {
@@ -508,11 +527,11 @@ export default function Schedule() {
                                       <Icon name="edit_calendar" className="text-sm" />
                                     </button>
                                   </div>
-                                  <p className="text-[10px] text-on-surface-variant font-mono-data flex items-center gap-1">
+                                  <p className="text-[10px] md:text-[12px] text-on-surface-variant font-mono-data flex items-center gap-1">
                                     계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}
                                     {r.sch.source === "excel" && (
                                       <span
-                                        className="text-[9px] font-bold text-primary not-italic"
+                                        className="text-[9px] md:text-[12px] font-bold text-primary not-italic"
                                         title="엑셀에서 받았거나 손으로 지정한 일정"
                                       >
                                         지정
@@ -520,7 +539,7 @@ export default function Schedule() {
                                     )}
                                   </p>
                                   <p
-                                    className={`text-[10px] font-mono-data ${
+                                    className={`text-[10px] md:text-[12px] font-mono-data ${
                                       r.actualBar ? BAR_STYLE[barColor].text : "text-on-surface-variant/50"
                                     }`}
                                   >
@@ -564,7 +583,7 @@ export default function Schedule() {
                                   )}
                                   {/* 진행률 라벨 */}
                                   <span
-                                    className={`absolute top-[13px] text-[10px] font-bold ${BAR_STYLE[barColor].text}`}
+                                    className={`absolute top-[13px] text-[10px] md:text-[12px] font-bold ${BAR_STYLE[barColor].text}`}
                                     style={{ left: `calc(${pos(labelOff)} + 6px)` }}
                                   >
                                     {r.actual}%

@@ -1,77 +1,103 @@
 @import "tailwindcss";
 
 /*
- * PlantSync Pro의 Stitch "Lumina Overhaul Director" 디자인 토큰을
- * Tailwind 4의 CSS-first 방식(@theme)으로 이식한 것.
- * 원본: legacy/plantsync/tailwind.config.js
+ * DESIGN.md("Supabaze" 계열 — 흰 바탕·그레이 사다리·에메랄드 단색 포인트)를
+ * 이 앱의 기존 시맨틱 토큰 이름 위에 이식한 것. 값만 바꿨으므로 컴포넌트는
+ * 거의 손대지 않고 전체 톤이 따라온다.
+ *
+ * 다만 이 앱은 카드가 빽빽한 입력·조회 화면이 대부분이라 DESIGN.md의 순수
+ * "흰 바탕 위 흰 카드"는 그대로 가져오지 않았다 — 예전에 이미 한번 겪은
+ * 문제라(바탕 #f9f9ff가 카드 흰색과 거의 같아 목록·입력 카드 경계가 안 보였다),
+ * 바탕은 canvas-soft(#fafafa) 한 단계, 카드는 순백(#ffffff) + 헤어라인
+ * 테두리로 분리해 둔다 — DESIGN.md도 카드마다 1px 헤어라인을 쓰므로 정신은
+ * 같다.
  */
 @theme {
-  --color-background: #f9f9ff;
-  --color-on-background: #181c23;
+  --color-background: #fafafa;
+  --color-on-background: #171717;
 
-  --color-surface: #f9f9ff;
-  --color-surface-bright: #f9f9ff;
-  --color-surface-dim: #d8d9e5;
-  --color-surface-glass: rgba(255, 255, 255, 0.7);
-  --color-surface-variant: #e0e2ed;
+  --color-surface: #ffffff;
+  --color-surface-bright: #ffffff;
+  --color-surface-dim: #e5e5e5;
+  --color-surface-glass: rgba(255, 255, 255, 0.88);
+  --color-surface-variant: #f0f0f0;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f1f3fe;
-  --color-surface-container: #ecedf9;
-  --color-surface-container-high: #e6e8f3;
-  --color-surface-container-highest: #e0e2ed;
-  --color-on-surface: #181c23;
-  --color-on-surface-variant: #414755;
-  --color-inverse-surface: #2d3039;
-  --color-inverse-on-surface: #eef0fc;
-  --color-surface-tint: #005bc1;
+  --color-surface-container-low: #fafafa;
+  --color-surface-container: #f5f5f5;
+  --color-surface-container-high: #ededed;
+  --color-surface-container-highest: #e5e5e5;
+  --color-on-surface: #171717;
+  --color-on-surface-variant: #707070;
+  --color-inverse-surface: #1c1c1c;
+  --color-inverse-on-surface: #ffffff;
+  --color-surface-tint: #28366b;
 
-  --color-primary: #0058bc;
-  --color-primary-container: #0070eb;
-  --color-primary-fixed: #d8e2ff;
-  --color-primary-fixed-dim: #adc6ff;
+  /*
+   * 남색 — 이 앱의 시그니처 포인트색(DESIGN.md의 "단색 포인트" 틀은 유지하되
+   * 색相만 에메랄드 그린에서 남색으로 바꿨다). 남색은 그 자체로 충분히
+   * 어두워서 에메랄드 때와 반대로 on-primary 를 다시 흰색으로 둔다 — 짙은
+   * 바탕엔 흰 글씨가 또렷하다(DESIGN.md 의 "밝은 포인트색엔 짙은 글씨" 규칙은
+   * 포인트색이 밝을 때만 적용되는 예외였다).
+   */
+  --color-primary: #28366b;
+  --color-primary-container: #1c2850;
+  --color-primary-fixed: #dde3f5;
+  --color-primary-fixed-dim: #aab7e0;
   --color-on-primary: #ffffff;
-  --color-on-primary-container: #fefcff;
-  --color-on-primary-fixed: #001a41;
-  --color-on-primary-fixed-variant: #004493;
-  --color-inverse-primary: #adc6ff;
+  --color-on-primary-container: #ffffff;
+  --color-on-primary-fixed: #15204a;
+  --color-on-primary-fixed-variant: #28366b;
+  --color-inverse-primary: #8fa0e0;
 
-  --color-secondary: #5d5e60;
-  --color-secondary-container: #dfdfe1;
-  --color-secondary-fixed: #e2e2e4;
-  --color-secondary-fixed-dim: #c6c6c8;
+  --color-secondary: #707070;
+  --color-secondary-container: #ededed;
+  --color-secondary-fixed: #f0f0f0;
+  --color-secondary-fixed-dim: #d4d4d4;
   --color-on-secondary: #ffffff;
-  --color-on-secondary-container: #616365;
-  --color-on-secondary-fixed: #1a1c1d;
-  --color-on-secondary-fixed-variant: #454749;
+  --color-on-secondary-container: #171717;
+  --color-on-secondary-fixed: #171717;
+  --color-on-secondary-fixed-variant: #707070;
 
-  --color-tertiary: #9e3d00;
-  --color-tertiary-container: #c64f00;
-  --color-tertiary-fixed: #ffdbcc;
-  --color-tertiary-fixed-dim: #ffb595;
+  /*
+   * 고장관리 챕터 전용 강조색(ACCENT_STYLE 참고) — DESIGN.md 원칙("포인트색은
+   * 하나")과 충돌하지만, 고장 보고서는 사고 기록이라 매뉴얼·설비와 섞이면 안
+   * 된다는 기존 결정을 유지하기로 했다. 대신 채도를 낮춰 에메랄드·그레이
+   * 사다리 옆에서도 튀지 않고 "차분한 경고"로 읽히게 한다.
+   */
+  --color-tertiary: #b23a0e;
+  --color-tertiary-container: #d9480f;
+  --color-tertiary-fixed: #fde4d4;
+  --color-tertiary-fixed-dim: #f3b494;
   --color-on-tertiary: #ffffff;
-  --color-on-tertiary-container: #fffbff;
-  --color-on-tertiary-fixed: #351000;
-  --color-on-tertiary-fixed-variant: #7c2e00;
+  --color-on-tertiary-container: #ffffff;
+  --color-on-tertiary-fixed: #5c1d04;
+  --color-on-tertiary-fixed-variant: #8a2d08;
 
   --color-error: #ba1a1a;
   --color-error-container: #ffdad6;
   --color-on-error: #ffffff;
   --color-on-error-container: #93000a;
 
-  --color-outline: #717786;
-  --color-outline-variant: #c1c6d7;
-  --color-border-subtle: rgba(0, 0, 0, 0.1);
+  --color-outline: #9a9a9a;
+  --color-outline-variant: #d4d4d4;
+  --color-border-subtle: rgba(0, 0, 0, 0.09);
 
   --color-status-success: #34c759;
   --color-status-warning: #ff9500;
   --color-status-error: #ff3b30;
   --color-status-info: #5856d6;
 
-  --radius-sm: 0.25rem;
+  /*
+   * DESIGN.md 라운드 스케일(xs4·sm6·md8·lg12·xl16, pill은 뱃지·아바타 전용).
+   * sm(6px)은 코드에서 안 쓰던 값이라 버튼(ui.tsx Button/ButtonLink)을
+   * rounded-xl → rounded-sm 으로 같이 바꿔서 "각지지 않은 6px 버튼" 시그니처를
+   * 실제로 반영했다.
+   */
+  --radius-sm: 0.375rem;
   --radius-DEFAULT: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 
   --spacing-unit: 8px;
   --spacing-card-padding: 24px;
@@ -82,34 +108,59 @@
   --font-sans: Inter, Pretendard, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
+  /*
+   * 제목 줄 굵기를 700대에서 500으로 낮췄다 — DESIGN.md 원칙("display 는
+   * 500을 넘지 않는다, 600부터는 브랜드가 깨진다"). 폰트는 그대로 Pretendard라
+   * Weight 500(Medium)도 한글에서 충분히 또렷하다.
+   */
   --text-display-lg: 34px;
   --text-display-lg--line-height: 41px;
   --text-display-lg--letter-spacing: -0.02em;
-  --text-display-lg--font-weight: 700;
+  --text-display-lg--font-weight: 500;
   --text-headline-md: 24px;
   --text-headline-md--line-height: 30px;
   --text-headline-md--letter-spacing: -0.01em;
-  --text-headline-md--font-weight: 600;
+  --text-headline-md--font-weight: 500;
   --text-title-sm: 17px;
   --text-title-sm--line-height: 22px;
-  --text-title-sm--font-weight: 600;
+  --text-title-sm--font-weight: 500;
   --text-body-md: 15px;
   --text-body-md--line-height: 20px;
+  /* Tailwind 기본값과 같다 — 아래 md 이상 블록에서 한 단계 올리기 위해 명시해 둔다 */
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
   --text-label-caps: 12px;
   --text-label-caps--line-height: 16px;
   --text-label-caps--letter-spacing: 0.05em;
-  --text-label-caps--font-weight: 600;
+  --text-label-caps--font-weight: 500;
   --text-mono-data: 13px;
   --text-mono-data--line-height: 18px;
 
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0 10px 25px rgba(0, 0, 0, 0.06);
+  /* DESIGN.md elevation 사다리(Level 1 카드 리프트 / Level 2 떠 있는 카드) */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
 
   --container-content: 1440px;
 }
 
 :root {
   color-scheme: light;
+}
+
+/*
+ * 데스크톱(md 이상) 가독성 보정 — 모바일은 위 @theme 값 그대로 둔다.
+ * 한글은 12px 아래에서 획이 뭉개지고, 보조 글자색 #707070(대비 4.7:1)은 작은
+ * 글자에서 흐려 보여 PC 화면에서만 한 단계 올린다. 소스에 박힌 text-[9~12px]
+ * 는 md:text-[12~13px] 를 덧붙여 같은 기준을 따른다.
+ */
+@media (min-width: 768px) {
+  :root {
+    --text-body-md: 16px;
+    --text-body-md--line-height: 22px;
+    --text-xs: 13px;
+    --text-xs--line-height: 18px;
+    --color-on-surface-variant: #595959;
+  }
 }
 
 html,
@@ -124,18 +175,78 @@ body {
   font-family: var(--font-mono);
 }
 
+/* 모바일 챕터 서브내비(ChapterSubNav) — 가로 스크롤은 되지만 막대는 숨긴다 */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .material-symbols-outlined {
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
   user-select: none;
 }
 
+/* 첫 화면 로딩 게이트 — layout.tsx 의 인라인 스크립트가 html 클래스를 토글한다.
+   아이콘이 합자(ligature)라 폰트 전에는 이름이 글자로 보이므로, 준비될 때까지
+   셸을 감추고 스피너만 띄운다. 두 클래스가 모두 없으면(자바스크립트 꺼짐)
+   평소대로 보인다 — 못 띄우는 것보다 낫다. */
+#app-splash {
+  display: none;
+}
+.app-loading #app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background-color: var(--color-background);
+}
+.app-loading body > *:not(#app-splash) {
+  visibility: hidden;
+}
+.app-splash-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border-subtle, rgba(0, 0, 0, 0.12));
+  border-top-color: var(--color-primary, #1f3a93);
+  border-radius: 9999px;
+  animation: app-splash-spin 0.7s linear infinite;
+}
+.app-ready body {
+  animation: app-splash-fade 0.18s ease-out;
+}
+@keyframes app-splash-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes app-splash-fade {
+  from {
+    opacity: 0;
+  }
+}
+/* 애니메이션을 줄이도록 설정한 기기에서는 회전·페이드를 멈춘다 */
+@media (prefers-reduced-motion: reduce) {
+  .app-splash-spinner,
+  .app-ready body {
+    animation: none;
+  }
+}
+
 @layer components {
   .glass-card {
-    background: rgba(255, 255, 255, 0.8);
-    /* 접두사는 Lightning CSS가 타깃에 맞춰 붙인다.
-       -webkit- 형을 직접 쓰면 표준 속성이 제거되어 블러가 사라진다. */
-    backdrop-filter: blur(25px);
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    /*
+     * DESIGN.md 카드는 블러 없는 순백 + 헤어라인 한 줄이다. 스크롤 아래
+     * 내용이 비치는 "유리" 느낌은 빼고, 거의 불투명한 흰 배경 + 얇은 테두리로
+     * 크리스프하게 둔다 — 블러를 완전히 0으로 하면 헤더처럼 sticky로 겹쳐
+     * 쓰는 곳(surface-glass)에서 밑 내용이 그대로 비쳐 보이므로 살짝만 남긴다.
+     */
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow: var(--shadow-card);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -148,7 +259,7 @@ body {
     box-shadow: var(--shadow-card);
   }
   .input {
-    @apply w-full h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm text-on-surface outline-none transition-colors focus:border-primary focus:bg-surface-container-lowest;
+    @apply w-full h-11 px-4 rounded-sm bg-surface-container-low border border-border-subtle text-sm text-on-surface outline-none transition-colors focus:border-primary focus:bg-surface-container-lowest;
   }
   textarea.input {
     @apply h-auto py-3 leading-relaxed;

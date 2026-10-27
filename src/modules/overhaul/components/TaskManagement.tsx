@@ -95,7 +95,7 @@ export default function TaskManagement() {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href="/overhaul/upload"
+            href="/overhaul/tasks/upload"
             className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-surface-container-high text-on-surface hover:bg-surface-container-highest border border-border-subtle transition-colors"
           >
             <Icon name="upload_file" className="text-base" />
@@ -201,7 +201,7 @@ export default function TaskManagement() {
           <div className="overflow-x-auto">
             <table className="w-full text-left min-w-[860px]">
               <thead>
-                <tr className="text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest border-b border-border-subtle">
+                <tr className="text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest border-b border-border-subtle">
                   <th className="pb-3 pr-3">설비 / 작업명</th>
                   <th className="pb-3 px-3">규격</th>
                   <th className="pb-3 px-3">계획수량</th>

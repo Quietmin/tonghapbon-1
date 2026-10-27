@@ -183,22 +183,38 @@ export async function saveAnalysis(params: {
   fileName: string;
   fieldHint?: string | null;
   tasks: ParsedTask[];
+  /** 업로드한 엑셀 원본 — 목록에서 다시 내려받기 위해 보관 */
+  fileData?: Uint8Array | null;
 }): Promise<{ sourceId: string; taskCount: number; linkedStatementItems: number }> {
-  const { projectId, fileName, fieldHint, tasks } = params;
+  const { projectId, fileName, fieldHint, tasks, fileData } = params;
 
   const source = await queryOne<{ id: string }>(
-    `insert into overhaul_source (project_id, file_name, field_hint, task_count)
-     values ($1, $2, $3, $4) returning id`,
-    [projectId, fileName, fieldHint ?? null, tasks.length],
+    `insert into overhaul_source (project_id, file_name, field_hint, task_count, file_data)
+     values ($1, $2, $3, $4, $5) returning id`,
+    [projectId, fileName, fieldHint ?? null, tasks.length, fileData ?? null],
   );
   if (!source) throw new Error("업로드 이력을 저장하지 못했습니다.");
 
   // 설비 마스터를 먼저 채운다. '기타'는 분류 실패를 뜻하므로 마스터에 만들지 않는다.
-  const equipMap = await ensureEquipments(
-    tasks
-      .filter((t) => t.equipment && t.equipment !== "기타")
-      .map((t) => ({ name: t.equipment, type: t.equipment, field: t.field === "미분류" ? null : t.field })),
+  // 설비 마스터는 지사에 속하므로 회차의 지사를 따른다 — 지사 없는 옛 회차면
+  // 마스터 등록만 건너뛴다 (작업 저장은 그대로 된다).
+  const project = await queryOne<{ branch: string | null }>(
+    `select branch from overhaul_project where id = $1`,
+    [projectId],
   );
+  const branch = project?.branch ?? null;
+  const equipMap = branch
+    ? await ensureEquipments(
+        tasks
+          .filter((t) => t.equipment && t.equipment !== "기타")
+          .map((t) => ({
+            name: t.equipment,
+            branch,
+            type: t.equipment,
+            field: t.field === "미분류" ? null : t.field,
+          })),
+      )
+    : new Map<string, string>();
 
   for (const t of tasks) {
     const equipmentId = equipMap.get(t.equipment.trim().toLowerCase()) ?? null;
@@ -420,11 +436,21 @@ export async function createTask(
   if (!name) throw new Error("작업명을 입력하세요.");
 
   const equipmentType = input.equipment_type?.trim() || null;
-  // 설비 마스터에도 등록해 고장이력·챗봇이 같은 설비를 참조하게 한다 ('기타'는 분류 실패)
+  // 설비 마스터에도 등록해 고장이력·챗봇이 같은 설비를 참조하게 한다 ('기타'는 분류 실패).
+  // 설비 마스터는 지사에 속하므로 회차의 지사를 따른다.
+  const project = await queryOne<{ branch: string | null }>(
+    `select branch from overhaul_project where id = $1`,
+    [projectId],
+  );
   const equipMap =
-    equipmentType && equipmentType !== "기타"
+    equipmentType && equipmentType !== "기타" && project?.branch
       ? await ensureEquipments([
-          { name: equipmentType, type: equipmentType, field: input.field ?? undefined },
+          {
+            name: equipmentType,
+            branch: project.branch,
+            type: equipmentType,
+            field: input.field ?? undefined,
+          },
         ])
       : null;
 
