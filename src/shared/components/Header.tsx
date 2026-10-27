@@ -55,7 +55,8 @@ export default function Header() {
           데스크톱(sm 이상)은 건드리지 않는다 — 일반 타이틀 + 아래 "/ 챕터명"
           브레드크럼이 이미 같은 정보를 보여주고 있다.
         */}
-        <h2 className="text-base sm:text-lg font-black text-primary tracking-tight truncate">
+        {/* 폰에서는 챕터 제목이 곧 이 화면의 유일한 타이틀이라 더 크게 — 데스크톱(sm:)은 그대로 둔다 */}
+        <h2 className="text-xl sm:text-lg font-black text-primary tracking-tight truncate">
           <span className="sm:hidden">{group ? group.label : "플랜트 지능형 관리시스템"}</span>
           <span className="hidden sm:inline">플랜트 지능형 관리시스템</span>
         </h2>
