@@ -339,7 +339,7 @@ export default function MaintenancePlan() {
   return (
     <>
       <div>
-        <h1 className="text-display-lg text-on-surface pt-2">보수계획 수립</h1>
+        <h1 className="text-display-lg text-on-surface pt-2">중장기보수계획</h1>
         <p className="text-body-md text-on-surface-variant mt-2">
           설비별 중장기 유지보수 관리계획을 한 번 등록하면, 연도만 고르면 그 해에 보수할 대상을
           시스템이 점검주기로 판정합니다. 확정한 목록은 수량산출서 엑셀로 뽑아 시공사에 전달합니다.
