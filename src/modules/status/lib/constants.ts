@@ -8,17 +8,11 @@ export const STATUS_OPTIONS = ["미완료", "조치중", "추후 조치 예정",
 export type IssueStatus = (typeof STATUS_OPTIONS)[number];
 
 /**
- * 담당부서 목록 — ⚠️ 임시값이다. 실제 부서 목록이 정해지면 이 배열만 바꾸면 등록 화면·조회
- * 필터가 함께 바뀐다(DB 에는 부서 이름을 그대로 저장하므로 목록을 바꿔도 기존 행은 남는다).
+ * 담당부서 목록. 이 배열만 바꾸면 등록 화면·조회 필터가 함께 바뀐다(DB 에는 부서 이름을
+ * 그대로 저장하므로 목록을 바꿔도 기존 행은 남는다 — 다만 목록에서 빠진 이름의 행은 조회
+ * 화면의 부서 필터로는 걸러 볼 수 없다).
  */
-export const DEPARTMENTS = [
-  "운영부",
-  "기계정비부",
-  "전기정비부",
-  "제어정비부",
-  "안전환경부",
-  "기타",
-] as const;
+export const DEPARTMENTS = ["운영부", "계전부", "기계부", "공무부"] as const;
 
 /** 상태 칩 색 — 미완료는 눈에 띄게, 조치완료는 차분하게 */
 export const STATUS_STYLE: Record<IssueStatus, string> = {
