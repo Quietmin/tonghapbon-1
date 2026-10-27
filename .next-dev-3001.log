@@ -1,0 +1,11 @@
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://100.106.228.20:3001
+- Environments: .env.local
+✓ Ready in 1253ms
+
+ GET /api/equipment/overview 500 in 2.1s (next.js: 1235ms, application-code: 846ms)
+ GET /overhaul/plan 200 in 709ms (next.js: 216ms, application-code: 493ms)
+ GET /api/equipment/overview 200 in 270ms (next.js: 40ms, application-code: 229ms)
+ GET /api/equipment/overview 200 in 215ms (next.js: 11ms, application-code: 204ms)
+ GET /api/equipment/overview 200 in 229ms (next.js: 17ms, application-code: 212ms)

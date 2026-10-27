@@ -339,7 +339,7 @@ export default function MaintenancePlan() {
   return (
     <>
       <div>
-        <h1 className="text-display-lg text-on-surface pt-2">중장기보수계획</h1>
+        <h1 className="text-display-lg text-on-surface pt-2">오버홀 수량산출</h1>
         <p className="text-body-md text-on-surface-variant mt-2">
           설비별 중장기 유지보수 관리계획을 한 번 등록하면, 연도만 고르면 그 해에 보수할 대상을
           시스템이 점검주기로 판정합니다. 확정한 목록은 수량산출서 엑셀로 뽑아 시공사에 전달합니다.
@@ -833,8 +833,13 @@ export default function MaintenancePlan() {
             )}
           </Card>
 
-          {/* 확정 · 출력 */}
-          <Card className="p-card-padding" lift={false}>
+          {/* 확정 · 출력 — 이 화면의 본래 목적이라 스크롤해도 늘 보이도록
+              화면 아래에 붙여 둔다(sticky). 목록이 수백 줄이라 맨 밑에만
+              두면 주 기능이 묻힌다. */}
+          <Card
+            className="p-card-padding sticky bottom-4 z-20 border-2 border-primary/30 shadow-card-hover"
+            lift={false}
+          >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-title-sm text-on-surface">
@@ -851,11 +856,31 @@ export default function MaintenancePlan() {
                   맞춰집니다.
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={confirmAndExport} disabled={!selected.size || !!busy}>
-                  <Icon name="table_view" className="text-base" />
+              <div className="flex flex-col items-stretch gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={confirmAndExport}
+                  disabled={!selected.size || !!busy}
+                  title={
+                    selected.size
+                      ? `선택한 ${selected.size}건으로 수량산출서를 만듭니다`
+                      : "위 목록에서 항목을 먼저 선택하세요"
+                  }
+                  className="flex items-center justify-center gap-2 h-14 px-7 rounded-xl bg-primary text-on-primary text-title-sm font-black shadow-card-hover transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:shadow-none"
+                >
+                  <Icon name="table_view" className="text-xl" />
                   {busy ? "만드는 중…" : "확정하고 엑셀 내보내기"}
-                </Button>
+                  {!!selected.size && !busy && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-on-primary/20 text-sm font-black">
+                      {selected.size}
+                    </span>
+                  )}
+                </button>
+                {!selected.size && (
+                  <p className="text-xs text-on-surface-variant text-center">
+                    위 목록에서 항목을 선택하세요
+                  </p>
+                )}
               </div>
             </div>
 

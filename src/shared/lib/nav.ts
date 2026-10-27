@@ -62,7 +62,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/equipment", label: "설비 마스터", icon: "precision_manufacturing", exact: true },
       // ── ① 계약 전: 이번 오버홀에서 무엇을 할지 정하는 단계 ──────────────
-      { href: "/overhaul/plan", label: "중장기보수계획", icon: "event_note", section: "계약 전 — 보수계획 수립" },
+      { href: "/overhaul/plan", label: "오버홀 수량산출", icon: "event_note", section: "계약 전 — 보수계획 수립" },
       // 전체 현황(연도 축 매트릭스)은 중장기보수계획 화면의 하위 탭으로 합쳤다
       // (/overhaul/plan/matrix) — 같은 계획 데이터를 보는 두 시점이라서.
       // ── ② 계약 후: 체결 후 실제로 진행·기록하는 단계 ────────────────────
@@ -135,7 +135,6 @@ export const NAV_GROUPS: NavGroup[] = [
  * 오버홀 공정관리는 설비관리 챕터의 정식 메뉴가 되어 여기서 뺐다)
  */
 export const HIDDEN_ROUTES: NavItem[] = [
-  { href: "/docgen/archive", label: "보관함 전체 조회", icon: "inventory_2" },
 ];
 
 export function isActive(pathname: string, item: NavItem): boolean {
