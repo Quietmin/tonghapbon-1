@@ -156,6 +156,10 @@ create table if not exists overhaul_source (
 
 create index if not exists overhaul_source_project_idx on overhaul_source (project_id);
 
+-- 원본 엑셀 바이트 — 업로드 목록에서 다시 내려받기 위해 보관한다.
+-- (Vercel은 디스크가 요청마다 사라지므로 파일시스템 대신 DB에 둔다)
+alter table overhaul_source add column if not exists file_data bytea;
+
 
 create table if not exists overhaul_task (
   id            uuid primary key default gen_random_uuid(),
@@ -468,6 +472,8 @@ create table if not exists maintenance_plan_source (
 
 alter table maintenance_plan_source add column if not exists branch text;
 update maintenance_plan_source set branch = '양산지사' where branch is null;
+-- 원본 엑셀 바이트 — 업로드 목록에서 다시 내려받기 위해 보관한다
+alter table maintenance_plan_source add column if not exists file_data bytea;
 
 -- 설비별 보수계획 1행 = 태그넘버로 개별 관리되는 설비 하나 (수량은 항상 1)
 create table if not exists maintenance_plan (

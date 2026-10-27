@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Button, Card, EmptyState, FieldChip, Icon } from "@/shared/components/ui";
 import { EQUIPMENT_FIELDS, EQUIPMENT_TYPES } from "@/shared/lib/equipmentMeta";
 import type { Device, EquipmentWithCount } from "@/shared/lib/equipment";
@@ -261,7 +261,14 @@ function DeviceFormCard({
 // 목록 + 2단
 // ---------------------------------------------------------------------------
 
-export default function EquipmentCrud({ onChanged }: { onChanged?: () => void }) {
+export default function EquipmentCrud({
+  fieldFilter,
+  onChanged,
+}: {
+  /** 분야 필터 — null이면 전체. 분야가 비어 있는 설비는 전체에서만 보인다. */
+  fieldFilter?: string | null;
+  onChanged?: () => void;
+}) {
   const [items, setItems] = useState<EquipmentWithCount[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** 설비 폼의 대상 — null이면 폼 닫힘 */
@@ -349,7 +356,7 @@ export default function EquipmentCrud({ onChanged }: { onChanged?: () => void })
     return <p className="py-10 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
   }
 
-  const selected = items?.find((e) => e.id === selectedId) ?? null;
+  const visible = items ? (fieldFilter ? items.filter((e) => e.field === fieldFilter) : items) : null;
   const th = "py-3 text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest";
 
   return (
@@ -386,11 +393,17 @@ export default function EquipmentCrud({ onChanged }: { onChanged?: () => void })
       )}
 
       <Card lift={false} className="p-0 overflow-hidden">
-        {items && items.length === 0 ? (
+        {visible && visible.length === 0 ? (
           <EmptyState
             icon="precision_manufacturing"
-            title="등록된 설비가 없습니다"
-            desc="설비를 직접 추가하거나, 보수계획·오버홀 엑셀을 올리면 자동으로 채워집니다."
+            title={
+              fieldFilter && items?.length ? `${fieldFilter} 분야 설비가 없습니다` : "등록된 설비가 없습니다"
+            }
+            desc={
+              fieldFilter && items?.length
+                ? "분야를 전체로 바꾸거나, 설비의 분야를 수정해 보세요."
+                : "설비를 직접 추가하거나, 보수계획·오버홀 엑셀을 올리면 자동으로 채워집니다."
+            }
           />
         ) : (
           <div className="overflow-x-auto">
@@ -406,9 +419,9 @@ export default function EquipmentCrud({ onChanged }: { onChanged?: () => void })
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {items?.map((e) => (
+                {visible?.map((e) => (
+                  <Fragment key={e.id}>
                   <tr
-                    key={e.id}
                     onClick={() => setSelectedId(selectedId === e.id ? null : e.id)}
                     className={`cursor-pointer transition-colors ${
                       selectedId === e.id
@@ -466,6 +479,104 @@ export default function EquipmentCrud({ onChanged }: { onChanged?: () => void })
                       </span>
                     </td>
                   </tr>
+                  {/* 선택한 설비의 기기·태그 — 행 바로 아래에 펼친다 */}
+                  {selectedId === e.id && (
+                    <tr>
+                      <td colSpan={6} className="bg-surface-container-low/40 px-card-padding py-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="text-title-sm text-on-surface flex items-center gap-2">
+                            <Icon name="sell" className="text-base text-primary" />
+                            기기·태그 — {e.name}
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            onClick={() => setDevEditing("new")}
+                            disabled={devEditing === "new"}
+                          >
+                            <Icon name="add" className="text-base" />
+                            기기 추가
+                          </Button>
+                        </div>
+
+                        {devEditing && (
+                          <DeviceFormCard
+                            equipmentId={e.id}
+                            target={devEditing}
+                            onCancel={() => setDevEditing(null)}
+                            onDone={() => {
+                              setDevEditing(null);
+                              void loadDevices(e.id);
+                              void load();
+                            }}
+                          />
+                        )}
+
+                        {!devices ? (
+                          <p className="py-6 text-center text-sm text-on-surface-variant">
+                            불러오는 중…
+                          </p>
+                        ) : devices.length === 0 ? (
+                          <EmptyState
+                            icon="sell"
+                            title="등록된 기기·태그가 없습니다"
+                            desc="태그(예: PIT-7610)를 등록하면 챗봇의 태그 정확일치 검색 대상이 됩니다."
+                          />
+                        ) : (
+                          <div className="overflow-x-auto mt-3">
+                            <table className="w-full text-left min-w-[560px]">
+                              <thead>
+                                <tr className="border-b border-border-subtle">
+                                  <th className={th}>태그</th>
+                                  <th className={th}>기기명</th>
+                                  <th className={th}>규격</th>
+                                  <th className={`${th} text-right`}>관리</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border-subtle">
+                                {devices.map((d) => (
+                                  <tr
+                                    key={d.id}
+                                    className="hover:bg-surface-container-low transition-colors"
+                                  >
+                                    <td className="py-3 text-sm font-bold text-on-surface">
+                                      {d.tag}
+                                    </td>
+                                    <td className="py-3 text-sm text-on-surface">{d.name ?? "—"}</td>
+                                    <td className="py-3 text-sm text-on-surface-variant">
+                                      {d.spec ?? "—"}
+                                    </td>
+                                    <td className="py-3">
+                                      <span className="flex justify-end gap-1">
+                                        <button
+                                          type="button"
+                                          title="수정"
+                                          disabled={busy}
+                                          onClick={() => setDevEditing(d)}
+                                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors"
+                                        >
+                                          <Icon name="edit" className="text-base" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          title="삭제"
+                                          disabled={busy}
+                                          onClick={() => void removeDevice(d)}
+                                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors"
+                                        >
+                                          <Icon name="delete" className="text-base" />
+                                        </button>
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -473,91 +584,6 @@ export default function EquipmentCrud({ onChanged }: { onChanged?: () => void })
         )}
       </Card>
 
-      {selected && (
-        <Card lift={false} className="p-card-padding">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-title-sm text-on-surface flex items-center gap-2">
-              <Icon name="sell" className="text-base text-primary" />
-              기기·태그 — {selected.name}
-            </h2>
-            <Button
-              variant="ghost"
-              onClick={() => setDevEditing("new")}
-              disabled={devEditing === "new"}
-            >
-              <Icon name="add" className="text-base" />
-              기기 추가
-            </Button>
-          </div>
-
-          {devEditing && (
-            <DeviceFormCard
-              equipmentId={selected.id}
-              target={devEditing}
-              onCancel={() => setDevEditing(null)}
-              onDone={() => {
-                setDevEditing(null);
-                void loadDevices(selected.id);
-                void load();
-              }}
-            />
-          )}
-
-          {!devices ? (
-            <p className="py-8 text-center text-sm text-on-surface-variant">불러오는 중…</p>
-          ) : devices.length === 0 ? (
-            <EmptyState
-              icon="sell"
-              title="등록된 기기·태그가 없습니다"
-              desc="태그(예: PIT-7610)를 등록하면 챗봇의 태그 정확일치 검색 대상이 됩니다."
-            />
-          ) : (
-            <div className="overflow-x-auto mt-3">
-              <table className="w-full text-left min-w-[560px]">
-                <thead>
-                  <tr className="border-b border-border-subtle">
-                    <th className={th}>태그</th>
-                    <th className={th}>기기명</th>
-                    <th className={th}>규격</th>
-                    <th className={`${th} text-right`}>관리</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
-                  {devices.map((d) => (
-                    <tr key={d.id} className="hover:bg-surface-container-low transition-colors">
-                      <td className="py-3 text-sm font-bold text-on-surface">{d.tag}</td>
-                      <td className="py-3 text-sm text-on-surface">{d.name ?? "—"}</td>
-                      <td className="py-3 text-sm text-on-surface-variant">{d.spec ?? "—"}</td>
-                      <td className="py-3">
-                        <span className="flex justify-end gap-1">
-                          <button
-                            type="button"
-                            title="수정"
-                            disabled={busy}
-                            onClick={() => setDevEditing(d)}
-                            className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors"
-                          >
-                            <Icon name="edit" className="text-base" />
-                          </button>
-                          <button
-                            type="button"
-                            title="삭제"
-                            disabled={busy}
-                            onClick={() => void removeDevice(d)}
-                            className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors"
-                          >
-                            <Icon name="delete" className="text-base" />
-                          </button>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
     </>
   );
 }

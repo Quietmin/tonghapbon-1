@@ -3,7 +3,10 @@ import { normalizeEquipmentName } from "@/shared/lib/equipmentMeta";
 import { listPlanMatrix, type MatrixRow } from "@/modules/overhaul/lib/maintenanceRepo";
 
 /**
- * 설비 단위 장기 유지보수 계획 — 과거 실적 포함 (기본: 과거 2년 ~ 향후 4년).
+ * 설비 단위 장기 유지보수 계획 — 과거 2년·올해·향후 2년, 다섯 해만 그린다.
+ * 전체 연도를 다 깔아 봤더니 열이 10개가 넘어 한눈에 안 들어왔다(사용자 피드백).
+ * 설비 마스터에서는 "지금 어디쯤인지"만 보여주고, 전체 연도·태그 단위 상세는
+ * 전체 현황(/overhaul/matrix)에서 본다.
  *
  * 전체 현황(/overhaul/matrix)이 보수계획 1행(태그 단위)씩 펼쳐 보는 표라면,
  * 여기는 그 행들을 설비(대분류) 단위로 말아 올린 요약이다. 연도 판정은
@@ -53,14 +56,19 @@ const nameKey = (s: string) => s.trim().toLowerCase();
 
 export async function listLongTermPlan(
   branch: string,
-  opts?: { pastYears?: number; futureYears?: number },
+  opts?: {
+    pastYears?: number;
+    futureYears?: number;
+    /** 표의 가운데 해 — 안 주면 올해. 판정(도래·예정)도 이 해 기준으로 계산된다 */
+    baseYear?: number;
+  },
 ): Promise<LongTermPayload> {
   const pastYears = opts?.pastYears ?? 2;
-  const futureYears = opts?.futureYears ?? 4;
+  const futureYears = opts?.futureYears ?? 2;
 
   const [equipment, matrix] = await Promise.all([
     listEquipment(branch),
-    listPlanMatrix({ branch, futureYears }),
+    listPlanMatrix({ branch, futureYears, thisYear: opts?.baseYear }),
   ]);
 
   const thisYear = matrix.thisYear;
@@ -93,6 +101,10 @@ export async function listLongTermPlan(
         else if (c.hasRecord) cell.done += 1;
         else if (c.planned) cell.planned += 1;
         else if (c.projected) cell.projected += 1;
+        // 올해 도래·기한초과(필수) 판정인데 올해 칸에 아무것도 없으면 예정으로 센다.
+        // 매트릭스의 projected는 내년부터만 계산해서, 그대로 두면 보수계획 화면은
+        // "필수"라는데 이 표의 올해 칸만 비어 보인다.
+        else if (year === thisYear && m.judge.classification === "필수") cell.projected += 1;
       }
       return cell;
     });
