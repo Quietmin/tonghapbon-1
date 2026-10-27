@@ -70,7 +70,7 @@ export function normalizeManualSections(raw: unknown): ManualSectionsValue {
 }
 
 const TEXTAREA_CLASS =
-  "w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary disabled:cursor-not-allowed";
+  "w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest disabled:cursor-not-allowed";
 
 /* ---- 입력 화면 ----------------------------------------------------------- */
 

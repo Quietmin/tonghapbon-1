@@ -123,7 +123,7 @@ const CHIP_LABELS: { key: keyof AppliedFilters; label: string }[] = [
 ];
 
 const FIELD_CLASS =
-  "px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary";
+  "px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest";
 
 /** 조회 조건 셀렉트 — 첫 항목은 늘 '전체'(= 조건 없음)다 */
 function FilterSelect({
@@ -974,7 +974,7 @@ export default function ArchiveBrowser({
                 }}
                 autoFocus
                 autoComplete="off"
-                className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+                className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
               />
               {pwError && (
                 <p className="text-sm font-bold text-status-error flex items-center gap-1.5">

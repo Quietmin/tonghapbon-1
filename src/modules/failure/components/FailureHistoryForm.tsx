@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Button, Icon } from "@/shared/components/ui";
 import { BRANCHES, FAULT_FIELDS, sortKorean } from "@/modules/docgen/lib/constants";
@@ -40,8 +40,20 @@ const EMPTY: FormState = {
   source: "",
 };
 
-/** 빈 칸에 붙이는 공통 표시 — PDF로 못 채운 칸과 원래부터 안 채운 칸을 같은 방식으로 알려준다 */
+/** 빈 칸에 붙이는 공통 표시 — PDF로 못 채운 칸이 사람이 직접 채울 곳임을 알려준다 */
 const EMPTY_FIELD_CLASS = "border-status-warning/50 bg-status-warning/5";
+
+/**
+ * 음영은 PDF를 올린 뒤에만 켠다. PDF 없이 처음부터 직접 입력하는 빈 폼은 다른 입력 화면
+ * (고장보고서 작성 등)과 같은 차분한 입력칸으로 두고, 추출 결과를 검토할 때만 "이 칸이
+ * 비었다"를 눈에 띄게 한다 — 전부 음영이면 어디가 비었는지 오히려 구분이 안 된다.
+ */
+const ShadeEmptyContext = createContext(false);
+
+function useEmptyClass(value: string): string {
+  const shade = useContext(ShadeEmptyContext);
+  return shade && !value.trim() ? EMPTY_FIELD_CLASS : "";
+}
 
 function Field({
   label,
@@ -56,6 +68,7 @@ function Field({
   type?: string;
   placeholder?: string;
 }) {
+  const emptyClass = useEmptyClass(value);
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-bold text-on-surface-variant">{label}</span>
@@ -64,7 +77,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`input ${value.trim() ? "" : EMPTY_FIELD_CLASS}`}
+        className={`input ${emptyClass}`}
       />
     </label>
   );
@@ -83,13 +96,14 @@ function Select({
   options: string[];
   placeholder?: string;
 }) {
+  const emptyClass = useEmptyClass(value);
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-bold text-on-surface-variant">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`input ${value.trim() ? "" : EMPTY_FIELD_CLASS}`}
+        className={`input ${emptyClass}`}
       >
         <option value="">{placeholder}</option>
         {options.map((o) => (
@@ -113,6 +127,7 @@ function TextArea({
   onChange: (v: string) => void;
   rows?: number;
 }) {
+  const emptyClass = useEmptyClass(value);
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-bold text-on-surface-variant">{label}</span>
@@ -120,7 +135,7 @@ function TextArea({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
-        className={`input ${value.trim() ? "" : EMPTY_FIELD_CLASS}`}
+        className={`input ${emptyClass}`}
       />
     </label>
   );
@@ -155,7 +170,7 @@ export interface FailureHistoryFormProps {
  * PDF를 올리면(드래그앤드롭 또는 파일 선택) "고장상보" 양식에서 뽑아낼 수 있는
  * 항목만 채우고, 못 뽑아낸 칸은 비워 둔 채 노란 음영으로 표시한다 — 그 칸들이
  * 사람이 직접 채워야 할 곳이다. PDF 없이 처음부터 전부 손으로 입력해도 된다
- * (그 경우엔 안 채운 칸이 전부 음영으로 보인다).
+ * (그 경우엔 음영 없이 일반 입력칸으로 보인다).
  *
  * 일괄 업로드 큐 목록에서 파일 하나를 검토할 때도 이 폼을 그대로 쓴다
  * (initialForm/initialAttachment로 미리 채우고, showDropzone=false로 드롭존만 숨김).
@@ -271,6 +286,7 @@ export default function FailureHistoryForm({
   }
 
   return (
+    <ShadeEmptyContext.Provider value={attachment !== null}>
     <div className="flex flex-col gap-4">
       {showDropzone && (
       <Card
@@ -398,5 +414,6 @@ export default function FailureHistoryForm({
         </Button>
       </div>
     </div>
+    </ShadeEmptyContext.Provider>
   );
 }

@@ -808,7 +808,7 @@ export default function DocEditor({
         value={fileName}
         onChange={(e) => setFileName(e.target.value)}
         placeholder={MODE_PLACEHOLDERS[mode]}
-        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
       />
     </div>
   );
@@ -827,7 +827,7 @@ export default function DocEditor({
         value={author}
         onChange={(e) => setAuthor(e.target.value)}
         placeholder="이름을 입력하세요."
-        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
       />
     </div>
   ) : null;

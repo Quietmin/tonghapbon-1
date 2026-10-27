@@ -34,7 +34,7 @@ export default function SortedSelect({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
       >
         <option value="">{placeholder}</option>
         {sortKorean(values).map((v) => (
@@ -75,7 +75,7 @@ export function PlainSelect({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
       >
         <option value="">{placeholder}</option>
         {values.map((v) => (
@@ -142,7 +142,7 @@ export function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary"
+        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
       />
     </div>
   );
@@ -210,7 +210,7 @@ export function InlineCheck({
 }
 
 const BOX =
-  "px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary disabled:cursor-not-allowed";
+  "px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest disabled:cursor-not-allowed";
 
 /**
  * 날짜 칸. 값은 "YYYY-MM-DDTHH:mm" 한 덩어리로 들고 다니고 여기서는 날짜만 만진다 —
