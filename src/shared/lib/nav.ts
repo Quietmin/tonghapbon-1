@@ -66,15 +66,15 @@ export const NAV_GROUPS: NavGroup[] = [
       // 전체 현황(연도 축 매트릭스)은 중장기보수계획 화면의 하위 탭으로 합쳤다
       // (/overhaul/plan/matrix) — 같은 계획 데이터를 보는 두 시점이라서.
       // ── ② 계약 후: 체결 후 실제로 진행·기록하는 단계 ────────────────────
-      { href: "/overhaul/project", label: "회차 관리", icon: "engineering", section: "계약 후 — 공정관리" },
-      { href: "/overhaul", label: "대시보드", icon: "dashboard", exact: true, section: "계약 후 — 공정관리" },
-      { href: "/overhaul/upload", label: "업로드 분석", icon: "analytics", section: "계약 후 — 공정관리" },
-      { href: "/overhaul/tasks", label: "작업 관리", icon: "format_list_bulleted", section: "계약 후 — 공정관리" },
-      { href: "/overhaul/schedule", label: "공정표", icon: "calendar_view_week", section: "계약 후 — 공정관리" },
+      // 회차 관리는 사이드바에서 뺐다 — 모든 공정관리 화면 상단 회차 띠에
+      // 같은 링크가 있어 중복이고, 설정 성격이라 자주 들어가지 않는다.
+      { href: "/overhaul/dashboard", label: "대시보드", icon: "dashboard", section: "계약 후 — 공정관리" },
+      // 업로드 분석·공정표는 작업·공정의 하위 탭으로 합쳤다
+      // (/overhaul/tasks/upload, /overhaul/tasks/schedule) — 셋 다 같은 작업항목이라서.
+      { href: "/overhaul/tasks", label: "작업·공정", icon: "format_list_bulleted", section: "계약 후 — 공정관리" },
       // 분해 전·후 사진은 실적 입력 화면에서 날짜별로 함께 다룬다.
       // 별도 사진 화면은 두지 않는다 (실적과 떨어져 있으면 두 곳을 오가야 한다).
       { href: "/overhaul/entry", label: "실적 입력", icon: "edit_note", section: "계약 후 — 공정관리" },
-      { href: "/overhaul/reports", label: "보고서", icon: "summarize", section: "계약 후 — 공정관리" },
     ],
   },
   {
