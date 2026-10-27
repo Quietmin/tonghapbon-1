@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveBranchFromRequest } from "@/modules/overhaul/lib/activeBranch";
 import { listLongTermPlan } from "@/modules/equipment/lib/longTermRepo";
 
-/** 설비 단위 장기 유지보수 계획 — 기본 과거 2년 ~ 향후 4년. */
+/** 설비 단위 장기 유지보수 계획 — 기본 과거 2년·올해·향후 2년(다섯 해). */
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     }
     const url = new URL(req.url);
     const pastYears = Number(url.searchParams.get("pastYears") ?? "2") || 2;
-    const futureYears = Number(url.searchParams.get("futureYears") ?? "4") || 4;
+    const futureYears = Number(url.searchParams.get("futureYears") ?? "2") || 2;
     const payload = await listLongTermPlan(branch, { pastYears, futureYears });
     return NextResponse.json({ ok: true, ...payload });
   } catch (e) {

@@ -1,16 +1,12 @@
 import { listEquipment } from "@/shared/lib/equipment";
 import { normalizeEquipmentName } from "@/shared/lib/equipmentMeta";
-import {
-  listAvailableYears,
-  listPlanMatrix,
-  type MatrixRow,
-} from "@/modules/overhaul/lib/maintenanceRepo";
+import { listPlanMatrix, type MatrixRow } from "@/modules/overhaul/lib/maintenanceRepo";
 
 /**
- * 설비 단위 장기 유지보수 계획 — 계획·실적이 있는 전체 연도를 그린다.
- * 과거는 데이터가 있는 첫 해까지, 미래는 엑셀 계획의 마지막 해까지 —
- * 중장기 계획 엑셀이 2033년까지 있으면 표도 2033년까지 간다. 데이터가
- * 짧아도 최소 과거 pastYears(기본 2년) ~ 향후 futureYears(기본 4년)는 보여준다.
+ * 설비 단위 장기 유지보수 계획 — 과거 2년·올해·향후 2년, 다섯 해만 그린다.
+ * 전체 연도를 다 깔아 봤더니 열이 10개가 넘어 한눈에 안 들어왔다(사용자 피드백).
+ * 설비 마스터에서는 "지금 어디쯤인지"만 보여주고, 전체 연도·태그 단위 상세는
+ * 전체 현황(/overhaul/matrix)에서 본다.
  *
  * 전체 현황(/overhaul/matrix)이 보수계획 1행(태그 단위)씩 펼쳐 보는 표라면,
  * 여기는 그 행들을 설비(대분류) 단위로 말아 올린 요약이다. 연도 판정은
@@ -63,25 +59,16 @@ export async function listLongTermPlan(
   opts?: { pastYears?: number; futureYears?: number },
 ): Promise<LongTermPayload> {
   const pastYears = opts?.pastYears ?? 2;
-  const futureYears = opts?.futureYears ?? 4;
-
-  // 엑셀 계획의 마지막 해까지 미래 축을 늘린다 — 기본 4년으로 자르면
-  // 중장기 계획(10년+)의 뒷부분이 표에서 통째로 사라진다.
-  const nowYear = new Date().getFullYear();
-  const gradeYears = await listAvailableYears(branch);
-  const maxPlanYear = gradeYears.length ? gradeYears[gradeYears.length - 1] : nowYear;
-  const extendedFuture = Math.max(futureYears, maxPlanYear - nowYear);
+  const futureYears = opts?.futureYears ?? 2;
 
   const [equipment, matrix] = await Promise.all([
     listEquipment(branch),
-    listPlanMatrix({ branch, futureYears: extendedFuture }),
+    listPlanMatrix({ branch, futureYears }),
   ]);
 
   const thisYear = matrix.thisYear;
-  // 과거 축도 데이터가 있는 첫 해(matrix.years[0] = 등급·실적의 최솟값)까지 연다
-  const startYear = Math.min(matrix.years[0] ?? thisYear, thisYear - pastYears);
   const years: number[] = [];
-  for (let y = startYear; y <= thisYear + extendedFuture; y++) years.push(y);
+  for (let y = thisYear - pastYears; y <= thisYear + futureYears; y++) years.push(y);
 
   // 계획 행을 대분류(=설비명)로 묶는다 — 등록 때와 같은 규칙으로 머리 번호를 뗀다
   const groups = new Map<string, { label: string; rows: MatrixRow[] }>();
