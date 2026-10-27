@@ -42,6 +42,7 @@ export default async function HomePage() {
         min-h 로 전체를 세로 가운데 두는 이유: 콘텐츠가 로고+타이틀+카드 3장뿐이라
         위쪽에 그냥 쌓아 두면 아래쪽이 텅 비어 화면 위로 쏠려 보인다.
       */}
+<<<<<<< HEAD
       <div className="md:hidden flex flex-col items-center justify-center gap-10 min-h-[75dvh] text-center">
         <div className="flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
@@ -56,6 +57,13 @@ export default async function HomePage() {
 
         <div className="w-full flex flex-col gap-5">
           {NAV_GROUPS.map((group) => (
+=======
+      {HIDDEN_ROUTES.length > 0 && (
+      <section className="pt-2">
+        <p className="text-xs font-bold text-on-surface-variant mb-2">그 외 화면</p>
+        <div className="flex flex-wrap gap-1.5">
+          {HIDDEN_ROUTES.map((r) => (
+>>>>>>> ym
             <Link
               key={group.key}
               href={group.root}
@@ -74,12 +82,17 @@ export default async function HomePage() {
             </Link>
           ))}
         </div>
+<<<<<<< HEAD
       </div>
 
       {/* 데스크톱 첫 화면 — 선택한 지사의 설비관리 현황 대시보드(HomeDashboard) */}
       <div className="hidden md:block">
         <HomeDashboard />
       </div>
+=======
+      </section>
+      )}
+>>>>>>> ym
     </>
   );
 }
