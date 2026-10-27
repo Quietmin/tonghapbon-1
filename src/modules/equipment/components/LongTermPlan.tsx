@@ -128,7 +128,7 @@ export default function LongTermPlan({
         </div>
       </div>
       <p className="text-xs text-on-surface-variant mt-1.5">
-        과거 2년·올해·향후 2년 요약입니다(설비 대분류 단위). 전체 연도와 태그 단위 상세는 전체 현황에서 봅니다.
+        과거 2년·올해·향후 2년 요약입니다(설비 대분류 단위). 전체 연도와 태그 단위 상세는 설비별 전체 현황에서 봅니다.
       </p>
 
       {error && (
