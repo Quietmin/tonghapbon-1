@@ -698,3 +698,37 @@ end $$;
 -- 지금은 프로젝트 안 .data/uploads/ 에 저장한다(로컬 개발). 나중에 파일 저장소를
 -- 바꾸더라도 경로 문자열 규칙만 맞추면 되고, 이 스키마는 손대지 않는다.
 -- ============================================================================
+
+
+-- ============================================================================
+-- 현황관리 — 운영 근무자가 등록한 설비 이슈와, 유지보수 담당자의 조치 현황
+--
+-- 운영 근무자가 [현황 등록]에서 설비명·이슈 내용·담당부서·작성자를 적으면 한 행이 생기고
+-- (상태는 '미완료'로 시작), 유지보수 담당자가 [현황 조회]에서 상태·조치 내용을 갱신한다.
+-- 지사별로 독립 운영되므로 branch 를 들고 있다. 설비명은 마스터 연결 전에도 원문을
+-- 잃지 않도록 텍스트로 보존한다(failure_history.equipment_name 과 같은 이유).
+-- ============================================================================
+create table if not exists status_issue (
+  id                uuid primary key default gen_random_uuid(),
+  branch            text,
+  equipment_name    text not null,
+  content           text not null,
+  department        text not null,
+  reporter          text not null,
+  status            text not null default '미완료'
+                    check (status in ('미완료', '조치중', '조치완료', '추후 조치 예정')),
+  -- 유지보수 담당자가 상태를 바꿀 때 남기는 내용
+  action_note       text,
+  scheduled_date    date,
+  handled_by        text,
+  status_updated_at timestamptz,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+create index if not exists status_issue_branch_status_idx
+  on status_issue (branch, status, created_at desc);
+
+drop trigger if exists status_issue_set_updated_at on status_issue;
+create trigger status_issue_set_updated_at before update on status_issue
+  for each row execute function set_updated_at();
