@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   createContext,
@@ -205,14 +204,6 @@ export default function ChatbotDock() {
         </span>
         <span className="text-title-sm text-on-surface flex-1 truncate">정비 챗봇 (따소미)</span>
 
-        <Link
-          href="/chatbot"
-          aria-label="전체화면으로 열기"
-          title="전체화면으로 열기"
-          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
-        >
-          <Icon name="open_in_full" className="text-base" />
-        </Link>
         <button
           type="button"
           onClick={() => setState("bubble")}

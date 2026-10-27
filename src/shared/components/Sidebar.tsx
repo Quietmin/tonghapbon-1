@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ACCENT_STYLE, Icon } from "./ui";
 import { NAV_GROUPS, activeGroup, isActive, type NavGroup } from "@/shared/lib/nav";
-import { useChatbotDock } from "./ChatbotDock";
 import { useSidebar } from "./SidebarState";
 
 const LINK_BASE =
@@ -22,7 +21,6 @@ const STORAGE_KEY = "sidebar-open-groups";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const dock = useChatbotDock();
   const sidebar = useSidebar();
 
   /*
@@ -216,18 +214,6 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      {/* 챗봇은 메뉴가 아니라 떠 있는 도크다 — 여기서는 여는 버튼만 둔다 */}
-      <div className="mt-auto pt-4 border-t border-border-subtle shrink-0">
-        <button
-          type="button"
-          onClick={dock.open}
-          className={`${LINK_BASE} w-full text-on-surface-variant hover:bg-surface-container-high`}
-        >
-          <Icon name="smart_toy" className="text-lg" />
-          <span>정비 챗봇 열기</span>
-        </button>
-      </div>
     </aside>
   );
 }

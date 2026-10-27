@@ -113,14 +113,14 @@ export const NAV_GROUPS: NavGroup[] = [
 
 /**
  * 메뉴에서 감췄지만 경로는 살아 있는 화면들.
- * 지우지 않은 이유: 보관함 전체 조회와 고장이력 화면은 나중에 다시 메뉴로 올릴 수
- * 있다. 완전히 접근할 길이 없으면 사실상 삭제와 같으므로, 홈 맨 아래에 작은 링크
- * 줄로만 남겨 둔다. (오버홀 공정관리는 설비관리 챕터의 정식 메뉴가 되어 여기서 뺐다)
+ * 보관함 전체 조회는 사진대장(/docgen/photo-report)으로 가는 유일한 입구라 홈 맨 아래
+ * 작은 링크 줄로 남겨 둔다 — 나중에 정식 위치가 정해지면 옮긴다.
+ * (고장이력 대시보드 /failure/dashboard 와 정비 챗봇 전체화면 /chatbot 은 아직 빈 화면이라
+ * 링크를 뺐다. 경로는 살아 있으니 화면이 완성되면 해당 챕터 메뉴에 정식으로 올린다.
+ * 오버홀 공정관리는 설비관리 챕터의 정식 메뉴가 되어 여기서 뺐다)
  */
 export const HIDDEN_ROUTES: NavItem[] = [
   { href: "/docgen/archive", label: "보관함 전체 조회", icon: "inventory_2" },
-  { href: "/failure/dashboard", label: "고장이력 (미구현)", icon: "history" },
-  { href: "/chatbot", label: "정비 챗봇 전체화면", icon: "smart_toy" },
 ];
 
 export function isActive(pathname: string, item: NavItem): boolean {
