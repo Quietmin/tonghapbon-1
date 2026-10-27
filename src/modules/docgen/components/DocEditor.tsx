@@ -15,6 +15,7 @@ import { composePreview, readImageFile } from "../lib/imageEdit";
 import { isDocgenSupabaseConfigured } from "../lib/supabase";
 import { saveToArchive, type SaveMeta } from "../lib/archive";
 import { loadDocumentSource, saveDocumentSource } from "../lib/source";
+import { indexDocumentFireAndForget } from "../lib/docgenSearch";
 import { isTextItem, type DocItem, type PhotoItem } from "../lib/types";
 import {
   clearDraft,
@@ -743,7 +744,7 @@ export default function DocEditor({
     try {
       const blob = await renderPagesToBlob(pages);
       const photoCount = items.filter((it) => !("kind" in it)).length;
-      await saveToArchive(
+      const saved = await saveToArchive(
         blob,
         {
           ...saveMeta,
@@ -756,6 +757,12 @@ export default function DocEditor({
         },
         sourceLink,
       );
+      // 챗봇 내용 검색용 색인 — "쏘고 잊는다": 원본(sourceLink)이 있어야 색인할
+      // 텍스트가 있고(원본 저장이 실패했으면 건너뜀), 색인 자체가 실패해도(비활성
+      // 상태 포함) 이미 끝난 PDF 저장에는 영향을 주지 않는다.
+      if (sourceLink && (mode === "manual" || mode === "fault")) {
+        indexDocumentFireAndForget({ documentId: saved.id, sourceId: sourceLink.sourceId, docType: mode });
+      }
       setNotice(
         mailWindow
           ? "PDF 를 내려받고 보관함에도 저장했습니다. 열린 Gmail 화면에서 첨부파일로 추가해 주세요."

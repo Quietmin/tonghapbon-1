@@ -17,6 +17,10 @@ import { askDdasomi } from "@/modules/overhaul/lib/chatbotAI";
 import type { ChatbotSnapshot } from "@/modules/overhaul/lib/chatbotSnapshot";
 import DdasomiLoading from "@/modules/overhaul/components/chatbot/DdasomiLoading";
 import "@/modules/overhaul/components/chatbot/ddasomi.css";
+import { searchDocgenDocuments, type DocMatch } from "@/modules/docgen/lib/docgenSearch";
+import { getSignedUrl } from "@/modules/docgen/lib/archive";
+import { MODE_LABELS } from "@/modules/docgen/lib/constants";
+import PdfPreviewModal from "@/modules/docgen/components/PdfPreviewModal";
 
 /**
  * 정비 챗봇 도크 — 메뉴가 아니라 모든 화면 위에 떠 있는 창.
@@ -98,6 +102,8 @@ interface Msg {
   id: number;
   role: "user" | "bot";
   text: string;
+  /** 매뉴얼·고장보고서 검색 결과 — 있으면 말풍선 아래에 카드 목록으로 그린다 */
+  matches?: DocMatch[];
 }
 
 let msgSeq = 0;
@@ -142,6 +148,27 @@ export default function ChatbotDock() {
   const [pending, setPending] = useState(false);
   const snapshotRef = useRef<ChatbotSnapshot | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const [preview, setPreview] = useState<{ title: string; previewUrl: string; downloadUrl: string } | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+
+  /** 검색 결과 카드를 탭했을 때 — 보관함 조회 화면(ArchiveBrowser)과 같은 방식으로 서명 URL 둘을 받아 모달로 연다 */
+  async function openMatch(m: DocMatch) {
+    setOpeningId(m.id);
+    try {
+      const [previewUrl, downloadUrl] = await Promise.all([
+        getSignedUrl(m.pdfPath),
+        getSignedUrl(m.pdfPath, 3600, { download: true }),
+      ]);
+      setPreview({ title: m.title, previewUrl, downloadUrl });
+    } catch {
+      setMsgs((prev) => [
+        ...prev,
+        { id: (msgSeq += 1), role: "bot", text: "문서를 여는 데 실패했어요. 다시 시도해 주세요." },
+      ]);
+    } finally {
+      setOpeningId(null);
+    }
+  }
 
   // 패널을 열 때 최신 데이터를 미리 받아둔다 — 첫 질문에서도 바로 답할 수 있게.
   useEffect(() => {
@@ -165,9 +192,9 @@ export default function ChatbotDock() {
     if (fresh) snapshotRef.current = fresh;
     const snapshot = snapshotRef.current ?? emptySnapshot();
 
-    const reply = await getDdasomiReply(q, snapshot, askDdasomi);
+    const reply = await getDdasomiReply(q, snapshot, askDdasomi, searchDocgenDocuments);
     setPending(false);
-    setMsgs((prev) => [...prev, { id: (msgSeq += 1), role: "bot", text: reply.text }]);
+    setMsgs((prev) => [...prev, { id: (msgSeq += 1), role: "bot", text: reply.text, matches: reply.matches }]);
   }
 
   if (state === "bubble") {
@@ -243,20 +270,49 @@ export default function ChatbotDock() {
             <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
               전체 공정률·지연 위험 작업·설비별 진행률 같은 오버홀 공정 현황을 물어보세요.
               <br />
+              매뉴얼·고장보고서 내용도 찾아드려요(예: "변압기 고장 관련 보고서 찾아줘").
+              <br />
               <strong>준공도서·벤더프린트 검색은 아직 연결 전입니다.</strong>
             </p>
           </div>
         ) : (
           msgs.map((m) => (
-            <div
-              key={m.id}
-              className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
-                m.role === "user"
-                  ? "self-end bg-primary text-on-primary rounded-br-sm"
-                  : "self-start bg-surface-container-high text-on-surface rounded-bl-sm"
-              }`}
-            >
-              {m.text}
+            <div key={m.id} className={`flex flex-col gap-2 ${m.role === "user" ? "items-end" : "items-start"}`}>
+              <div
+                className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                  m.role === "user"
+                    ? "bg-primary text-on-primary rounded-br-sm"
+                    : "bg-surface-container-high text-on-surface rounded-bl-sm"
+                }`}
+              >
+                {m.text}
+              </div>
+              {m.matches && m.matches.length > 0 && (
+                <div className="w-full max-w-[92%] flex flex-col gap-1.5">
+                  {m.matches.map((doc) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => void openMatch(doc)}
+                      disabled={openingId === doc.id}
+                      className="text-left px-3 py-2 rounded-xl bg-surface-container border border-border-subtle hover:bg-surface-container-high transition-colors disabled:opacity-60"
+                    >
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-on-surface-variant">
+                        <Icon name="description" className="text-sm" />
+                        {MODE_LABELS[doc.docType]}
+                        {doc.branch && <span>· {doc.branch}</span>}
+                        {doc.field && <span>· {doc.field}</span>}
+                      </div>
+                      <div className="text-sm font-bold text-on-surface mt-0.5 truncate">{doc.title}</div>
+                      <div className="text-xs text-on-surface-variant mt-0.5 line-clamp-2">{doc.snippet}</div>
+                      <div className="text-[11px] text-primary font-bold mt-1 flex items-center gap-1">
+                        <Icon name="visibility" className="text-sm" />
+                        {openingId === doc.id ? "여는 중…" : "미리보기"}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))
         )}
@@ -285,6 +341,15 @@ export default function ChatbotDock() {
           <Icon name="send" className="text-lg" />
         </button>
       </div>
+
+      {preview && (
+        <PdfPreviewModal
+          title={preview.title}
+          previewUrl={preview.previewUrl}
+          downloadUrl={preview.downloadUrl}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }

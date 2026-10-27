@@ -120,11 +120,15 @@ async function uploadWithRetry(basePath: string, pdfBlob: Blob): Promise<string>
  * 채워졌는지로 판단한다. 03-docgen-sources.sql 을 실행하지 않았으면(컬럼이
  * 없으면) link 를 넘기지 않으면 그만이다 — PDF 저장 자체는 그대로 된다.
  */
+/**
+ * 저장한 행의 id를 돌려준다 — 챗봇 검색 색인(/api/docgen/index)이 이 PDF 행과
+ * 조각을 연결하려면 필요하다(04-docgen-search.sql 의 document_id).
+ */
 export async function saveToArchive(
   pdfBlob: Blob,
   meta: SaveMeta,
   link?: { lineageId: string; sourceId: string },
-): Promise<void> {
+): Promise<{ id: string }> {
   const client = getDocgenSupabase();
   if (!client) throw new Error("보관함이 설정되지 않았습니다.");
 
@@ -140,22 +144,28 @@ export async function saveToArchive(
 
   const path = await uploadWithRetry(basePath, pdfBlob);
 
-  const { error } = await client.from(DOCGEN_TABLE).insert({
-    ...meta,
-    year,
-    // 무인증이므로 참조할 auth.users 행이 없다 — 항상 null
-    author_id: null,
-    author_name: meta.author_name?.trim() || null,
-    pdf_path: path,
-    pdf_bytes: pdfBlob.size,
-    ...(link ? { lineage_id: link.lineageId, source_id: link.sourceId } : {}),
-  });
+  const { data, error } = await client
+    .from(DOCGEN_TABLE)
+    .insert({
+      ...meta,
+      year,
+      // 무인증이므로 참조할 auth.users 행이 없다 — 항상 null
+      author_id: null,
+      author_name: meta.author_name?.trim() || null,
+      pdf_path: path,
+      pdf_bytes: pdfBlob.size,
+      ...(link ? { lineage_id: link.lineageId, source_id: link.sourceId } : {}),
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !data) {
     // 행 생성이 실패했으면 올린 파일도 치운다
     await client.storage.from(DOCGEN_BUCKET).remove([path]).catch(() => {});
-    throw error;
+    throw error ?? new Error("보관함 저장에 실패했습니다.");
   }
+
+  return { id: data.id as string };
 }
 
 /**
