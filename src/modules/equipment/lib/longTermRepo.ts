@@ -56,14 +56,19 @@ const nameKey = (s: string) => s.trim().toLowerCase();
 
 export async function listLongTermPlan(
   branch: string,
-  opts?: { pastYears?: number; futureYears?: number },
+  opts?: {
+    pastYears?: number;
+    futureYears?: number;
+    /** 표의 가운데 해 — 안 주면 올해. 판정(도래·예정)도 이 해 기준으로 계산된다 */
+    baseYear?: number;
+  },
 ): Promise<LongTermPayload> {
   const pastYears = opts?.pastYears ?? 2;
   const futureYears = opts?.futureYears ?? 2;
 
   const [equipment, matrix] = await Promise.all([
     listEquipment(branch),
-    listPlanMatrix({ branch, futureYears }),
+    listPlanMatrix({ branch, futureYears, thisYear: opts?.baseYear }),
   ]);
 
   const thisYear = matrix.thisYear;
