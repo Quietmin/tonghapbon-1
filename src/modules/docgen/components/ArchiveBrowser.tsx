@@ -105,6 +105,23 @@ const EMPTY_FILTERS: Partial<ListFilter> = {
   fileName: "",
 };
 
+/** 지금 화면 결과에 실제로 걸려 있는 조회 조건 — 조회 버튼을 누른 시점의 값이다 */
+type AppliedFilters = Pick<
+  ListFilter,
+  "branch" | "field" | "manualType" | "facility" | "faultContent" | "authorName" | "fileName"
+>;
+
+/** 조건 칩의 이름표 — 접어 둔 검색 영역 아래에 "지사: 양산지사" 꼴로 보여 준다 */
+const CHIP_LABELS: { key: keyof AppliedFilters; label: string }[] = [
+  { key: "branch", label: "지사" },
+  { key: "field", label: "분야" },
+  { key: "manualType", label: "매뉴얼 종류" },
+  { key: "facility", label: "설비명" },
+  { key: "faultContent", label: "고장내용" },
+  { key: "authorName", label: "작성자" },
+  { key: "fileName", label: "파일명" },
+];
+
 const FIELD_CLASS =
   "px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary";
 
@@ -281,9 +298,33 @@ export default function ArchiveBrowser({
     setFileName("");
   }
 
+  /** 칩의 ✕ — 그 조건 하나만 비우고 바로 다시 조회한다 (load 의 overrides 로 비운 값을 넘긴다) */
+  function clearOne(key: keyof AppliedFilters) {
+    const setters: Record<keyof AppliedFilters, (v: string) => void> = {
+      branch: setBranch,
+      field: setField,
+      manualType: setManualType,
+      facility: setFacility,
+      faultContent: setFaultContent,
+      authorName: setAuthor,
+      fileName: setFileName,
+    };
+    setters[key]("");
+    void load({ [key]: "" });
+  }
+
   const [rows, setRows] = useState<ArchiveRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /*
+   * 칩은 입력칸에 적어 둔 값이 아니라 "마지막으로 조회한 조건"을 보여 준다 — 적기만 하고
+   * [조회]를 안 눌렀는데 칩이 먼저 뜨면 결과와 조건이 어긋나 보인다.
+   */
+  const [applied, setApplied] = useState<AppliedFilters>({});
+  const appliedChips = CHIP_LABELS.flatMap(({ key, label }) => {
+    const value = (applied[key] ?? "").trim();
+    return value ? [{ key, label, value }] : [];
+  });
 
   /*
    * overrides 를 받는 이유: [초기화]는 칸을 비운 그 자리에서 바로 다시 조회해야
@@ -296,22 +337,30 @@ export default function ArchiveBrowser({
     setError(null);
     try {
       // fixedType 이 있으면 종류가 절대 흔들리지 않게 여기서 다시 고정한다
-      setRows(
-        await listArchive({
-          docType: fixedType ?? docType,
-          branch,
-          field,
-          // 그 종류에 없는 칸은 보내지 않는다 — 숨어 있는 칸의 옛 값이 조용히
-          // 조건으로 걸리면, 화면에는 아무 조건도 안 보이는데 결과만 비어 버린다
-          manualType: showManualType ? manualType : "",
-          facility: showFaultFields ? facility : "",
-          faultContent: showFaultFields ? faultContent : "",
-          authorName: author,
-          fileName,
-          limit: preview,
-          ...overrides,
-        }),
-      );
+      const params: ListFilter = {
+        docType: fixedType ?? docType,
+        branch,
+        field,
+        // 그 종류에 없는 칸은 보내지 않는다 — 숨어 있는 칸의 옛 값이 조용히
+        // 조건으로 걸리면, 화면에는 아무 조건도 안 보이는데 결과만 비어 버린다
+        manualType: showManualType ? manualType : "",
+        facility: showFaultFields ? facility : "",
+        faultContent: showFaultFields ? faultContent : "",
+        authorName: author,
+        fileName,
+        limit: preview,
+        ...overrides,
+      };
+      setRows(await listArchive(params));
+      setApplied({
+        branch: params.branch,
+        field: params.field,
+        manualType: params.manualType,
+        facility: params.facility,
+        faultContent: params.faultContent,
+        authorName: params.authorName,
+        fileName: params.fileName,
+      });
     } catch (e) {
       // 대부분 anon 권한 미설정 — 무엇을 해야 하는지 알려준다
       const msg = e instanceof Error ? e.message : "보관함을 읽지 못했습니다.";
@@ -417,6 +466,8 @@ export default function ArchiveBrowser({
    * 연 채로 다운로드를 눌렀을 때 한 번 더 기다리지 않는다.
    */
   async function open(row: ArchiveRow) {
+    // 행 클릭으로도 열리므로, 이미 여는 중이면 두 번째 요청을 보내지 않는다
+    if (openingId) return;
     setOpeningId(row.id);
     setError(null);
     try {
@@ -626,6 +677,41 @@ export default function ArchiveBrowser({
                 ? "조건에 맞는 문서가 없습니다."
                 : `${rows.length}건을 찾았습니다.`}
           </p>
+          {/*
+            적용 중인 조건 칩 — 검색 영역을 접어 둬도 무엇으로 걸러진 결과인지 보이고, ✕ 로
+            조건 하나만 바로 뺄 수 있다. PC 전용: 폰은 위 "N개 적용" 배지로 충분하다.
+          */}
+          {!filtersOpen && appliedChips.length > 0 && (
+            <div className="hidden md:flex flex-wrap items-center gap-2 mt-2">
+              {appliedChips.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => clearOne(c.key)}
+                  disabled={loading}
+                  aria-label={`${c.label} 조건 해제: ${c.value}`}
+                  className="inline-flex items-center gap-1 pl-3 pr-2 py-1 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-xs font-bold text-on-surface transition-colors disabled:opacity-40"
+                >
+                  <span className="text-on-surface-variant">{c.label}</span>
+                  <span>{c.value}</span>
+                  <Icon name="close" className="text-sm text-on-surface-variant" />
+                </button>
+              ))}
+              {appliedChips.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetFilters();
+                    void load(EMPTY_FILTERS);
+                  }}
+                  disabled={loading}
+                  className="text-xs font-bold text-primary hover:underline disabled:opacity-40"
+                >
+                  모두 해제
+                </button>
+              )}
+            </div>
+          )}
           {error && (
             <p className="mt-2 text-sm font-bold text-status-error flex items-start gap-1.5">
               <Icon name="error" className="text-base shrink-0" />
@@ -765,7 +851,12 @@ export default function ArchiveBrowser({
                 {rows.map((r) => (
                   <tr
                     key={r.id}
-                    className="border-b border-border-subtle last:border-0 text-on-surface"
+                    // 행 어디를 눌러도 미리보기가 열린다 — [열기]를 정확히 겨누지 않아도 된다.
+                    // 키보드·스크린리더는 행 안의 [열기] 버튼을 그대로 쓴다.
+                    onClick={() => void open(r)}
+                    className={`border-b border-border-subtle last:border-0 text-on-surface cursor-pointer hover:bg-surface-container-high/60 transition-colors ${
+                      openingId === r.id ? "opacity-60" : ""
+                    }`}
                   >
                     <td className="py-2 pr-3 whitespace-nowrap">
                       {/* 종류를 색 배지로 — 전체 조회처럼 섞여 나올 때 줄을 훑기만 해도 갈린다 */}
@@ -787,7 +878,11 @@ export default function ArchiveBrowser({
                       {new Date(r.created_at).toLocaleDateString("ko-KR")}
                     </td>
                     <td className="py-2">
-                      <div className="flex items-center justify-end gap-3">
+                      {/* 버튼 영역의 클릭은 행 클릭(미리보기)으로 번지지 않게 막는다 — 수정·삭제를 눌렀는데 미리보기가 뜨면 안 된다 */}
+                      <div
+                        className="flex items-center justify-end gap-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           type="button"
                           onClick={() => void open(r)}
