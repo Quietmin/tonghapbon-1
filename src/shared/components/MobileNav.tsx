@@ -26,6 +26,11 @@ const TAB_ACTIVE = {
   tertiary: "text-tertiary",
 } as const;
 
+const TAB_ACTIVE_CHIP = {
+  primary: "bg-primary-fixed",
+  tertiary: "bg-tertiary-fixed",
+} as const;
+
 export default function MobileNav() {
   const pathname = usePathname();
 
@@ -35,7 +40,7 @@ export default function MobileNav() {
     // 거기 바짝 붙이면 손가락이 걸리거나 시스템 제스처와 겹친다. viewport-fit=cover
     // (layout.tsx) 를 켜 둬야 env(safe-area-inset-bottom) 가 0 이 아닌 실제 값을
     // 준다 — 둘이 짝이다.
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 min-h-16 pb-[env(safe-area-inset-bottom)] bg-surface-glass backdrop-blur-xl border-t border-border-subtle flex justify-around items-center z-50 print:hidden">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 min-h-16 pb-[env(safe-area-inset-bottom)] bg-surface-glass backdrop-blur-xl border-t border-border-subtle flex items-stretch gap-1 px-2 z-50 print:hidden">
       {TABS.map((tab) => {
         // 홈은 정확히 일치할 때만 — 아니면 모든 경로에서 홈이 활성으로 보인다
         const active =
@@ -50,11 +55,16 @@ export default function MobileNav() {
             href={tab.href}
             // 아이콘 없이 글자만 — 세로로 쌓던 두 줄(아이콘+캡션)이 한 줄로 줄어
             // 글자를 더 키울 여유가 생겼다. min-w-0 + truncate 로 넘침만 막는다.
-            className={`flex items-center justify-center px-1 min-w-0 flex-1 h-full ${
-              active ? TAB_ACTIVE[tab.accent] : "text-on-surface-variant"
-            }`}
+            className="flex items-center justify-center min-w-0 flex-1 py-2"
           >
-            <span className={`text-sm truncate max-w-full ${active ? "font-bold" : "font-semibold"}`}>
+            {/* 글자 색뿐 아니라 옅은 배경 칩도 같이 켜서 "지금 여기" 를 또렷하게 한다 */}
+            <span
+              className={`px-3 py-1.5 rounded-full text-sm truncate max-w-full transition-colors ${
+                active
+                  ? `${TAB_ACTIVE[tab.accent]} ${TAB_ACTIVE_CHIP[tab.accent]} font-bold`
+                  : "text-on-surface-variant font-semibold"
+              }`}
+            >
               {tab.label}
             </span>
           </Link>

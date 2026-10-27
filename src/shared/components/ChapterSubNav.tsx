@@ -45,10 +45,12 @@ export default function ChapterSubNav() {
 
   return (
     <nav
-      className="md:hidden sticky top-16 z-30 -mx-gutter px-gutter py-2 bg-surface-glass backdrop-blur-xl border-b border-border-subtle"
+      className={`md:hidden sticky top-16 z-30 -mx-gutter px-gutter bg-surface-glass backdrop-blur-xl border-b border-border-subtle ${
+        dense ? "py-2" : "py-3"
+      }`}
       aria-label={`${group.label} 하위 화면`}
     >
-      <div className={dense ? "grid grid-cols-6 gap-1" : "flex flex-wrap justify-center gap-1.5"}>
+      <div className={dense ? "grid grid-cols-6 gap-1" : "flex gap-3"}>
         {items.map((item) => {
           const active = isActive(pathname, item);
           const label = MOBILE_LABEL_OVERRIDE[item.href] ?? item.label;
@@ -56,10 +58,12 @@ export default function ChapterSubNav() {
             <Link
               key={item.href}
               href={item.href}
+              // 2~3개뿐일 때는 균등폭(flex-1)의 큰 버튼으로 둬서 탭 전환을 확실하고
+              // 쉽게 누를 수 있게 한다 — 많을 때(dense)는 6열 그리드라 폭을 안 나눈다.
               className={`text-center leading-tight transition-colors ${
                 dense
                   ? "px-1 py-1.5 rounded-md text-[11px] font-bold"
-                  : "px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+                  : "flex-1 px-4 py-3 rounded-xl text-base font-bold"
               } ${active ? ACCENT_ACTIVE[group.accent] : "bg-surface-container-high text-on-surface-variant"}`}
             >
               {label}

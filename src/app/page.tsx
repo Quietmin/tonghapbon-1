@@ -8,6 +8,16 @@ const ACCENT_BAR = {
   tertiary: "bg-tertiary",
 } as const;
 
+/**
+ * 모바일 홈 카드 전용 한 줄 요약(개조식) — nav.ts 의 group.desc(서술형 문장,
+ * 데스크톱 카드가 그대로 씀)는 안 건드리고 여기서만 짧게 줄인다.
+ */
+const MOBILE_SUMMARY: Record<(typeof NAV_GROUPS)[number]["key"], string> = {
+  equipment: "설비 마스터 기반 오버홀 관리",
+  manual: "매뉴얼 조회 · 작성",
+  failure: "고장이력 조회 · 작성",
+};
+
 export default function HomePage() {
   return (
     <>
@@ -40,7 +50,9 @@ export default function HomePage() {
               <span className={`w-1 self-stretch rounded-full shrink-0 ${ACCENT_BAR[group.accent]}`} />
               <span className="flex-1 min-w-0 text-left">
                 <span className="block text-title-sm font-bold text-on-surface">{group.label}</span>
-                <span className="block text-xs text-on-surface-variant mt-0.5 truncate">{group.desc}</span>
+                <span className="block text-xs text-on-surface-variant mt-0.5 truncate">
+                  {MOBILE_SUMMARY[group.key]}
+                </span>
               </span>
               <Icon name="chevron_right" className="text-xl text-on-surface-variant shrink-0" />
             </Link>

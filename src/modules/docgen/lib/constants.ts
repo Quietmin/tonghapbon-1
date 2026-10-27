@@ -10,25 +10,26 @@ export type DocMode = "report" | "manual" | "fault";
 export const MODE_LABELS: Record<DocMode, string> = {
   report: "사진대장",
   manual: "매뉴얼",
-  fault: "고장 보고서",
+  fault: "고장이력",
 };
 
 /**
  * 화면 제목("매뉴얼 작성")에 쓰는 이름.
- * MODE_LABELS 와 따로 두는 이유: 보관함 표의 '종류' 칸에는 "고장 보고서"라고
- * 띄어 쓰는 게 읽기 좋은데, 메뉴와 제목은 "고장보고서 작성"으로 붙여 쓴다.
- * 한쪽을 고치면 다른 쪽 표기가 함께 어긋나므로 이름을 나눠 둔다.
+ * MODE_LABELS 와 따로 둔 이유는 원래 "고장 보고서"(표 칸)/"고장보고서"(제목)처럼
+ * 띄어쓰기만 다르게 쓰려던 것이었는데, 지금은 "고장이력"으로 둘 다 같은 표기라
+ * 사실상 같은 값이다 — 그래도 둘을 다시 합치지 않는다. 종류마다 표기가 또
+ * 갈릴 수 있으니(예: 표 칸은 짧게, 제목은 다르게) 자리를 나눠 둔 쪽이 안전하다.
  */
 export const MODE_TITLES: Record<DocMode, string> = {
   report: "사진대장",
   manual: "매뉴얼",
-  fault: "고장보고서",
+  fault: "고장이력",
 };
 
 export const MODE_PLACEHOLDERS: Record<DocMode, string> = {
   report: "예: 사진대장",
   manual: "예: 현장 매뉴얼",
-  fault: "예: 고장 보고서",
+  fault: "예: 고장 이력",
 };
 
 export const BRANCHES = [

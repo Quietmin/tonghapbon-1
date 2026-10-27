@@ -82,6 +82,18 @@ function formatBytes(n: number | null): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/**
+ * 작성자 이름 비공개 처리 — 첫 글자와 끝 글자만 남기고 가운데를 별표로 가린다
+ * (예: "김영섭" → "김*섭"). 2자 이하는 가릴 가운데가 없어 그대로 둔다.
+ */
+function maskName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  if (trimmed.length <= 2) return trimmed;
+  return trimmed[0] + "*".repeat(trimmed.length - 2) + trimmed[trimmed.length - 1];
+}
+
 /** [초기화] 가 넘기는 값 — 모든 조건을 비운 상태 */
 const EMPTY_FILTERS: Partial<ListFilter> = {
   branch: "",
@@ -436,7 +448,7 @@ export default function ArchiveBrowser({
               실행하세요.
             </p>
             <p className="text-sm text-on-surface-variant mt-2">
-              설정하지 않아도 사진대장·매뉴얼·고장 보고서의{" "}
+              설정하지 않아도 사진대장·매뉴얼·고장이력의{" "}
               <strong>PDF 생성과 다운로드는 그대로 됩니다.</strong>
             </p>
           </div>
@@ -654,7 +666,7 @@ export default function ArchiveBrowser({
           <EmptyState
             icon="inventory_2"
             title="문서가 없습니다"
-            desc="사진대장·매뉴얼·고장 보고서를 만들고 [PDF 출력]을 누르면 여기에 쌓입니다."
+            desc="사진대장·매뉴얼·고장이력을 만들고 [PDF 출력]을 누르면 여기에 쌓입니다."
           />
         ) : (
           <>
@@ -688,7 +700,7 @@ export default function ArchiveBrowser({
                   <p className="text-sm font-bold text-on-surface break-keep">{r.file_name}</p>
 
                   <p className="text-xs text-on-surface-variant">
-                    {[r.branch, r.field, r.author_name].filter(Boolean).join(" · ") || "-"}
+                    {[r.branch, r.field, maskName(r.author_name)].filter(Boolean).join(" · ") || "-"}
                   </p>
                   <p className="text-xs text-on-surface-variant">
                     사진 {r.photo_count}장 · {formatBytes(r.pdf_bytes)}
@@ -768,7 +780,7 @@ export default function ArchiveBrowser({
                     <td className="py-2 pr-3">{r.file_name}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{r.branch ?? "-"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{r.field ?? "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.author_name ?? "-"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{maskName(r.author_name) ?? "-"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{r.photo_count}장</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{formatBytes(r.pdf_bytes)}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">

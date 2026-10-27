@@ -273,6 +273,10 @@ export function ButtonLink({
  * 한눈에 들어온다. bullets 를 안 넘기면(undefined) desc 문단을 그대로 가운데
  * 정렬해 쓰고, 빈 배열([])로 넘기면 설명 자체를 아예 그리지 않는다 — 타이틀
  * 하나만 또렷하게 남기고 싶은 조회·작성 화면이 이 경우다.
+ *
+ * action(조회↔작성을 오가는 버튼)은 모바일에서는 그리지 않는다 — 같은 역할을
+ * 챕터 서브내비(ChapterSubNav)의 탭이 이미 하고 있어서, 타이틀 밑에 또 두면
+ * 중복이고 자리만 차지한다. 데스크톱은 서브내비가 없으니 그대로 보여준다.
  */
 export function ScreenHeader({
   icon,
@@ -309,7 +313,6 @@ export function ScreenHeader({
             ))}
           </ul>
         )}
-        {action && <div className="mt-5 [&>*]:w-full">{action}</div>}
       </div>
 
       {/* 데스크톱 */}
