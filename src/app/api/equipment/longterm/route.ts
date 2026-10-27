@@ -15,7 +15,10 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const pastYears = Number(url.searchParams.get("pastYears") ?? "2") || 2;
     const futureYears = Number(url.searchParams.get("futureYears") ?? "2") || 2;
-    const payload = await listLongTermPlan(branch, { pastYears, futureYears });
+    // 기준년도 — 표의 가운데 해. 터무니없는 값은 올해로 돌린다.
+    const baseRaw = Number(url.searchParams.get("baseYear"));
+    const baseYear = baseRaw >= 2000 && baseRaw <= 2100 ? baseRaw : undefined;
+    const payload = await listLongTermPlan(branch, { pastYears, futureYears, baseYear });
     return NextResponse.json({ ok: true, ...payload });
   } catch (e) {
     return NextResponse.json(

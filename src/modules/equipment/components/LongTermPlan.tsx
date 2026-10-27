@@ -64,14 +64,18 @@ export default function LongTermPlan({
 }) {
   const [data, setData] = useState<LongTermPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 표의 가운데 해 — null이면 올해. 판정(도래·예정)도 이 해 기준으로 계산된다 */
+  const [baseYear, setBaseYear] = useState<number | null>(null);
+  const nowYear = new Date().getFullYear();
 
   useEffect(() => {
     setData(null);
     setError(null);
     void (async () => {
       try {
+        const base = baseYear ? `&baseYear=${baseYear}` : "";
         const json = await (
-          await fetch(`/api/equipment/longterm?branch=${encodeURIComponent(branch)}`)
+          await fetch(`/api/equipment/longterm?branch=${encodeURIComponent(branch)}${base}`)
         ).json();
         if (json.ok) setData(json);
         else setError(json.error ?? "장기 계획을 불러오지 못했습니다.");
@@ -79,7 +83,7 @@ export default function LongTermPlan({
         setError(e instanceof Error ? e.message : String(e));
       }
     })();
-  }, [branch]);
+  }, [branch, baseYear]);
 
   const th = "py-3 text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest";
 
@@ -91,6 +95,21 @@ export default function LongTermPlan({
         <h2 className="text-title-sm text-on-surface flex items-center gap-2">
           <Icon name="calendar_month" className="text-base text-primary" />
           장기 유지보수 계획
+          <select
+            value={baseYear ?? nowYear}
+            onChange={(e) => {
+              const y = Number(e.target.value);
+              setBaseYear(y === nowYear ? null : y);
+            }}
+            title="기준년도 — 이 해를 가운데에 두고 앞뒤 2년씩 보여줍니다"
+            className="ml-1 h-7 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-xs font-bold outline-none focus:border-primary"
+          >
+            {Array.from({ length: 11 }, (_, k) => nowYear - 5 + k).map((y) => (
+              <option key={y} value={y}>
+                기준 {y}년{y === nowYear ? " (올해)" : ""}
+              </option>
+            ))}
+          </select>
         </h2>
         <div className="flex flex-wrap items-center gap-3 text-[11px] text-on-surface-variant">
           <span className="flex items-center gap-1">
