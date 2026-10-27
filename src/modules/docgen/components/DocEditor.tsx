@@ -1010,7 +1010,7 @@ export default function DocEditor({
               <EmptyState
                 icon="photo_library"
                 title="사진이 없습니다"
-                desc="[사진 추가]로 앨범에서 고르세요. 한 번에 여러 장 선택할 수 있습니다. 폰에서는 [촬영]으로 바로 찍어 붙일 수 있습니다."
+                desc={"[사진 추가]로 사진을 골라요.\n폰에서는 [촬영]으로 바로 찍어요."}
               />
             ) : (
               // 왼쪽 폭이 전체 화면보다 좁아질 수 있어(2열 미리보기 때문에) 3열까지는
@@ -1114,32 +1114,35 @@ export default function DocEditor({
           </Card>
 
           {/* ---- 출력 ----
-              세 버튼은 같은 폭으로 나란히 — flex-wrap 으로 가운데 모으면 폭이
-              좁은 폰에서 두 개는 한 줄, 하나는 다음 줄로 떨어져 보였다. grid 로
-              묶어 셋이 항상 한 줄에 나란히 있게 한다. */}
+              세 버튼은 같은 폭으로 나란히, 글자는 한 줄 가로쓰기로 — 아이콘을
+              빼서 생긴 자리를 글자에 그대로 준다. 아이콘이 있을 때는 gap 때문에
+              좁은 칸에서 글자가 세로로 꺾여 보였다. */}
           <Card className="p-card-padding flex flex-col gap-3">
             <div className="grid grid-cols-3 gap-2">
               {/* 새로고침하면 작성 중이던 내용이 사라지므로, 잠깐 자리를 비울 때 눌러 둔다 */}
               <Button
                 variant="ghost"
-                className="w-full"
+                className="w-full !px-1 whitespace-nowrap"
                 onClick={() => void handleSaveDraft()}
                 disabled={draftBusy || items.length === 0}
               >
-                <Icon name="save" className="text-lg" />
                 {draftBusy ? "저장 중…" : "임시저장"}
               </Button>
-              <Button className="w-full" onClick={handleExport} disabled={busy || items.length === 0}>
-                <Icon name="picture_as_pdf" className="text-lg" />
-                {busy ? "만들고 있습니다…" : "PDF 출력"}
+              <Button
+                className="w-full !px-1 whitespace-nowrap"
+                onClick={handleExport}
+                disabled={busy || items.length === 0}
+              >
+                {/* 평소엔 "PDF 출력"과 길이가 비슷해야 버튼이 한 줄을 유지한다 —
+                    "만들고 있습니다…"는 너무 길어 혼자만 줄바꿈되거나 넘쳤다 */}
+                {busy ? "생성 중…" : "PDF 출력"}
               </Button>
               <Button
                 variant="ghost"
-                className="w-full"
+                className="w-full !px-1 whitespace-nowrap"
                 onClick={handleMail}
                 disabled={busy || items.length === 0}
               >
-                <Icon name="mail" className="text-lg" />
                 메일로 전송
               </Button>
             </div>

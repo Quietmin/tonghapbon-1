@@ -351,7 +351,11 @@ export function EmptyState({
         <Icon name={icon} className="text-3xl" />
       </div>
       <h4 className="text-title-sm text-on-surface mb-1">{title}</h4>
-      {desc && <p className="text-sm text-on-surface-variant max-w-sm mb-4">{desc}</p>}
+      {/* whitespace-pre-line — desc 안의 줄바꿈을 그대로 살린다. 문장을 한 줄씩
+          끊어 주지 않으면 브라우저가 아무 데서나 꺾어 너저분해 보인다. */}
+      {desc && (
+        <p className="text-sm text-on-surface-variant max-w-sm mb-4 whitespace-pre-line">{desc}</p>
+      )}
       {action}
     </div>
   );
