@@ -552,7 +552,7 @@ export default function ArchiveBrowser({
                         label="설비명"
                         value={facility}
                         onChange={setFacility}
-                        placeholder="예: 변압기"
+                        placeholder="설비명 입력"
                         onEnter={load}
                       />
                       <FilterInput
@@ -560,7 +560,7 @@ export default function ArchiveBrowser({
                         label="고장내용"
                         value={faultContent}
                         onChange={setFaultContent}
-                        placeholder="예: 방압변"
+                        placeholder="고장내용 입력"
                         onEnter={load}
                       />
                     </>
@@ -570,7 +570,7 @@ export default function ArchiveBrowser({
                     label="작성자"
                     value={author}
                     onChange={setAuthor}
-                    placeholder="작성자 이름 일부 입력"
+                    placeholder="작성자 입력"
                     onEnter={load}
                   />
                   {/*
@@ -585,7 +585,7 @@ export default function ArchiveBrowser({
                       label="파일명"
                       value={fileName}
                       onChange={setFileName}
-                      placeholder="파일명 일부 입력"
+                      placeholder="파일명 입력"
                       onEnter={load}
                     />
                   </div>

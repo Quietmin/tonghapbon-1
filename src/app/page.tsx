@@ -18,6 +18,17 @@ const MOBILE_SUMMARY: Record<(typeof NAV_GROUPS)[number]["key"], string> = {
   failure: "고장보고서 조회 · 작성",
 };
 
+/**
+ * 첫 화면 전용 표기 — 사이드바·하단탭·헤더는 "설비관리"처럼 붙여 쓰지만, 첫
+ * 화면의 큰 챕터 이름은 "설비 관리"처럼 띄어 써야 읽기 편하다는 요청으로 여기서만
+ * 따로 둔다. nav.ts 의 label(다른 화면들이 쓰는 값)은 건드리지 않는다.
+ */
+const HOME_LABEL: Record<(typeof NAV_GROUPS)[number]["key"], string> = {
+  equipment: "설비 관리",
+  manual: "매뉴얼 관리",
+  failure: "고장 관리",
+};
+
 export default function HomePage() {
   return (
     <>
@@ -49,7 +60,9 @@ export default function HomePage() {
             >
               <span className={`w-1 self-stretch rounded-full shrink-0 ${ACCENT_BAR[group.accent]}`} />
               <span className="flex-1 min-w-0 text-left">
-                <span className="block text-title-sm font-bold text-on-surface">{group.label}</span>
+                <span className="block text-title-sm font-bold text-on-surface">
+                  {HOME_LABEL[group.key]}
+                </span>
                 <span className="block text-xs text-on-surface-variant mt-0.5 truncate">
                   {MOBILE_SUMMARY[group.key]}
                 </span>
@@ -87,7 +100,7 @@ export default function HomePage() {
                     group.accent === "tertiary" ? "hover:text-tertiary" : "hover:text-primary"
                   }`}
                 >
-                  {group.label}
+                  {HOME_LABEL[group.key]}
                 </h2>
               </Link>
               <p className="text-sm text-on-surface-variant mt-2 flex-1">{group.desc}</p>
