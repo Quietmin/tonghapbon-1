@@ -662,7 +662,7 @@ export default function PhotoEditorModal({
           </button>
         </div>
 
-        <p className="text-white/60 text-[11px] text-center">
+        <p className="text-white/60 text-[11px] md:text-[12px] text-center">
           {message ??
             (isCrop
               ? HINT_CROP

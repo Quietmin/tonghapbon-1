@@ -66,7 +66,7 @@ export default function ChapterSubNav() {
               // 쉽게 누를 수 있게 한다 — 많을 때(dense)는 6열 그리드라 폭을 안 나눈다.
               className={`text-center leading-tight transition-colors ${
                 dense
-                  ? "px-1 py-1.5 rounded-md text-[11px] font-bold"
+                  ? "px-1 py-1.5 rounded-md text-[11px] md:text-[12px] font-bold"
                   : "flex-1 px-4 py-3 rounded-xl text-base font-bold"
               } ${active ? ACCENT_ACTIVE[group.accent] : "bg-surface-container-high text-on-surface-variant"}`}
             >

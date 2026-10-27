@@ -69,7 +69,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
               },
             ].map((s) => (
               <div key={s.label} className="text-center">
-                <p className="text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">
+                <p className="text-[11px] md:text-[12px] text-on-surface-variant uppercase tracking-wider font-semibold">
                   {s.label}
                 </p>
                 <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
@@ -245,7 +245,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
             </p>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">
+            <p className="text-[11px] md:text-[12px] text-on-surface-variant uppercase tracking-wider font-semibold">
               오버홀 기간
             </p>
             <p className="text-sm font-semibold text-on-surface">
@@ -258,7 +258,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
           <div className="flex items-center gap-4">
             <ProgressRing value={d.overall} size={104}>
               <span className="text-2xl font-black text-on-surface">{d.overall}%</span>
-              <span className="text-[10px] text-on-surface-variant">전체</span>
+              <span className="text-[10px] md:text-[12px] text-on-surface-variant">전체</span>
             </ProgressRing>
           </div>
           <div className="md:col-span-2 grid grid-cols-2 gap-4">

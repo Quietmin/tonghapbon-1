@@ -53,7 +53,7 @@ export default function BranchOverview({
     return <EmptyState icon="apartment" title="지사 정보가 없습니다" desc="" />;
   }
 
-  const th = "py-3 text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest";
+  const th = "py-3 text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest";
 
   return (
     <Card lift={false} className="p-0 overflow-hidden">
@@ -86,7 +86,7 @@ export default function BranchOverview({
                       <Icon name="apartment" className="text-base text-on-surface-variant" />
                       {r.branch}
                       {active && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-primary/10 text-primary">
                           보는 중
                         </span>
                       )}

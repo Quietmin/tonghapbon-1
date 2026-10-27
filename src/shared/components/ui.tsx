@@ -76,7 +76,7 @@ const FIELD_STYLE: Record<string, string> = {
 export function FieldChip({ field }: { field: string }) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold ${
         FIELD_STYLE[field] || FIELD_STYLE["미분류"]
       }`}
     >
@@ -176,7 +176,7 @@ export function Avatar({
     : "bg-outline-variant text-on-surface-variant";
   return (
     <div
-      className={`${size} rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${bg} ${className}`}
+      className={`${size} rounded-full flex items-center justify-center text-[10px] md:text-[12px] font-bold shrink-0 ${bg} ${className}`}
     >
       {initials}
     </div>

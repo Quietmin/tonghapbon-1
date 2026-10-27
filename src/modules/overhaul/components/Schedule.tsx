@@ -406,7 +406,7 @@ export default function Schedule() {
               <div className="min-w-[760px]">
                 {/* 타임라인 헤더 */}
                 <div className="flex items-stretch border-b border-border-subtle pb-2 mb-2">
-                  <div className="w-[220px] shrink-0 text-[12px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end">
+                  <div className="w-[220px] shrink-0 text-[12px] md:text-[13px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end">
                     설비 / 작업
                   </div>
                   <div className="relative flex-1 h-8">
@@ -416,10 +416,10 @@ export default function Schedule() {
                         className="absolute top-0 bottom-0 flex flex-col items-center -translate-x-1/2"
                         style={{ left: pos(d) }}
                       >
-                        <span className="text-[10px] text-on-surface-variant whitespace-nowrap">
+                        <span className="text-[10px] md:text-[12px] text-on-surface-variant whitespace-nowrap">
                           {startDate ? ymd(addDays(toDate(startDate), d)).slice(5) : ""}
                         </span>
-                        <span className="text-[9px] text-on-surface-variant/60">D+{d}</span>
+                        <span className="text-[9px] md:text-[12px] text-on-surface-variant/60">D+{d}</span>
                       </div>
                     ))}
                   </div>
@@ -432,7 +432,7 @@ export default function Schedule() {
                     className="absolute top-0 bottom-0 w-px bg-status-error/70 z-10 pointer-events-none"
                     style={{ left: `calc(220px + (100% - 220px) * ${todayOff / total})` }}
                   >
-                    <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] font-bold text-status-error bg-surface px-1 rounded">
+                    <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] md:text-[12px] font-bold text-status-error bg-surface px-1 rounded">
                       오늘
                     </span>
                   </div>
@@ -468,7 +468,7 @@ export default function Schedule() {
                               />
                             </div>
                             <span
-                              className="absolute top-1/2 -translate-y-1/2 text-[10px] font-bold text-on-surface-variant"
+                              className="absolute top-1/2 -translate-y-1/2 text-[10px] md:text-[12px] font-bold text-on-surface-variant"
                               style={{ left: `calc(${pos(g.maxOff)} + 6px)` }}
                             >
                               {g.progress}%
@@ -499,8 +499,8 @@ export default function Schedule() {
                                       {r.name}
                                     </p>
                                     {r.actual >= 100 ? (
-                                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-success/15 text-status-success shrink-0 flex items-center gap-0.5">
-                                        <Icon name="check" className="text-[10px]" /> 완료
+                                      <span className="px-1.5 py-0.5 rounded-full text-[9px] md:text-[12px] font-bold bg-status-success/15 text-status-success shrink-0 flex items-center gap-0.5">
+                                        <Icon name="check" className="text-[10px] md:text-[12px]" /> 완료
                                       </span>
                                     ) : r.behind ? (
                                       <span
@@ -509,9 +509,9 @@ export default function Schedule() {
                                             ? `계획 종료일(${r.sch.plannedEndStr})에서 ${overdueDays}일 지났습니다`
                                             : "오늘까지 나갔어야 할 계획 진도보다 뒤처졌습니다"
                                         }
-                                        className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-error/15 text-status-error shrink-0 flex items-center gap-0.5"
+                                        className="px-1.5 py-0.5 rounded-full text-[9px] md:text-[12px] font-bold bg-status-error/15 text-status-error shrink-0 flex items-center gap-0.5"
                                       >
-                                        <Icon name="warning" className="text-[10px]" />
+                                        <Icon name="warning" className="text-[10px] md:text-[12px]" />
                                         {overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
                                       </span>
                                     ) : null}
@@ -527,11 +527,11 @@ export default function Schedule() {
                                       <Icon name="edit_calendar" className="text-sm" />
                                     </button>
                                   </div>
-                                  <p className="text-[10px] text-on-surface-variant font-mono-data flex items-center gap-1">
+                                  <p className="text-[10px] md:text-[12px] text-on-surface-variant font-mono-data flex items-center gap-1">
                                     계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}
                                     {r.sch.source === "excel" && (
                                       <span
-                                        className="text-[9px] font-bold text-primary not-italic"
+                                        className="text-[9px] md:text-[12px] font-bold text-primary not-italic"
                                         title="엑셀에서 받았거나 손으로 지정한 일정"
                                       >
                                         지정
@@ -539,7 +539,7 @@ export default function Schedule() {
                                     )}
                                   </p>
                                   <p
-                                    className={`text-[10px] font-mono-data ${
+                                    className={`text-[10px] md:text-[12px] font-mono-data ${
                                       r.actualBar ? BAR_STYLE[barColor].text : "text-on-surface-variant/50"
                                     }`}
                                   >
@@ -583,7 +583,7 @@ export default function Schedule() {
                                   )}
                                   {/* 진행률 라벨 */}
                                   <span
-                                    className={`absolute top-[13px] text-[10px] font-bold ${BAR_STYLE[barColor].text}`}
+                                    className={`absolute top-[13px] text-[10px] md:text-[12px] font-bold ${BAR_STYLE[barColor].text}`}
                                     style={{ left: `calc(${pos(labelOff)} + 6px)` }}
                                   >
                                     {r.actual}%

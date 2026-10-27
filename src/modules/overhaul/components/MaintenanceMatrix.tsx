@@ -249,7 +249,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 계약변경 등으로 보수하지 않음 (확인된 사실)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-on-surface-variant bg-surface-container-highest ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface-variant bg-surface-container-highest ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -261,7 +261,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 실적으로 확인된 보수${cell.done ? ` (${cell.done}급)` : ""}`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-on-primary ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-primary ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         } bg-status-success`}
       >
@@ -273,7 +273,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 관리계획 엑셀상 ${cell.planned}급 (실적 미확인)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-on-surface bg-primary/15 border border-primary/30 ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface bg-primary/15 border border-primary/30 ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -285,7 +285,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 과거 등급이 반복되는 패턴을 찾아 추정한 등급 (확정 아님 — 확인 권장)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-status-info border border-dashed border-status-info/50 ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-status-info border border-dashed border-status-info/50 ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -297,7 +297,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 반복 패턴이 확인되지 않아 등급을 추정할 수 없음 — 확인 필요`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold text-on-surface-variant border border-dashed border-outline-variant ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface-variant border border-dashed border-outline-variant ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -586,7 +586,7 @@ export default function MaintenanceMatrix() {
           <div className="overflow-x-auto">
             <table className="text-left border-collapse">
               <thead>
-                <tr className="text-on-surface-variant text-[11px] font-semibold uppercase tracking-widest border-b border-border-subtle">
+                <tr className="text-on-surface-variant text-[11px] md:text-[12px] font-semibold uppercase tracking-widest border-b border-border-subtle">
                   <th className="py-3 pl-card-padding pr-3 sticky left-0 bg-surface-container-lowest z-10 min-w-[220px]">
                     대분류 / 설비명
                   </th>
@@ -624,12 +624,12 @@ export default function MaintenanceMatrix() {
                     <td className="py-2 pl-card-padding pr-3 sticky left-0 bg-surface-container-lowest z-10">
                       <div className="flex items-center gap-1.5">
                         {r.field && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
+                          <span className="text-[10px] md:text-[12px] font-bold px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
                             {r.field}
                           </span>
                         )}
                         {!r.isActive && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-error/10 text-error">
+                          <span className="text-[10px] md:text-[12px] font-bold px-1.5 py-0.5 rounded bg-error/10 text-error">
                             사용중지
                           </span>
                         )}
@@ -637,7 +637,7 @@ export default function MaintenanceMatrix() {
                       <p className="font-semibold text-on-surface text-sm truncate max-w-[200px]">
                         {r.name}
                       </p>
-                      <p className="text-[11px] text-on-surface-variant truncate max-w-[200px]">
+                      <p className="text-[11px] md:text-[12px] text-on-surface-variant truncate max-w-[200px]">
                         {r.category ?? "—"}
                       </p>
                     </td>

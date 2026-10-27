@@ -120,7 +120,7 @@ function PhotoGroup({
     <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-xs font-bold text-on-surface">{label}</span>
-        <span className="text-[11px] text-on-surface-variant">
+        <span className="text-[11px] md:text-[12px] text-on-surface-variant">
           {items.length}/{MAX_PER_SLOT}장
         </span>
       </div>
@@ -152,7 +152,7 @@ function PhotoGroup({
               <Icon name="close" className="text-sm" />
             </button>
             {it.note && (
-              <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-[9px] text-center py-0.5">
+              <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-[9px] md:text-[12px] text-center py-0.5">
                 {it.note}
               </span>
             )}
@@ -170,7 +170,7 @@ function PhotoGroup({
               name={working ? "hourglass_top" : "add_a_photo"}
               className="text-xl text-on-surface-variant"
             />
-            <span className="text-[10px] font-semibold text-on-surface-variant px-1 text-center leading-tight">
+            <span className="text-[10px] md:text-[12px] font-semibold text-on-surface-variant px-1 text-center leading-tight">
               {working ?? "사진 추가"}
             </span>
           </button>
@@ -269,7 +269,7 @@ function HistoryTimeline({
                         </span>
                       )}
                       {delayed && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-error/10 text-status-error">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] md:text-[12px] font-bold bg-status-error/10 text-status-error">
                           지연
                         </span>
                       )}
@@ -639,7 +639,7 @@ export default function PerformanceEntry() {
             ))}
           </select>
           {optionsTruncated && (
-            <p className="text-[11px] text-on-surface-variant md:max-w-xs">
+            <p className="text-[11px] md:text-[12px] text-on-surface-variant md:max-w-xs">
               작업이 많아 목록을 일부만 보여줍니다 — 위에서 검색해 좁히세요.
             </p>
           )}

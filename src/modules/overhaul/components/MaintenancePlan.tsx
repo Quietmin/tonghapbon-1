@@ -645,7 +645,7 @@ export default function MaintenancePlan() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[980px]">
                   <thead>
-                    <tr className="text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest border-b border-border-subtle">
+                    <tr className="text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest border-b border-border-subtle">
                       <th className="py-3 pl-card-padding w-10">
                         {tab !== "참고" && (
                           <input
@@ -681,20 +681,20 @@ export default function MaintenancePlan() {
                         <td className="py-3 pr-3">
                           <div className="flex items-center gap-2 mb-0.5">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                              className={`px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold ${
                                 CLASS_STYLE[r.judge.classification]
                               }`}
                             >
                               {r.judge.classification}
                             </span>
                             {r.judge.needsDecision && (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-warning/15 text-status-warning flex items-center gap-1">
-                                <Icon name="help" className="text-[12px]" />
+                              <span className="px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/15 text-status-warning flex items-center gap-1">
+                                <Icon name="help" className="text-[12px] md:text-[13px]" />
                                 판단 필요
                               </span>
                             )}
                             {r.plannedGrade && (
-                              <span className="text-[11px] font-bold text-on-surface-variant">
+                              <span className="text-[11px] md:text-[12px] font-bold text-on-surface-variant">
                                 계획 {r.plannedGrade}급
                               </span>
                             )}
@@ -734,7 +734,7 @@ export default function MaintenancePlan() {
                         </td>
                         <td className="py-3 pr-card-padding text-sm whitespace-nowrap">
                           {r.isOverhaul ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-primary/10 text-primary">
                               O/H
                             </span>
                           ) : (

@@ -190,13 +190,13 @@ export default function Sidebar() {
                     return (
                       <div key={item.href}>
                         {showSection && (
-                          <p className="px-3 mt-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60">
+                          <p className="px-3 mt-3 mb-1 text-[12px] font-bold uppercase tracking-wider text-on-surface-variant/60">
                             {item.section}
                           </p>
                         )}
                         <Link
                           href={item.href}
-                          className={`${LINK_BASE} py-2 text-sm ${
+                          className={`${LINK_BASE} py-2 text-[15px] ${
                             isActive(pathname, item)
                               ? `${ACCENT_STYLE[group.accent].solid} font-bold translate-x-1`
                               : "text-on-surface-variant hover:bg-surface-container-high"

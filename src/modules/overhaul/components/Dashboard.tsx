@@ -239,7 +239,7 @@ export default function Dashboard() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest border-b border-border-subtle">
+                <tr className="text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest border-b border-border-subtle">
                   <th className="pb-4">설비</th>
                   <th className="pb-4">분야</th>
                   <th className="pb-4">작업 수</th>

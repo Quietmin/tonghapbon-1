@@ -126,6 +126,9 @@
   --text-title-sm--font-weight: 500;
   --text-body-md: 15px;
   --text-body-md--line-height: 20px;
+  /* Tailwind 기본값과 같다 — 아래 md 이상 블록에서 한 단계 올리기 위해 명시해 둔다 */
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
   --text-label-caps: 12px;
   --text-label-caps--line-height: 16px;
   --text-label-caps--letter-spacing: 0.05em;
@@ -142,6 +145,22 @@
 
 :root {
   color-scheme: light;
+}
+
+/*
+ * 데스크톱(md 이상) 가독성 보정 — 모바일은 위 @theme 값 그대로 둔다.
+ * 한글은 12px 아래에서 획이 뭉개지고, 보조 글자색 #707070(대비 4.7:1)은 작은
+ * 글자에서 흐려 보여 PC 화면에서만 한 단계 올린다. 소스에 박힌 text-[9~12px]
+ * 는 md:text-[12~13px] 를 덧붙여 같은 기준을 따른다.
+ */
+@media (min-width: 768px) {
+  :root {
+    --text-body-md: 16px;
+    --text-body-md--line-height: 22px;
+    --text-xs: 13px;
+    --text-xs--line-height: 18px;
+    --color-on-surface-variant: #595959;
+  }
 }
 
 html,

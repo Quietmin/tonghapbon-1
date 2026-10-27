@@ -12,7 +12,7 @@ import type { LongTermCell, LongTermPayload } from "@/modules/equipment/lib/long
  */
 
 function YearCell({ cell, isThisYear }: { cell: LongTermCell; isThisYear: boolean }) {
-  const base = "w-9 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] font-bold";
+  const base = "w-9 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold";
   const ring = isThisYear ? " ring-2 ring-primary ring-offset-1" : "";
   if (cell.done) {
     return (
@@ -85,7 +85,7 @@ export default function LongTermPlan({
     })();
   }, [branch, baseYear]);
 
-  const th = "py-3 text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest";
+  const th = "py-3 text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest";
 
   const rows = data ? (fieldFilter ? data.rows.filter((r) => r.field === fieldFilter) : data.rows) : [];
 
@@ -111,7 +111,7 @@ export default function LongTermPlan({
             ))}
           </select>
         </h2>
-        <div className="flex flex-wrap items-center gap-3 text-[11px] text-on-surface-variant">
+        <div className="flex flex-wrap items-center gap-3 text-[11px] md:text-[12px] text-on-surface-variant">
           <span className="flex items-center gap-1">
             <span className="w-3.5 h-3.5 rounded bg-status-success inline-block" />
             실적
@@ -186,7 +186,7 @@ export default function LongTermPlan({
                       {!r.equipmentId && (
                         <span
                           title="보수계획에는 있지만 설비 마스터에 등록되지 않은 이름입니다"
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-warning/10 text-status-warning"
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/10 text-status-warning"
                         >
                           마스터 미등록
                         </span>

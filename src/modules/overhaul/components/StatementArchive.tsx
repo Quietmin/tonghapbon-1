@@ -162,11 +162,11 @@ export default function StatementArchive() {
                 </p>
               </div>
               {s.reconciled_at ? (
-                <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-status-success/10 text-status-success whitespace-nowrap">
+                <span className="text-[11px] md:text-[12px] font-bold px-2 py-1 rounded-full bg-status-success/10 text-status-success whitespace-nowrap">
                   반영됨 · {s.reconciled_at.slice(0, 10)}
                 </span>
               ) : (
-                <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-status-warning/10 text-status-warning whitespace-nowrap">
+                <span className="text-[11px] md:text-[12px] font-bold px-2 py-1 rounded-full bg-status-warning/10 text-status-warning whitespace-nowrap">
                   반영 필요
                 </span>
               )}

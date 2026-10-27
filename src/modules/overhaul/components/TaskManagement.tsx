@@ -201,7 +201,7 @@ export default function TaskManagement() {
           <div className="overflow-x-auto">
             <table className="w-full text-left min-w-[860px]">
               <thead>
-                <tr className="text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest border-b border-border-subtle">
+                <tr className="text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest border-b border-border-subtle">
                   <th className="pb-3 pr-3">설비 / 작업명</th>
                   <th className="pb-3 px-3">규격</th>
                   <th className="pb-3 px-3">계획수량</th>

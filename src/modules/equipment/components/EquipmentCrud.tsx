@@ -357,7 +357,7 @@ export default function EquipmentCrud({
   }
 
   const visible = items ? (fieldFilter ? items.filter((e) => e.field === fieldFilter) : items) : null;
-  const th = "py-3 text-on-surface-variant text-[12px] font-semibold uppercase tracking-widest";
+  const th = "py-3 text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest";
 
   return (
     <>
