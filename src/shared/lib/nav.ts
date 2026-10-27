@@ -28,7 +28,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  key: "equipment" | "failure" | "manual";
+  key: "equipment" | "failure" | "manual" | "status";
   label: string;
   /**
    * 챕터 색. 사이드바·하단탭·각 화면 제목이 모두 이 값을 읽으므로, 챕터를
@@ -107,6 +107,21 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/failure", label: "고장보고서 조회", icon: "inventory_2", exact: true },
       { href: "/failure/new", label: "고장보고서 작성", icon: "edit_note" },
       { href: "/failure/history/new", label: "수기 등록", icon: "note_add", desktopOnly: true },
+    ],
+  },
+  {
+    // 네 번째 챕터 — 현황을 조회하고 등록한다. 화면 내용은 아직 정해지는 중이라 지금은 뼈대만 있다
+    // (/status, /status/new). 챕터 첫 화면이 곧 조회다 — 매뉴얼관리·고장관리와 같은 구조.
+    key: "status",
+    label: "현황관리",
+    accent: "primary",
+    short: "현황",
+    icon: "assessment",
+    root: "/status",
+    desc: "현황을 조회하고, 새 현황을 등록합니다.",
+    items: [
+      { href: "/status", label: "현황 조회", icon: "monitoring", exact: true },
+      { href: "/status/new", label: "현황 등록", icon: "edit_note" },
     ],
   },
 ];

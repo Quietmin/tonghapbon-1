@@ -17,6 +17,7 @@ const MOBILE_SUMMARY: Record<(typeof NAV_GROUPS)[number]["key"], string> = {
   equipment: "설비 마스터 기반 오버홀 관리",
   manual: "매뉴얼 조회 · 작성",
   failure: "고장보고서 조회 · 작성",
+  status: "현황 조회 · 등록",
 };
 
 /**
@@ -28,6 +29,7 @@ const HOME_LABEL: Record<(typeof NAV_GROUPS)[number]["key"], string> = {
   equipment: "설비 관리",
   manual: "매뉴얼 관리",
   failure: "고장 관리",
+  status: "현황 관리",
 };
 
 export default async function HomePage() {

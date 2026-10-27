@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_GROUPS, isActive, type NavItem } from "@/shared/lib/nav";
 
-// 모바일에서는 하위 메뉴까지 담을 공간이 없어 홈 + 메인 메뉴 3개만 노출한다.
+// 모바일에서는 하위 메뉴까지 담을 공간이 없어 홈 + 메인 메뉴(챕터)만 노출한다.
 // 챗봇은 탭이 아니라 떠 있는 도크(ChatbotDock)라 여기 없다 — 그래서 탭이 4개로
 // 줄어 앱 하단탭 그대로의 모양이 된다.
 const TABS = [
@@ -68,7 +68,7 @@ export default function MobileNav() {
           >
             {/* 글자 색뿐 아니라 옅은 배경 칩도 같이 켜서 "지금 여기" 를 또렷하게 한다 */}
             <span
-              className={`px-3 py-1.5 max-w-full text-center transition-colors ${
+              className={`px-1.5 py-1.5 max-w-full text-center transition-colors ${
                 twoLine
                   ? "rounded-2xl text-xs leading-tight whitespace-pre-line"
                   : "rounded-full text-sm truncate"
