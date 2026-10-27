@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import {
   ACCENT_STYLE,
   Button,
@@ -104,6 +104,23 @@ const EMPTY_FILTERS: Partial<ListFilter> = {
   authorName: "",
   fileName: "",
 };
+
+/**
+ * PC 폭(Tailwind md = 768px 이상)인지. 레이아웃은 CSS(md:)가 정하고, 이 값은 접근성
+ * 속성(aria-expanded·tabIndex)만 맞추는 데 쓴다. 서버·첫 렌더는 false(폰 기준)라
+ * 하이드레이션이 어긋나지 않는다.
+ */
+function useIsDesktop(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia("(min-width: 768px)");
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia("(min-width: 768px)").matches,
+    () => false,
+  );
+}
 
 /** 지금 화면 결과에 실제로 걸려 있는 조회 조건 — 조회 버튼을 누른 시점의 값이다 */
 type AppliedFilters = Pick<
@@ -261,10 +278,13 @@ export default function ArchiveBrowser({
   const [fileName, setFileName] = useState("");
 
   /*
-   * 조건은 접어 둔 채로 들어온다 — 화면을 열면 결과가 먼저 보이고, 조건을 만질
+   * 폰에서는 조건을 접어 둔 채로 들어온다 — 화면을 열면 결과가 먼저 보이고, 조건을 만질
    * 때만 펴면 되므로 목록에 쓸 자리가 넓어진다. (원본과 같은 기본값)
+   * PC(md 이상)는 늘 펼쳐 둔다 — 자리가 넉넉하고, 누르지 않아도 바로 조건을 고를 수 있어야
+   * 해서다. 그래서 PC 에서는 머리줄의 접기 버튼이 동작하지 않는다.
    */
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const isDesktop = useIsDesktop();
 
   /** 지금 종류에서 실제로 쓰이는 칸만 본다 — 숨어 있는 칸은 세지 않는다 */
   const type = fixedType ?? docType;
@@ -525,26 +545,34 @@ export default function ArchiveBrowser({
 
       {!isPreview && (
         <Card className="p-0 overflow-hidden" lift={false}>
-          {/* 머리줄 — 누르면 펴고 접는다. 접혀 있을 때도 몇 개가 걸렸는지는 보인다 */}
+          {/*
+            머리줄 — 폰에서는 누르면 펴고 접는다. 접혀 있을 때도 몇 개가 걸렸는지는 보인다.
+            PC 는 늘 펼쳐 두므로 접기 버튼(화살표)·"N개 적용" 배지를 감추고 눌러도 아무 일이
+            없게 한다 — 걸린 조건은 아래 칩이 보여 준다.
+          */}
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
-            aria-expanded={filtersOpen}
+            aria-expanded={isDesktop || filtersOpen}
             aria-controls="archiveFilters"
-            className="w-full flex items-center gap-2 px-card-padding py-4 text-left hover:bg-surface-container-high transition-colors"
+            tabIndex={isDesktop ? -1 : 0}
+            className="w-full flex items-center gap-2 px-card-padding py-4 text-left hover:bg-surface-container-high transition-colors md:pointer-events-none md:hover:bg-transparent md:pb-2"
           >
             <span className="text-title-sm text-on-surface">조회 검색</span>
             {activeCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-primary text-on-primary text-xs font-bold">
+              <span className="md:hidden px-2 py-0.5 rounded-full bg-primary text-on-primary text-xs font-bold">
                 {activeCount}개 적용
               </span>
             )}
-            <Icon
-              name="expand_more"
-              className={`ml-auto text-xl text-on-surface transition-transform duration-200 ${
-                filtersOpen ? "rotate-180" : ""
-              }`}
-            />
+            {/* Icon 자체에 md:hidden 을 주면 .material-symbols-outlined 의 display 가 이겨서 안 숨는다 — span 으로 감싼다 */}
+            <span className="md:hidden ml-auto flex">
+              <Icon
+                name="expand_more"
+                className={`text-xl text-on-surface transition-transform duration-200 ${
+                  filtersOpen ? "rotate-180" : ""
+                }`}
+              />
+            </span>
           </button>
 
           {/*
@@ -553,7 +581,7 @@ export default function ArchiveBrowser({
           */}
           <div
             id="archiveFilters"
-            className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+            className={`grid transition-[grid-template-rows] duration-200 ease-out md:grid-rows-[1fr] ${
               filtersOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
             }`}
           >
@@ -681,7 +709,7 @@ export default function ArchiveBrowser({
             적용 중인 조건 칩 — 검색 영역을 접어 둬도 무엇으로 걸러진 결과인지 보이고, ✕ 로
             조건 하나만 바로 뺄 수 있다. PC 전용: 폰은 위 "N개 적용" 배지로 충분하다.
           */}
-          {!filtersOpen && appliedChips.length > 0 && (
+          {appliedChips.length > 0 && (
             <div className="hidden md:flex flex-wrap items-center gap-2 mt-2">
               {appliedChips.map((c) => (
                 <button
