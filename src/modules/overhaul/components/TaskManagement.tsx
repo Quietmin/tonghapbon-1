@@ -95,7 +95,7 @@ export default function TaskManagement() {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href="/overhaul/upload"
+            href="/overhaul/tasks/upload"
             className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-surface-container-high text-on-surface hover:bg-surface-container-highest border border-border-subtle transition-colors"
           >
             <Icon name="upload_file" className="text-base" />

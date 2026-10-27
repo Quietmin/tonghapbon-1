@@ -58,10 +58,10 @@ export default function Dashboard() {
           <EmptyState
             icon="analytics"
             title="아직 집계할 작업이 없습니다"
-            desc="업로드 분석에서 설계내역서 엑셀을 넣으면 공정률과 지연 위험이 자동으로 산정됩니다."
+            desc="작업·공정의 엑셀 등록 탭에서 설계내역서를 넣으면 공정률과 지연 위험이 자동으로 산정됩니다."
             action={
               <Link
-                href="/overhaul/upload"
+                href="/overhaul/tasks/upload"
                 className="px-4 py-2.5 rounded-xl font-bold text-sm inline-flex items-center gap-2 bg-primary text-on-primary hover:opacity-90"
               >
                 <Icon name="upload_file" className="text-base" />
@@ -113,7 +113,7 @@ export default function Dashboard() {
             </div>
           </div>
           <Link
-            href="/overhaul/upload"
+            href="/overhaul/tasks/upload"
             className="shrink-0 px-4 py-2.5 rounded-xl font-bold text-sm inline-flex items-center gap-2 bg-surface-container-lowest border border-border-subtle text-on-surface hover:bg-surface-container"
           >
             설정하러 가기

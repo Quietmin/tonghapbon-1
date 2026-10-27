@@ -842,7 +842,7 @@ export default function MaintenancePlan() {
                 </p>
                 <p className="text-sm text-on-surface-variant mt-1">
                   명칭·규격·수량·단위·등급·비고가 채워지고 <b>작업 시작일·종료일은 빈칸</b>으로
-                  나갑니다. 시공사가 그 칸을 채워 보내면 업로드 분석 화면에 넣어 공정관리를
+                  나갑니다. 시공사가 그 칸을 채워 보내면 작업·공정의 엑셀 등록 탭에 넣어 공정관리를
                   시작하세요.
                 </p>
                 <p className="text-sm text-on-surface-variant mt-1.5">
