@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Icon } from "./ui";
 import { activeGroup } from "@/shared/lib/nav";
 import { useSidebar } from "./SidebarState";
+import { ProfileChip } from "./ProfileGate";
 
 export default function Header() {
   const pathname = usePathname();
@@ -83,6 +84,8 @@ export default function Header() {
         )}
       </div>
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* 내 지사·부서 — 로그인 대용. 눌러서 바꾼다 */}
+        <ProfileChip />
         {pathname !== "/" && (
           <Link
             href="/"

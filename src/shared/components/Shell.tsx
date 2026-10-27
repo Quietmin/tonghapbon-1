@@ -5,6 +5,7 @@ import Header from "./Header";
 import ChapterSubNav from "./ChapterSubNav";
 import MobileNav from "./MobileNav";
 import ChatbotDock from "./ChatbotDock";
+import { ProfileProvider } from "./ProfileGate";
 import { useSidebar } from "./SidebarState";
 
 /**
@@ -18,8 +19,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const sidebar = useSidebar();
 
   return (
-    // overflow-x-hidden 은 여기 두지 않는다 — body 로 옮긴 이유는 layout.tsx 주석 참고
-    // (안쪽 div 에 두면 DocEditor 의 sticky 미리보기가 깨진다)
+    // 내 지사·부서 선택 창(처음 접속 시)과 헤더 칩이 같은 상태를 쓰도록 전체를 감싼다
+    <ProfileProvider>
+    {/* overflow-x-hidden 은 여기 두지 않는다 — body 로 옮긴 이유는 layout.tsx 주석 참고
+        (안쪽 div 에 두면 DocEditor 의 sticky 미리보기가 깨진다) */}
     <div className="flex min-h-screen">
       <Sidebar />
       <main
@@ -37,5 +40,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       <MobileNav />
       <ChatbotDock />
     </div>
+    </ProfileProvider>
   );
 }
