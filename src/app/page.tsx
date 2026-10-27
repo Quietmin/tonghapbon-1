@@ -74,7 +74,7 @@ export default function HomePage() {
       </div>
 
       {/* 데스크톱 첫 화면 — 챕터 카드 + 하위 메뉴 알약 목록이 있는 기존 "중앙 허브" */}
-      <div className="hidden md:block">
+      <div className="hidden md:block md:space-y-gutter">
         <section className="pt-2">
           <h1 className="text-display-lg text-on-surface">중앙 허브</h1>
           <p className="text-body-md text-on-surface-variant mt-2">
