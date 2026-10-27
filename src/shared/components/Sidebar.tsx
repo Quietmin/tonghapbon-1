@@ -100,7 +100,7 @@ export default function Sidebar() {
             alt="PIMS"
             width={239}
             height={240}
-            className="h-10 w-auto shrink-0"
+            className="h-12 w-auto shrink-0"
           />
           <div className="min-w-0">
             <h1 className="text-title-sm font-black text-on-surface leading-tight truncate">

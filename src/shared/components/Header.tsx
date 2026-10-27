@@ -46,7 +46,7 @@ export default function Header() {
           alt="PIMS"
           width={239}
           height={240}
-          className="h-9 w-auto shrink-0"
+          className="h-9 md:h-11 w-auto shrink-0"
         />
         {/*
           폰 폭에서는 챕터 안에 들어와 있으면("설비관리"/"매뉴얼관리"/"고장관리")
@@ -56,7 +56,7 @@ export default function Header() {
           브레드크럼이 이미 같은 정보를 보여주고 있다.
         */}
         {/* 폰에서는 챕터 제목이 곧 이 화면의 유일한 타이틀이라 더 크게 — 데스크톱(sm:)은 그대로 둔다 */}
-        <h2 className="text-xl sm:text-lg font-black text-primary tracking-tight truncate">
+        <h2 className="text-xl sm:text-lg md:text-[22px] font-black text-primary tracking-tight truncate">
           <span className="sm:hidden">{group ? group.label : "플랜트 지능형 관리시스템"}</span>
           <span className="hidden sm:inline">플랜트 지능형 관리시스템</span>
         </h2>
