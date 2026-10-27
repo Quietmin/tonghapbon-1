@@ -129,6 +129,53 @@ body {
   user-select: none;
 }
 
+/* 첫 화면 로딩 게이트 — layout.tsx 의 인라인 스크립트가 html 클래스를 토글한다.
+   아이콘이 합자(ligature)라 폰트 전에는 이름이 글자로 보이므로, 준비될 때까지
+   셸을 감추고 스피너만 띄운다. 두 클래스가 모두 없으면(자바스크립트 꺼짐)
+   평소대로 보인다 — 못 띄우는 것보다 낫다. */
+#app-splash {
+  display: none;
+}
+.app-loading #app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background-color: var(--color-background);
+}
+.app-loading body > *:not(#app-splash) {
+  visibility: hidden;
+}
+.app-splash-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border-subtle, rgba(0, 0, 0, 0.12));
+  border-top-color: var(--color-primary, #1f3a93);
+  border-radius: 9999px;
+  animation: app-splash-spin 0.7s linear infinite;
+}
+.app-ready body {
+  animation: app-splash-fade 0.18s ease-out;
+}
+@keyframes app-splash-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes app-splash-fade {
+  from {
+    opacity: 0;
+  }
+}
+/* 애니메이션을 줄이도록 설정한 기기에서는 회전·페이드를 멈춘다 */
+@media (prefers-reduced-motion: reduce) {
+  .app-splash-spinner,
+  .app-ready body {
+    animation: none;
+  }
+}
+
 @layer components {
   .glass-card {
     background: rgba(255, 255, 255, 0.8);
