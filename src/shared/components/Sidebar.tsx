@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ACCENT_STYLE, Icon } from "./ui";
 import { NAV_GROUPS, activeGroup, isActive, type NavGroup } from "@/shared/lib/nav";
 import { useSidebar } from "./SidebarState";
@@ -16,65 +16,30 @@ const GROUP_ACTIVE = {
   tertiary: "text-tertiary",
 } as const;
 
-/** 펼쳐 둔 챕터 — 새로고침해도 유지한다 */
-const STORAGE_KEY = "sidebar-open-groups";
-
 export default function Sidebar() {
   const pathname = usePathname();
   const sidebar = useSidebar();
 
   /*
-   * 펼친 챕터들. 처음에는 지금 있는 챕터만 펼친다 — 서버와 브라우저가 같은
-   * pathname 을 보므로 첫 렌더가 어긋나지 않는다. 저장값은 마운트 뒤에 덮어쓴다.
+   * 펼친 챕터는 한 번에 하나뿐이다(아코디언) — 지금 보고 있는 챕터의 하위 메뉴만 보이고,
+   * 다른 챕터를 고르면 앞의 것은 접힌다. 여러 챕터를 열어 두면 메뉴가 길어져 지금 어디 있는지
+   * 흐려진다. 서버와 브라우저가 같은 pathname 을 보므로 첫 렌더가 어긋나지 않는다.
    */
-  const [openKeys, setOpenKeys] = useState<NavGroup["key"][]>(() => {
-    const key = activeGroup(pathname)?.key ?? null;
-    return key ? [key] : [];
-  });
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
-      const keys = JSON.parse(saved) as unknown;
-      if (!Array.isArray(keys)) return;
-      const valid = NAV_GROUPS.map((g) => g.key);
-      setOpenKeys(keys.filter((k): k is NavGroup["key"] => valid.includes(k as NavGroup["key"])));
-    } catch {
-      /* 저장소를 못 읽어도 기본값(지금 챕터만 펼침)으로 그냥 동작한다 */
-    }
-  }, []);
-
-  const save = useCallback((keys: NavGroup["key"][]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
-    } catch {
-      /* 저장 실패는 이번 세션에서만 상태가 안 남는 정도라 무시한다 */
-    }
-  }, []);
+  const [openKey, setOpenKey] = useState<NavGroup["key"] | null>(
+    () => activeGroup(pathname)?.key ?? null,
+  );
 
   /*
-   * 다른 챕터로 넘어가면 그 챕터를 펼친다. 접힌 채로 두면 방금 누른 메뉴가
-   * 어디 있는지 보이지 않는다. 다른 챕터는 건드리지 않는다 — 사용자가 일부러
-   * 펼쳐 둔 것일 수 있다.
+   * 화면을 옮기면 그 챕터만 펼친다. 챕터 밖 화면(처음 화면 등)으로 가면 모두 접는다 —
+   * 어느 챕터도 "지금 선택한 것"이 아니기 때문이다.
    */
   useEffect(() => {
-    const key = activeGroup(pathname)?.key ?? null;
-    if (!key) return;
-    setOpenKeys((prev) => {
-      if (prev.includes(key)) return prev;
-      const next = [...prev, key];
-      save(next);
-      return next;
-    });
-  }, [pathname, save]);
+    setOpenKey(activeGroup(pathname)?.key ?? null);
+  }, [pathname]);
 
+  /** 화살표로 펼치고 접는다. 다른 챕터를 펼치면 지금 열린 것은 자동으로 접힌다 */
   function toggleGroup(key: NavGroup["key"]) {
-    setOpenKeys((prev) => {
-      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
-      save(next);
-      return next;
-    });
+    setOpenKey((prev) => (prev === key ? null : key));
   }
 
   return (
@@ -132,7 +97,7 @@ export default function Sidebar() {
             group.items.some((it) => isActive(pathname, it));
           // 하위가 대표 경로 하나뿐이면 펼쳐도 같은 링크가 두 번 나올 뿐이라 접어 둔다
           const hasItems = !(group.items.length === 1 && group.items[0].href === group.root);
-          const expanded = hasItems && openKeys.includes(group.key);
+          const expanded = hasItems && openKey === group.key;
 
           return (
             <div key={group.key} className="flex flex-col gap-1">
