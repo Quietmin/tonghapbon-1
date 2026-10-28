@@ -177,3 +177,11 @@
     animation: none;
   }
 }
+
+/* 로딩 문구용 귀여운 글씨 — Jua(구글 폰트, layout.tsx에서 로드). 폰트를 못 받으면 기본 sans로 떨어진다. */
+.ddasomi-cute-text {
+  font-family: "Jua", var(--font-sans);
+  font-size: 15px;
+  color: #f58a1f;
+  letter-spacing: 0.01em;
+}
