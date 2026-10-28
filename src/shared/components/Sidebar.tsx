@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ACCENT_STYLE, Icon } from "./ui";
 import { NAV_GROUPS, activeGroup, isActive, type NavGroup } from "@/shared/lib/nav";
 import { useSidebar } from "./SidebarState";
+import { useProfile } from "./ProfileGate";
 
 const LINK_BASE =
   "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-body-md";
@@ -15,6 +16,36 @@ const GROUP_ACTIVE = {
   primary: "text-primary",
   tertiary: "text-tertiary",
 } as const;
+
+/** 사이드바 꼭대기의 내 지사·부서 카드 */
+function ProfileCard() {
+  const { profile, open } = useProfile();
+  // 아직 조회 전이면 자리만 잡아 둔다(레이아웃이 밀리지 않게)
+  if (profile === undefined) return <div className="flex-1 h-12" aria-hidden />;
+  return (
+    <button
+      type="button"
+      onClick={open}
+      title="내 지사·부서 변경"
+      aria-label={
+        profile ? `내 지사·부서: ${profile.branch} ${profile.department} (눌러서 변경)` : "지사·부서 선택"
+      }
+      className="flex items-center gap-3 px-3 py-2 min-w-0 flex-1 rounded-lg text-left hover:bg-surface-container-high transition-colors"
+    >
+      <span className="w-10 h-10 shrink-0 rounded-xl bg-primary-fixed text-on-primary-fixed-variant flex items-center justify-center">
+        <Icon name="badge" className="text-xl" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-title-sm font-black text-on-surface leading-tight truncate">
+          {profile ? profile.branch : "지사·부서 선택"}
+        </span>
+        <span className="block text-xs text-on-surface-variant truncate">
+          {profile ? profile.department : "눌러서 고르기"}
+        </span>
+      </span>
+    </button>
+  );
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -52,38 +83,13 @@ export default function Sidebar() {
       }`}
     >
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <Link href="/" className="flex items-center gap-3 px-2 min-w-0 flex-1">
-          {/*
-            PIMS(Plant Intelligence Management System) 브랜드 마크 — 알파 채널이
-            있는 PNG 라 흰 배경 없이 어떤 사이드바 배경에도 자연스럽게 얹힌다
-            (출력물 머리말은 한국지역난방공사 로고를 그대로 쓰므로 manual-logo.gif
-            는 Letterhead.tsx 전용으로 손대지 않는다).
-          */}
-          {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
-          <img
-            src="/pims-icon.png"
-            alt="PIMS"
-            width={239}
-            height={240}
-            className="h-12 w-auto shrink-0"
-          />
-          <div className="min-w-0">
-            <h1 className="text-title-sm font-black text-on-surface leading-tight truncate">
-              PIMS
-            </h1>
-            <p className="text-xs text-on-surface-variant truncate">설비 · 고장 · 매뉴얼</p>
-          </div>
-        </Link>
-        {/* 숨긴 뒤 다시 부르는 곳은 헤더의 같은 버튼뿐이다 */}
-        <button
-          type="button"
-          onClick={() => sidebar.setOpen(false)}
-          aria-label="메뉴 숨기기"
-          title="메뉴 숨기기"
-          className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
-        >
-          <Icon name="menu_open" />
-        </button>
+        {/*
+          내 지사·부서 — 위쪽 헤더에 이미 PIMS 로고와 "플랜트 지능형 관리시스템"이 있어서 사이드바
+          꼭대기에 같은 로고를 또 두면 복잡해 보인다. 그 자리에 "지금 어느 지사·부서로 보고 있는지"를
+          보여 준다. 누르면 바꾸는 창이 열린다. (홈으로 가는 길은 헤더의 로고·제목 링크)
+        */}
+        <ProfileCard />
+        {/* 메뉴를 숨기고 다시 부르는 버튼은 헤더의 ☰ 하나뿐이다 — 사이드바 안에 같은 버튼을 또 두면 복잡해 보인다 */}
       </div>
 
       {/* 메인 메뉴 3개 — 화살표를 눌러 각각 펼치고 접는다 */}
