@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Button, Card, EmptyState, Icon, ScreenHeader, type Accent } from "@/shared/components/ui";
+import { Button, Card, EmptyState, Icon, RequiredMark, ScreenHeader, type Accent } from "@/shared/components/ui";
 import {
   MAX_PHOTOS,
   MODE_LABELS,
@@ -157,6 +157,8 @@ export default function DocEditor({
   const [items, setItems] = useState<DocItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** 출력을 한 번이라도 시도했는지 — 비어 있는 필수 칸(파일명·사진)을 붉게 표시하는 기준 */
+  const [triedOutput, setTriedOutput] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -663,12 +665,18 @@ export default function DocEditor({
   function validateForOutput(): string | null {
     setError(null);
     setNotice(null);
-    if (!fileName.trim()) {
-      setError("파일명을 입력해 주세요.");
-      return null;
-    }
-    if (items.length === 0) {
-      setError("사진을 한 장 이상 추가해 주세요.");
+    setTriedOutput(true);
+    // 비어 있는 필수 칸을 한꺼번에 알린다(칸은 triedOutput 으로 붉게 보인다)
+    const noName = !fileName.trim();
+    const noPhoto = items.length === 0;
+    if (noName || noPhoto) {
+      setError(
+        noName && noPhoto
+          ? "파일명을 입력하고 사진을 한 장 이상 추가해 주세요."
+          : noName
+            ? "파일명을 입력해 주세요."
+            : "사진을 한 장 이상 추가해 주세요.",
+      );
       return null;
     }
     return fileName.trim();
@@ -797,10 +805,12 @@ export default function DocEditor({
   // 매뉴얼로 만들다 모드를 바꾼 경우를 대비해 사진만 골라 쪽을 나눈다. (원본 주석)
   /* 파일명·작성자 칸은 어느 배치에서든 같은 모양이라 여기서 한 번만 만든다.
      renderMeta 를 넘긴 모드는 이 둘을 받아 원하는 줄에 꽂는다. */
+  const fileNameInvalid = triedOutput && !fileName.trim();
   const fileNameField = (
     <div className="flex flex-col gap-1.5">
       <label htmlFor="docFileName" className="text-xs font-bold text-on-surface-variant">
         파일명
+        <RequiredMark />
       </label>
       <input
         id="docFileName"
@@ -808,7 +818,12 @@ export default function DocEditor({
         value={fileName}
         onChange={(e) => setFileName(e.target.value)}
         placeholder={MODE_PLACEHOLDERS[mode]}
-        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
+        aria-invalid={fileNameInvalid}
+        className={`px-3 py-2.5 rounded-xl border text-sm text-on-surface outline-none md:rounded-sm ${
+          fileNameInvalid
+            ? "bg-error/10 border-error ring-1 ring-error/40"
+            : "bg-surface-container-high border-border-subtle focus:border-primary md:bg-surface-container-low md:focus:bg-surface-container-lowest"
+        }`}
       />
     </div>
   );
@@ -843,7 +858,8 @@ export default function DocEditor({
     <>
       <ScreenHeader
         icon="edit_note"
-        title={`${MODE_TITLES[mode]} 작성`}
+        // 고장보고서만 "등록"이라 부른다(메뉴 이름과 같게). 사진대장·매뉴얼은 그대로 "작성"
+        title={`${MODE_TITLES[mode]} ${mode === "fault" ? "등록" : "작성"}`}
         desc={`사진을 추가하고 설명을 적으면 A4 규격 ${label} 문서를 자동으로 구성합니다. 최대 ${MAX_PHOTOS}장.`}
         // 모바일은 타이틀만 — 빈 배열이면 ScreenHeader가 desc·bullets 모두 생략한다
         bullets={[]}
@@ -958,7 +974,16 @@ export default function DocEditor({
                 </Button>
               )}
             </div>
-            <div className="mt-2 text-right">
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span
+                className={`text-sm font-bold ${
+                  triedOutput && items.length === 0 ? "text-error" : "text-on-surface-variant"
+                }`}
+              >
+                사진
+                <RequiredMark />
+                <span className="font-normal text-xs"> 1장 이상</span>
+              </span>
               <span className="text-sm text-on-surface-variant">
                 {items.length} / {MAX_PHOTOS}
               </span>
@@ -1007,11 +1032,16 @@ export default function DocEditor({
             )}
 
             {items.length === 0 ? (
-              <EmptyState
-                icon="photo_library"
-                title="사진이 없습니다"
-                desc={"[사진 추가]로 사진을 골라요.\n폰에서는 [촬영]으로 바로 찍어요."}
-              />
+              <div
+                className={`rounded-xl ${triedOutput ? "bg-error/10 ring-1 ring-error" : ""}`}
+                aria-invalid={triedOutput}
+              >
+                <EmptyState
+                  icon="photo_library"
+                  title="사진이 없습니다"
+                  desc={"[사진 추가]로 사진을 골라요.\n폰에서는 [촬영]으로 바로 찍어요."}
+                />
+              </div>
             ) : (
               // 왼쪽 폭이 전체 화면보다 좁아질 수 있어(2열 미리보기 때문에) 3열까지는
               // 욱여넣지 않는다 — sm:grid-cols-2 가 폼 칸이 좁은 화면에서도 무난하다.
@@ -1131,7 +1161,7 @@ export default function DocEditor({
               <Button
                 className="w-full !px-1 whitespace-nowrap"
                 onClick={handleExport}
-                disabled={busy || items.length === 0}
+                disabled={busy}
               >
                 {/* 평소엔 "PDF 출력"과 길이가 비슷해야 버튼이 한 줄을 유지한다 —
                     "만들고 있습니다…"는 너무 길어 혼자만 줄바꿈되거나 넘쳤다 */}
@@ -1141,7 +1171,7 @@ export default function DocEditor({
                 variant="ghost"
                 className="w-full !px-1 whitespace-nowrap"
                 onClick={handleMail}
-                disabled={busy || items.length === 0}
+                disabled={busy}
               >
                 메일로 전송
               </Button>

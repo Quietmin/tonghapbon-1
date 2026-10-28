@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { Icon } from "./ui";
+import { Icon, RequiredMark } from "./ui";
 
 /**
  * 내 정보(지사·부서) 선택 — 로그인이 없는 동안의 임시 대용.
@@ -155,7 +155,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
             </div>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-on-surface-variant">지사</span>
+              <span className="text-xs font-bold text-on-surface-variant">
+                지사
+                <RequiredMark />
+              </span>
               <select
                 value={draftBranch}
                 onChange={(e) => setDraftBranch(e.target.value)}
@@ -172,7 +175,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
               </select>
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-on-surface-variant">부서</span>
+              <span className="text-xs font-bold text-on-surface-variant">
+                부서
+                <RequiredMark />
+              </span>
               <select
                 value={draftDept}
                 onChange={(e) => setDraftDept(e.target.value)}

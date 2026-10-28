@@ -102,13 +102,12 @@ export const NAV_GROUPS: NavGroup[] = [
     short: "고장",
     icon: "report",
     root: "/failure",
-    desc: "지난 고장 보고서를 지사·분야·설비명·고장내용으로 찾아보고, 새 보고서를 작성합니다.",
+    desc: "지난 고장 보고서를 지사·분야·설비명·고장내용으로 찾아보고, 새 보고서를 등록합니다.",
     // 챕터 첫 화면이 곧 조회다 — 따로 "홈"을 두지 않는다.
     // exact — /failure/new 에서도 조회가 켜져 보이면 어디 있는지 알 수 없다.
     items: [
       { href: "/failure", label: "고장보고서 조회", icon: "inventory_2", exact: true },
-      { href: "/failure/new", label: "고장보고서 작성", icon: "edit_note" },
-      { href: "/failure/history/new", label: "수기 등록", icon: "note_add", desktopOnly: true },
+      { href: "/failure/new", label: "고장보고서 등록", icon: "edit_note" },
     ],
   },
   {

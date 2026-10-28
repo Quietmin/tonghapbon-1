@@ -20,6 +20,16 @@ export function Icon({
   );
 }
 
+/** 필수 입력 칸 이름 옆의 빨간 * — 스크린리더에는 "필수"로 읽힌다 */
+export function RequiredMark() {
+  return (
+    <span className="text-error ml-0.5 font-bold" title="필수 입력">
+      <span aria-hidden>*</span>
+      <span className="sr-only">(필수)</span>
+    </span>
+  );
+}
+
 export function Card({
   className = "",
   lift = true,
