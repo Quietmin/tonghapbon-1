@@ -185,7 +185,7 @@ export function Avatar({
 
 const BUTTON_STYLE = {
   primary: "bg-primary text-on-primary hover:opacity-90 shadow-sm",
-  // 고장관리 챕터의 주 버튼. 색만 다르고 역할은 primary 와 같다 (ACCENT_STYLE 참고)
+  // 주황 버튼. 지금 쓰는 곳은 없다 — 고장관리도 남색(primary)으로 맞췄다. 주황 강조가 다시 필요할 때 쓴다
   tertiary: "bg-tertiary text-on-tertiary hover:opacity-90 shadow-sm",
   ghost: "bg-surface-container-high text-on-surface hover:bg-surface-container-highest border border-border-subtle",
   danger: "bg-error text-on-error hover:opacity-90",
@@ -194,10 +194,9 @@ const BUTTON_STYLE = {
 /**
  * 챕터 색.
  *
- * 고장관리만 주황(tertiary)이고 나머지는 파랑(primary)이다. 세 챕터에 각각 다른
- * 색을 주면 그냥 알록달록해질 뿐이라, "고장은 주황" 한 가지 규칙만 둔다 —
- * 고장 보고서는 사고 기록이라 눈에 먼저 들어와야 하고, 매뉴얼·설비와 섞이면
- * 안 되는 문서다.
+ * 모든 챕터가 남색(primary)이다. 챕터마다 다른 색을 주면 알록달록해질 뿐이라 하나로
+ * 맞췄다(고장관리도 예전에는 주황이었지만 이 탭만 튀어 보인다는 의견에 따라 남색으로).
+ * tertiary(주황)는 지금 쓰는 챕터가 없고, 주황 강조가 다시 필요할 때를 위해 남겨 둔다.
  *
  * solid 는 "내가 지금 만드는 것"(작성 화면), soft 는 "쌓여 있는 것"(조회 화면)에
  * 쓴다. 같은 색이라 챕터는 한눈에 같고, 채도로 작성/조회가 갈린다.

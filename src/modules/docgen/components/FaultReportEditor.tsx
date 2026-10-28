@@ -202,12 +202,12 @@ export default function FaultReportEditor() {
   return (
     <DocEditor
       mode="fault"
-      accent="tertiary"
+      accent="primary"
       faultSummary={faultSummary}
       // 작성 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 작성 버튼과
       // 같은 색으로 둬서, 두 화면을 오갈 때 같은 자리의 같은 버튼으로 읽히게 한다.
       headingAction={
-        <ButtonLink href="/failure" variant="tertiary">
+        <ButtonLink href="/failure" variant="primary">
           <Icon name="inventory_2" className="text-lg" />
           고장보고서 조회
         </ButtonLink>
@@ -266,7 +266,7 @@ export default function FaultReportEditor() {
       )}
       sections={
         <div className="mt-5 pt-5 border-t border-border-subtle">
-          <SectionHeading accent="tertiary" title="1. 고장 요약" />
+          <SectionHeading accent="primary" title="1. 고장 요약" />
 
           <div className="flex flex-col gap-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -320,7 +320,7 @@ export default function FaultReportEditor() {
 
           {/* 체크가 세부 칸 바로 위에 있어야 무엇을 끄는 스위치인지 읽힌다 */}
           <SectionHeading
-            accent="tertiary"
+            accent="primary"
             title="열공급 중단"
             trailing={
               <InlineCheck
@@ -386,7 +386,7 @@ export default function FaultReportEditor() {
           </div>
 
           <SectionHeading
-            accent="tertiary"
+            accent="primary"
             title="상황"
             trailing={
               <InlineCheck
@@ -442,7 +442,7 @@ export default function FaultReportEditor() {
           </div>
 
           <SectionHeading
-            accent="tertiary"
+            accent="primary"
             title="조치사항"
             trailing={
               <InlineCheck
@@ -464,7 +464,7 @@ export default function FaultReportEditor() {
             />
           </div>
 
-          <SectionHeading accent="tertiary" title="2. 관련 사진" />
+          <SectionHeading accent="primary" title="2. 관련 사진" />
           <p className="text-xs text-on-surface-variant leading-relaxed">
             추가한 사진이 등록 순서대로 출력됩니다.
           </p>

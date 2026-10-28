@@ -21,7 +21,7 @@ export default async function StatusNewPage() {
         // 꽉 찬 칩 = 등록. 조회 화면은 같은 색 연한 칩이다
         tone="solid"
         action={
-          <ButtonLink href="/status" variant="tertiary">
+          <ButtonLink href="/status" variant="primary">
             <Icon name="monitoring" className="text-lg" />
             현황 조회
           </ButtonLink>

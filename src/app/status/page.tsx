@@ -27,7 +27,7 @@ export default async function StatusPage() {
         // 연한 칩 = 조회. 등록 화면은 같은 색 꽉 찬 칩이라 둘이 바로 갈린다
         tone="soft"
         action={
-          <ButtonLink href="/status/new" variant="tertiary">
+          <ButtonLink href="/status/new" variant="primary">
             <Icon name="edit_note" className="text-lg" />
             현황 등록
           </ButtonLink>

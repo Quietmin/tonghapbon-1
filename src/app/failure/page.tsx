@@ -21,7 +21,7 @@ export default function FailureHomePage() {
         bullets: [],
       }}
       headingAction={
-        <ButtonLink href="/failure/new" variant="tertiary">
+        <ButtonLink href="/failure/new" variant="primary">
           <Icon name="edit_note" className="text-lg" />
           고장보고서 작성
         </ButtonLink>
