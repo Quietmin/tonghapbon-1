@@ -197,7 +197,56 @@ export default function IssueListPanel({
       {rows.length === 0 ? (
         <p className="py-8 text-center text-sm text-on-surface-variant">{emptyText}</p>
       ) : (
-        <div className="overflow-x-auto -mx-1">
+        <>
+        {/* 폰(md 미만) — 표는 칸이 좁아 이슈 내용이 잘리므로 카드 목록으로 보인다. 누르기·키보드는 표와 같다 */}
+        <ul className="md:hidden flex flex-col divide-y divide-border-subtle">
+          {visibleRows.map((r) => {
+            const open = () => (editable ? setSelected(r) : setDetail(r));
+            const meta = columns
+              .filter((c) => c === "department" || c === "reporter" || c === "created")
+              .map((c) => cell(c, r))
+              .filter(Boolean);
+            return (
+              <li
+                key={r.id}
+                tabIndex={0}
+                role="button"
+                onClick={open}
+                onKeyDown={rowKeyHandler(open)}
+                className="py-3 px-1 flex flex-col gap-1.5 cursor-pointer active:bg-surface-container-low focus-visible:bg-surface-container-low outline-none"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {columns.includes("status") && (
+                    <span className="shrink-0">
+                      <StatusBadge status={r.status} />
+                    </span>
+                  )}
+                  <span className="font-bold text-on-surface text-sm truncate">{r.equipment_name}</span>
+                  {hasScheduleColumn && r.scheduled_date && (
+                    <span className="ml-auto shrink-0 text-xs font-bold text-status-info tabular-nums">
+                      {formatDate(r.scheduled_date)}
+                    </span>
+                  )}
+                </div>
+                {columns.includes("content") && (
+                  <p className="text-sm text-on-surface line-clamp-2 break-keep">{r.content}</p>
+                )}
+                {!hasScheduleColumn && r.scheduled_date && (
+                  <p className="text-xs text-on-surface-variant">예정 {formatDate(r.scheduled_date)}</p>
+                )}
+                {meta.length > 0 && (
+                  <p className="text-xs text-on-surface-variant flex flex-wrap gap-x-2">
+                    {meta.map((m, i) => (
+                      <span key={i}>{m}</span>
+                    ))}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="max-md:hidden overflow-x-auto -mx-1">
           <table className={`${TABLE} table-fixed`}>
             <colgroup>
               {columns.map((c) => (
@@ -235,6 +284,7 @@ export default function IssueListPanel({
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {pageCount > 1 && (

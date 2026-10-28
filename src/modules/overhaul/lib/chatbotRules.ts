@@ -17,12 +17,22 @@ export const FAQ_QUESTIONS = [
   "계획보다 얼마나 늦어?",
   "지연 위험 작업 보여줘",
   "완료·진행·대기 작업 수는?",
+  // 아래 둘은 로컬 규칙이 아니라 서버 GPT(도구 호출)가 답하는 영역이다
+  "최근 고장이력 알려줘",
+  "조치 필요한 현황 보여줘",
 ];
 
 const MUTATION_RE = /(삭제|지워|수정|변경해|바꿔|등록해|입력해|처리해|업로드해)/;
-// 고장이력 도메인 질문 감지 — 이 챗봇은 아직 고장이력 데이터에 연결되어 있지 않으므로,
-// 오버홀 공정 데이터로 잘못 답하지 않도록 먼저 걸러내고 "연결 안 됨"을 솔직히 안내한다.
-const FAILURE_RE = /고장|장애\s*이력|failure/i;
+// 오버홀 공정 "밖" 영역(고장이력·매뉴얼·설비 마스터·중장기보수계획·현황 이슈) 질문 감지 —
+// 이 영역은 로컬 규칙으로 답하지 못하고 서버 GPT(도구 호출)만 답할 수 있다.
+// ddasomiChat.ts가 이 판정으로 "공정 데이터 없음" 단락을 건너뛰고 AI에 보낸다.
+const CROSS_MODULE_RE =
+  /고장|장애|failure|매뉴얼|절차서|지침|보관함|보고서|문서|사진대장|현황|이슈|조치|기기|태그|보수\s*계획|중장기|점검\s*주기|설비\s*(마스터|목록|검색|정보)/i;
+
+/** 오버홀 공정 데이터만으로는 답할 수 없는(다른 모듈 조회가 필요한) 질문인가 */
+export function isCrossModuleQuestion(question: string): boolean {
+  return CROSS_MODULE_RE.test(question || "");
+}
 const DELAY_LIST_RE = /지연.*(위험|작업|공정)|위험.*(작업|공정)/;
 const PLANNED_GAP_RE = /계획.*(얼마나|차이|보다|늦|빠르)/;
 const COUNT_RE = /(완료|진행\s*중|대기).*(몇|건|수)|작업\s*수|몇\s*건/;
@@ -57,7 +67,7 @@ function baselineNote(snapshot: ChatbotSnapshot): string {
 function noDataGuide(): Answer {
   return {
     kind: "no_data",
-    text: '현재 등록된 공정 데이터가 없습니다. "업로드 분석"에서 엑셀을 업로드하거나 "실적 입력"에서 실적을 입력한 뒤 다시 질문해 주세요.',
+    text: '현재 등록된 공정 데이터가 없습니다. "작업·공정"에서 엑셀을 등록하거나 작업을 눌러 실적을 입력한 뒤 다시 질문해 주세요.',
   };
 }
 
@@ -65,14 +75,6 @@ function noValidPlanMessage(): Answer {
   return {
     kind: "no_data",
     text: "등록된 작업은 있지만 유효한 계획수량이 없어 공정률을 계산할 수 없습니다. 업로드 데이터의 계획수량을 확인하거나 실적을 입력해 주세요.",
-  };
-}
-
-// 고장이력은 아직 챗봇에 연결되지 않았다 — 추측하지 않고 솔직하게 안내만 한다.
-function failureNotConnected(): Answer {
-  return {
-    kind: "no_data",
-    text: "현재 시스템에 등록된 데이터만으로는 확인하기 어려워요. 고장이력 조회는 아직 이 챗봇에 연결되지 않았어요.",
   };
 }
 
@@ -214,14 +216,9 @@ export function answerQuestion(question: string, snapshot: ChatbotSnapshot): Ans
   if (MUTATION_RE.test(q)) {
     return {
       kind: "refused",
-      text: '이 챗봇은 조회만 가능합니다. 실적 수정·삭제는 "실적 입력" 화면에서 직접 진행해 주세요.',
+      text: '이 챗봇은 조회만 가능합니다. 실적 수정·삭제는 "작업·공정"에서 작업을 눌러 직접 진행해 주세요.',
     };
   }
-
-  // 고장이력 도메인은 오버홀 데이터 유무와 무관하게 먼저 판단한다 — 오버홀 공정 데이터로
-  // 잘못 답하지 않도록, 그리고 오버홀 데이터가 비어 있어도 "공정 데이터 없음"이 아니라
-  // "고장이력 미연결"이라는 정확한 이유를 안내하도록.
-  if (FAILURE_RE.test(q)) return failureNotConnected();
 
   if (snapshot.dataSource === "empty") return noDataGuide();
 

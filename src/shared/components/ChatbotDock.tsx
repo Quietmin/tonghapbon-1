@@ -317,7 +317,7 @@ export default function ChatbotDock() {
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}
-          placeholder="예: 전체 공정률 알려줘"
+          placeholder="예: 전체 공정률 / 최근 고장이력 알려줘"
           aria-label="챗봇에게 물어보기"
           disabled={pending}
           className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary disabled:opacity-60"

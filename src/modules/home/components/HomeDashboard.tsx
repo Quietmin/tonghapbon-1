@@ -133,13 +133,13 @@ function RecentList({ recent, span = "lg:col-span-2" }: { recent: RecentEntry[];
     <Card lift={false} className={`p-5 ${span}`}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-title-sm text-on-surface">최근 실적 입력</h2>
-        <Link href="/overhaul/entry" className="text-sm font-bold text-primary hover:underline">
-          실적 입력하기
+        <Link href="/overhaul/tasks" className="text-sm font-bold text-primary hover:underline">
+          작업·공정에서 입력
         </Link>
       </div>
       {recent.length === 0 ? (
         <p className="py-6 text-center text-sm text-on-surface-variant">
-          아직 입력된 실적이 없습니다. 실적 입력에서 오늘 한 작업을 남겨 보세요.
+          아직 입력된 실적이 없습니다. 작업·공정에서 작업을 눌러 오늘 한 작업을 남겨 보세요.
         </p>
       ) : (
         <ul className="flex flex-col">

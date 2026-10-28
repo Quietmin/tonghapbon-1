@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Card,
   Icon,
@@ -13,6 +12,8 @@ import {
 } from "@/shared/components/ui";
 import { taskProgress } from "../lib/progress";
 import TaskEditor from "./TaskEditor";
+import EntryDialog from "./EntryDialog";
+import { useEntryHistoryHover } from "./EntryHistoryPreview";
 import type { OverhaulTask, OverhaulProject } from "../lib/repo";
 
 /**
@@ -47,7 +48,6 @@ interface Payload {
 type EditTarget = OverhaulTask | "new" | null;
 
 export default function TaskManagement() {
-  const router = useRouter();
   const [q, setQ] = useState("");
   const [field, setField] = useState("전체");
   const [equipment, setEquipment] = useState("전체");
@@ -56,6 +56,10 @@ export default function TaskManagement() {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<EditTarget>(null);
+  /** 실적 입력 팝업을 띄운 작업 id — null 이면 닫힘 */
+  const [entryTaskId, setEntryTaskId] = useState<string | null>(null);
+  /** 행에 마우스를 올리면 정비 이력을 먼저 보여 주는 미리보기 */
+  const { bind: bindHistory, preview: historyPreview, hide: hideHistory } = useEntryHistoryHover();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,6 +128,16 @@ export default function TaskManagement() {
             setEdit(null);
             void load();
           }}
+        />
+      )}
+
+      {historyPreview}
+
+      {entryTaskId && (
+        <EntryDialog
+          taskId={entryTaskId}
+          onClose={() => setEntryTaskId(null)}
+          onChanged={() => void load()}
         />
       )}
 
@@ -219,8 +233,20 @@ export default function TaskManagement() {
                   return (
                     <tr
                       key={t.id}
-                      onClick={() => router.push(`/overhaul/entry?task=${t.id}`)}
-                      title="눌러서 실적 입력으로 이동"
+                      {...bindHistory(t.id)}
+                      onClick={() => {
+                        hideHistory();
+                        setEntryTaskId(t.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return; // 안쪽 버튼의 키 입력은 제외
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setEntryTaskId(t.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      title="눌러서 실적 입력 · 올려 두면 정비 이력"
                       className="group cursor-pointer hover:bg-surface-container-low transition-colors"
                     >
                       <td className="py-3 pr-3">
@@ -282,7 +308,7 @@ export default function TaskManagement() {
                         <button
                           title="이 작업 수정·삭제"
                           onClick={(e) => {
-                            // 행 클릭(실적 입력 이동)과 겹치지 않게 막는다
+                            // 행 클릭(실적 입력 팝업)과 겹치지 않게 막는다
                             e.stopPropagation();
                             setEdit(t);
                           }}

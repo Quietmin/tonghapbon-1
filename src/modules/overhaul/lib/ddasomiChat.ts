@@ -1,13 +1,17 @@
 // 따소미 챗봇 응답 결정 로직 — DdasomiChatbot.tsx의 상태 관리에서 분리해 순수 함수로 테스트 가능하게 유지한다.
 //
 // 원본: AI-Do-Sample/src/lib/ddasomiChat.js (그대로)
-import { answerQuestion, type AnswerKind } from "./chatbotRules";
+import { answerQuestion, isCrossModuleQuestion, type AnswerKind } from "./chatbotRules";
 import { toDdasomiText } from "./ddasomiVoice";
 import type { ChatbotSnapshot } from "./chatbotSnapshot";
 import type { AskFn } from "./chatbotAI";
 import type { DocMatch } from "@/modules/docgen/lib/docgenSearch";
 
 const APOLOGY_TEXT = "잠시 문제가 생겼어요. 공정 데이터를 다시 확인해볼게요.";
+// 고장이력·매뉴얼 등 다른 모듈 조회는 서버 GPT만 할 수 있다 — 꺼져 있으면 꺼져 있다고 정확히 알린다.
+const AI_DISABLED_TEXT =
+  "고장이력·매뉴얼·설비 검색은 AI 연결이 필요한데, 아직 서버에 AI 설정이 되어 있지 않아요. 관리자가 배포 환경변수(OPENAI_API_KEY)를 설정하면 바로 쓸 수 있어요.";
+const AI_ERROR_TEXT = "조회 중에 연결이 잠시 불안정했어요. 조금 뒤에 다시 물어봐 주세요.";
 
 export type SearchFn = (message: string) => Promise<{ ok: true; matches: DocMatch[] } | null>;
 
@@ -27,18 +31,14 @@ export interface DdasomiReply {
  *
  * searchFn(message) => Promise<{ ok:true, matches } | null> — 보통 docgenSearch.searchDocgenDocuments.
  * 로컬 규칙이 숫자로 확실히 답하지 못했을 때("no_data"·"unsupported") 시도한다.
- * "unsupported"뿐 아니라 "no_data"도 포함하는 이유는 두 가지다:
- *   1) chatbotRules.ts는 "고장"이 들어간 질문을 전부 FAILURE_RE로 먼저 가로채
- *      "고장이력 조회는 아직 연결 안 됨"(no_data)으로 답해 버린다 — 그런데
- *      "고장보고서 찾아줘"는 이 기능이 생긴 지금 가장 먼저 물어볼 법한 질문이다.
- *      이 순서가 아니면 그 질문이 검색까지 가 보지도 못한다.
- *   2) 오버홀 데이터가 비어 있으면(dataSource === "empty") chatbotRules.ts가 질문
- *      내용과 무관하게 전부 no_data로 답한다 — 숫자 질문이 아닌 문서 질문도 똑같이
- *      막혀 버리므로 여기서 먼저 걸러 준다.
- * 매칭 문서를 찾으면 GPT 숫자 요약 경로(askFn)로는 보내지 않는다 — 그쪽은 "오버홀
- * 공정 현황 데이터만 안다"는 프롬프트로 짜여 있어, 문서를 찾았는데도 모른다고 답하는
- * 모순이 생긴다. 반대로 검색이 아무것도 못 찾으면, no_data는 원래 안내문 그대로
- * 돌려준다(아래로 계속 진행하지 않는다) — "업로드 분석에서..." 안내가 더 정확하다.
+ * "unsupported"뿐 아니라 "no_data"도 포함하는 이유: 오버홀 데이터가 비어 있으면
+ * (dataSource === "empty") chatbotRules.ts가 질문 내용과 무관하게 전부 no_data로
+ * 답한다 — 숫자 질문이 아닌 문서 질문도 똑같이 막혀 버리므로 여기서 먼저 걸러 준다.
+ * 매칭 문서를 찾으면 그 카드로 바로 답한다(열 수 있는 링크가 GPT 설명보다 낫다).
+ * 못 찾으면 GPT 경로로 계속 간다 — 서버 GPT는 도구(chatbotTools.ts)로 고장이력·
+ * 보관함·설비·보수계획·현황을 직접 조회할 수 있다. 다만 "고장·매뉴얼 같은 다른 모듈
+ * 질문"(isCrossModuleQuestion)이 아니면 no_data는 원래 안내문 그대로 돌려준다 —
+ * "업로드 분석에서..." 안내가 더 정확하다.
  *
  * 실적 수정/삭제 요청은 GPT에 보내지 않고 즉시 처리한다 — GPT는 실제로 아무 것도
  * 수행할 수 없으므로, 이런 요청을 보내면 "삭제했다"처럼 실제로 하지 않은 일을 한 것처럼 답할 위험이 있다.
@@ -50,10 +50,15 @@ export async function getDdasomiReply(
   searchFn?: SearchFn,
 ): Promise<DdasomiReply> {
   const local = answerQuestion(message, snapshot);
+  // 고장이력·매뉴얼·현황 등은 로컬 규칙이 못 본다 — "공정 데이터 없음" 단락에 걸리지 않고
+  // 문서 검색과 GPT(도구 호출)로 보낸다.
+  const crossModule = isCrossModuleQuestion(message);
   if (local.kind === "refused") {
     return { text: toDdasomiText(local), kind: local.kind, suggestions: local.suggestions };
   }
 
+  // 문서(매뉴얼·고장보고서) 검색이 먼저다 — 빠르고, 결과가 열 수 있는 카드로 나온다.
+  // 찾으면 그대로 답하고, 못 찾으면 아래 GPT 경로로 계속 간다(GPT도 도구로 보관함을 본다).
   if ((local.kind === "no_data" || local.kind === "unsupported") && typeof searchFn === "function") {
     try {
       const result = await searchFn(message);
@@ -69,23 +74,31 @@ export async function getDdasomiReply(
     }
   }
 
-  if (local.kind === "no_data") {
+  if (local.kind === "no_data" && !crossModule) {
     return { text: toDdasomiText(local), kind: local.kind, suggestions: local.suggestions };
   }
 
+  let aiFailReason: "disabled" | "error" = "error";
   if (typeof askFn === "function") {
     try {
       const result = await askFn(message, snapshot);
       if (result && result.ok && typeof result.answer === "string" && result.answer.trim()) {
         return { text: result.answer.trim(), kind: "answer" };
       }
+      if (result && result.ok === false) aiFailReason = result.reason;
     } catch {
       // 아래 로컬 대체로 진행
     }
+  } else {
+    aiFailReason = "disabled";
   }
 
-  // GPT를 못 썼거나 실패한 경우: 로컬 규칙이 답을 알면 그걸 쓰고, 로컬도 모르면(unsupported) 그때만 사과 문구를 보인다.
-  if (local.kind === "unsupported") {
+  // GPT를 못 썼거나 실패한 경우: 로컬 규칙이 답을 알면 그걸 쓰고, 로컬도 모르면 이유를 정직하게 보인다.
+  // (no_data가 여기까지 온 것은 crossModule로 우회한 경우뿐이다 — 위에서 이미 반환했다.)
+  if (local.kind === "unsupported" || local.kind === "no_data") {
+    if (crossModule) {
+      return { text: aiFailReason === "disabled" ? AI_DISABLED_TEXT : AI_ERROR_TEXT, kind: "error" };
+    }
     return { text: APOLOGY_TEXT, kind: "error" };
   }
   return { text: toDdasomiText(local), kind: local.kind, suggestions: local.suggestions };
