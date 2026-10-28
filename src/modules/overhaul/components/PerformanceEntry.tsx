@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Card, Button, Icon, StatusChip, FieldChip, ProgressBar, EmptyState } from "@/shared/components/ui";
+import { Card, Button, Icon, StatusChip, FieldChip, ProgressBar } from "@/shared/components/ui";
 import { taskProgress, taskStatus } from "../lib/progress";
 import { compressImage, formatBytes } from "../lib/imageCompress";
 import type { OverhaulTask, OverhaulEntry } from "../lib/repo";
@@ -10,7 +9,8 @@ import { invalidateEntryHistory } from "./EntryHistoryPreview";
 
 /**
  * 실적 입력 — 일자별 완료수량·작업내용·지연사유·분해 전후 사진을 기록하고,
- * 항목별 정비 이력 타임라인으로 되짚어 본다.
+ * 항목별 정비 이력 타임라인으로 되짚어 본다. 작업·공정 목록(과 공정표)에서 작업을 누르면 뜨는
+ * 팝업(EntryDialog)이 이 본체(EntryPanel)를 쓴다 — 예전의 별도 실적 입력 화면은 없앴다.
  *
  * 원본(legacy/plantsync/src/pages/PerformanceEntry.jsx)은 브라우저 상태에
  * entries 배열을 직접 얹었지만, 여기서는 overhaul_entry 테이블에 날짜별로 저장하고
@@ -18,12 +18,6 @@ import { invalidateEntryHistory } from "./EntryHistoryPreview";
  */
 
 const DELAY_REASONS = ["지연 없음", "자재/부품 입고 지연", "인력 부족", "선행 공정 지연", "설비 이상 발견", "기상 조건", "기타"];
-
-interface TaskOption {
-  id: string;
-  name: string;
-  equipment_type: string | null;
-}
 
 /**
  * 사진 한 장. 이미 저장된 것(id)과 방금 고른 것(dataUrl)이 한 목록에 섞인다.
@@ -400,7 +394,6 @@ function buildFormOf(entries: OverhaulEntry[], dateStr: string): FormState {
 /**
  * 작업 하나의 실적 입력 본체 — 작업 헤더 · 일자별 입력 폼 · 정비 이력.
  *
- * 실적 입력 화면(아래 PerformanceEntry)과 작업·공정 목록의 팝업(EntryDialog)이 같이 쓴다.
  * 작업이 바뀌면 호출하는 쪽에서 key={taskId} 로 새로 띄운다(폼 상태가 다른 작업 것으로 남지 않게).
  * onChanged 는 저장·삭제로 진행률이 바뀐 뒤 불린다 — 목록 쪽이 진행률을 다시 읽는 데 쓴다.
  */
@@ -736,115 +729,6 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
         일자별 기록은 각각 저장되어 <b className="text-on-surface">정비 이력</b>으로 누적됩니다. 누적 완료수량
         기준으로 설비별·분야별 진행률이 재계산됩니다.
       </p>
-    </>
-  );
-}
-
-export default function PerformanceEntry() {
-  const router = useRouter();
-  const sp = useSearchParams();
-
-  const [options, setOptions] = useState<TaskOption[] | null>(null);
-  /** 작업 목록 검색어 — 목록에 상한이 있어 수천 건이면 좁혀서 찾아야 한다 */
-  const [optionQuery, setOptionQuery] = useState("");
-  const [optionsTruncated, setOptionsTruncated] = useState(false);
-
-  const selectedId = sp.get("task");
-
-  // 작업 목록 로드. 검색어가 바뀌면 다시 읽는다.
-  // 선택된 작업은 검색 결과 밖이어도 서버가 끼워 넣어 준다(include) —
-  // 안 그러면 선택칸이 빈 것처럼 보인다.
-  useEffect(() => {
-    let alive = true;
-    const t = setTimeout(
-      () => {
-        void (async () => {
-          const sp = new URLSearchParams();
-          if (optionQuery.trim()) sp.set("q", optionQuery.trim());
-          if (selectedId) sp.set("include", selectedId);
-          const json = await (await fetch(`/api/overhaul/task-options?${sp}`)).json();
-          if (!alive || !json.ok) return;
-          setOptions(json.options);
-          setOptionsTruncated(!!json.truncated);
-        })();
-      },
-      optionQuery ? 250 : 0,
-    );
-    return () => {
-      alive = false;
-      clearTimeout(t);
-    };
-  }, [optionQuery, selectedId]);
-
-  // 선택된 작업이 없으면 첫 항목으로 이동
-  useEffect(() => {
-    if (options && options.length && !selectedId) {
-      router.replace(`/overhaul/entry?task=${options[0].id}`);
-    }
-  }, [options, selectedId, router]);
-
-  if (options === null) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
-  }
-
-  if (!options.length) {
-    return (
-      <>
-        <h1 className="text-display-lg text-on-surface pt-2">실적 입력</h1>
-        <Card lift={false} className="p-0">
-          <EmptyState
-            icon="edit_note"
-            title="입력할 작업이 없습니다"
-            desc="먼저 작업·공정의 엑셀 등록 탭에서 설계내역서를 올려 작업항목을 만드세요."
-          />
-        </Card>
-      </>
-    );
-  }
-
-  if (!selectedId) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
-  }
-
-  return (
-    <>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-display-lg text-on-surface">실적 입력</h1>
-          <p className="text-on-surface-variant text-body-md">
-            일자별로 실적·사진을 기록하면 그날 기록으로 저장됩니다. 다른 날짜를 선택하면 그 날짜의 기록을 불러옵니다.
-          </p>
-        </div>
-        <div className="flex flex-col gap-1.5 w-full md:w-auto">
-          <div className="flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 border border-transparent focus-within:border-primary transition-colors md:max-w-xs">
-            <Icon name="search" className="text-on-surface-variant text-base" />
-            <input
-              value={optionQuery}
-              onChange={(e) => setOptionQuery(e.target.value)}
-              placeholder="작업 찾기"
-              className="flex-1 min-w-0 bg-transparent outline-none text-sm"
-            />
-          </div>
-          <select
-            value={selectedId}
-            onChange={(e) => router.push(`/overhaul/entry?task=${e.target.value}`)}
-            className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary w-full md:max-w-xs truncate"
-          >
-            {options.map((t) => (
-              <option key={t.id} value={t.id}>
-                [{t.equipment_type ?? "기타"}] {t.name}
-              </option>
-            ))}
-          </select>
-          {optionsTruncated && (
-            <p className="text-[11px] md:text-[12px] text-on-surface-variant md:max-w-xs">
-              작업이 많아 목록을 일부만 보여줍니다 — 위에서 검색해 좁히세요.
-            </p>
-          )}
-        </div>
-      </div>
-
-      <EntryPanel key={selectedId} taskId={selectedId} />
     </>
   );
 }

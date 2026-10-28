@@ -72,9 +72,8 @@ export const NAV_GROUPS: NavGroup[] = [
       // 업로드 분석·공정표는 작업·공정의 하위 탭으로 합쳤다
       // (/overhaul/tasks/upload, /overhaul/tasks/schedule) — 셋 다 같은 작업항목이라서.
       { href: "/overhaul/tasks", label: "작업·공정", icon: "format_list_bulleted", section: "계약 후 — 공정관리" },
-      // 분해 전·후 사진은 실적 입력 화면에서 날짜별로 함께 다룬다.
-      // 별도 사진 화면은 두지 않는다 (실적과 떨어져 있으면 두 곳을 오가야 한다).
-      { href: "/overhaul/entry", label: "실적 입력", icon: "edit_note", section: "계약 후 — 공정관리" },
+      // 실적 입력은 따로 화면을 두지 않는다 — 작업·공정 목록(과 공정표)에서 작업을 누르면 뜨는
+      // 팝업에서 날짜별 실적·분해 전후 사진을 함께 다룬다. 옛 주소 /overhaul/entry 는 작업·공정으로 넘어간다.
     ],
   },
   {

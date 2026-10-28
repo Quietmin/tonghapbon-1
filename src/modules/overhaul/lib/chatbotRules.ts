@@ -57,7 +57,7 @@ function baselineNote(snapshot: ChatbotSnapshot): string {
 function noDataGuide(): Answer {
   return {
     kind: "no_data",
-    text: '현재 등록된 공정 데이터가 없습니다. "업로드 분석"에서 엑셀을 업로드하거나 "실적 입력"에서 실적을 입력한 뒤 다시 질문해 주세요.',
+    text: '현재 등록된 공정 데이터가 없습니다. "작업·공정"에서 엑셀을 등록하거나 작업을 눌러 실적을 입력한 뒤 다시 질문해 주세요.',
   };
 }
 
@@ -214,7 +214,7 @@ export function answerQuestion(question: string, snapshot: ChatbotSnapshot): Ans
   if (MUTATION_RE.test(q)) {
     return {
       kind: "refused",
-      text: '이 챗봇은 조회만 가능합니다. 실적 수정·삭제는 "실적 입력" 화면에서 직접 진행해 주세요.',
+      text: '이 챗봇은 조회만 가능합니다. 실적 수정·삭제는 "작업·공정"에서 작업을 눌러 직접 진행해 주세요.',
     };
   }
 
