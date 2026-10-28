@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button, Card, EmptyState, Icon } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
 import { DEPARTMENTS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
@@ -230,7 +231,7 @@ export default function StatusBoard({
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-on-surface-variant border-b border-border-subtle">
-                  <th className="py-3 pl-5 pr-3 font-bold whitespace-nowrap">조치 상태</th>
+                  <th className="py-3 pl-5 pr-3 font-bold whitespace-nowrap text-center">조치 상태</th>
                   <th className="py-3 pr-3 font-bold">설비명</th>
                   <th className="py-3 pr-3 font-bold">이슈 내용</th>
                   <th className="py-3 pr-3 font-bold whitespace-nowrap">지사</th>
@@ -246,7 +247,7 @@ export default function StatusBoard({
                     onClick={() => setSelected(r)}
                     className="border-b border-border-subtle last:border-0 text-on-surface cursor-pointer hover:bg-surface-container-high/60 transition-colors"
                   >
-                    <td className="py-3 pl-5 pr-3 whitespace-nowrap">
+                    <td className="py-3 pl-5 pr-3 whitespace-nowrap text-center">
                       <StatusBadge status={r.status} />
                       {r.scheduled_date && (
                         <span className="block text-xs text-on-surface-variant mt-1">
@@ -287,7 +288,7 @@ export default function StatusBoard({
 }
 
 /** 유지보수 담당자의 조치 갱신 창 — 상태·조치 내용·조치 예정일·조치자 */
-function UpdateDialog({
+export function UpdateDialog({
   row,
   onClose,
   onSaved,
@@ -331,7 +332,9 @@ function UpdateDialog({
     }
   }
 
-  return (
+  // body 로 포털 — 첫 화면 카드(glass-card)처럼 backdrop-filter 가 걸린 조상 안에서 그리면 fixed 가
+  // 그 카드 기준이 되어 창이 카드 안에 갇히고 뒤따르는 카드(설비관리 공정 현황)에 가려진다.
+  return createPortal(
     <div
       className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/40"
       role="dialog"
@@ -440,6 +443,7 @@ function UpdateDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -9,6 +9,17 @@ export const DEPARTMENTS = ["운영부", "계전부", "기계부", "공무부"] 
 
 export type Department = (typeof DEPARTMENTS)[number];
 
+/**
+ * 첫 화면을 가르는 큰 구분 — 운영부(이슈를 올리는 쪽)와 유지보수(조치하는 쪽).
+ * 유지보수 세 부서는 같은 화면 구성에 각자 부서 데이터만 다르게 보인다.
+ */
+export const OPERATIONS_DEPARTMENT: Department = "운영부";
+export const MAINTENANCE_DEPARTMENTS: readonly Department[] = ["계전부", "기계부", "공무부"];
+
+export function isMaintenanceDepartment(v: unknown): boolean {
+  return typeof v === "string" && (MAINTENANCE_DEPARTMENTS as readonly string[]).includes(v);
+}
+
 export function isDepartment(v: unknown): v is Department {
   return typeof v === "string" && (DEPARTMENTS as readonly string[]).includes(v);
 }

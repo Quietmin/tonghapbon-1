@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/shared/components/ui";
 import { NAV_GROUPS } from "@/shared/lib/nav";
-import HomeDashboard from "@/modules/home/components/HomeDashboard";
+import HomeByDepartment from "@/modules/home/components/HomeByDepartment";
 
 /* 챕터 왼쪽 세로 바 색 — 모바일 홈 카드는 아이콘 없이 이 선 하나로만 챕터를 구분한다 */
 const ACCENT_BAR = {
@@ -76,9 +76,9 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* 데스크톱 첫 화면 — 선택한 지사의 설비관리 현황 대시보드(HomeDashboard) */}
+      {/* 데스크톱 첫 화면 — 내 부서에 따라 운영부 / 유지보수(계전부·기계부·공무부) 화면이 갈린다 */}
       <div className="hidden md:block">
-        <HomeDashboard />
+        <HomeByDepartment />
       </div>
     </>
   );

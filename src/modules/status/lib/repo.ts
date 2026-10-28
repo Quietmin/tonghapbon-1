@@ -30,6 +30,8 @@ const COLUMNS = `id, branch, equipment_name, content, department, reporter, stat
 export interface IssueFilter {
   branch?: string;
   status?: string;
+  /** 여러 상태 중 하나(예: 조치가 필요한 미완료·조치중). status 와 함께 주면 둘 다 적용된다 */
+  statuses?: string[];
   department?: string;
   /** 설비명·이슈 내용·작성자 부분검색 */
   q?: string;
@@ -45,6 +47,13 @@ function where(f: IssueFilter, includeStatus: boolean): { sql: string; params: u
   };
   if (f.branch) add("branch = $#", f.branch);
   if (includeStatus && f.status) add("status = $#", f.status);
+  if (includeStatus && f.statuses?.length) {
+    const ph = f.statuses.map((s) => {
+      params.push(s);
+      return "$" + params.length;
+    });
+    conds.push(`status in (${ph.join(", ")})`);
+  }
   if (f.department) add("department = $#", f.department);
   const q = f.q?.trim();
   if (q) {
@@ -55,17 +64,29 @@ function where(f: IssueFilter, includeStatus: boolean): { sql: string; params: u
   return { sql: conds.length ? `where ${conds.join(" and ")}` : "", params };
 }
 
-/**
- * 목록 — 아직 조치가 필요한 것부터(미완료 → 조치중 → 추후 조치 예정 → 조치완료),
- * 같은 상태 안에서는 최근 등록순.
- */
-export async function listIssues(filter: IssueFilter = {}, limit = 300): Promise<StatusIssueRow[]> {
+export type IssueSort = "priority" | "recent" | "scheduled";
+
+const ORDER: Record<IssueSort, string> = {
+  // 아직 조치가 필요한 것부터(미완료 → 조치중 → 추후 조치 예정 → 조치완료), 같은 상태 안에서는 최근 등록순
+  priority: `case status when '미완료' then 0 when '조치중' then 1
+                            when '추후 조치 예정' then 2 else 3 end,
+                created_at desc`,
+  // 상태와 무관하게 최근 등록순
+  recent: "created_at desc",
+  // 조치 예정일이 가까운 순(예정일이 없는 것은 뒤로)
+  scheduled: "scheduled_date asc nulls last, created_at desc",
+};
+
+/** 목록 — 기본은 조치가 필요한 것부터(priority). 첫 화면 대시보드는 recent·scheduled 도 쓴다 */
+export async function listIssues(
+  filter: IssueFilter = {},
+  limit = 300,
+  sort: IssueSort = "priority",
+): Promise<StatusIssueRow[]> {
   const { sql, params } = where(filter, true);
   return query<StatusIssueRow>(
     `select ${COLUMNS} from status_issue ${sql}
-      order by case status when '미완료' then 0 when '조치중' then 1
-                           when '추후 조치 예정' then 2 else 3 end,
-               created_at desc
+      order by ${ORDER[sort]}
       limit ${Math.max(1, Math.min(1000, Math.floor(limit)))}`,
     params,
   );
