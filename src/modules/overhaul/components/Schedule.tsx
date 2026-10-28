@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Card, Icon, Button, FieldChip, EmptyState } from "@/shared/components/ui";
 import { addDays, toDate, ymd } from "../lib/schedule";
@@ -79,9 +79,18 @@ function barColorOf(row: Row): BarColor {
   return "primary";
 }
 
-/** 기간 눈금 생성 (약 6~8개) */
-function makeTicks(total: number) {
-  const step = Math.max(1, Math.ceil(total / 7));
+/**
+ * 오른쪽 끝에 남겨 두는 여백(px) — 마지막 날짜 눈금과 "100%" 같은 막대 끝 글자가 칸 밖으로
+ * 삐져나가 가로 스크롤이 생기지 않게 한다.
+ */
+const END_GUTTER = 44;
+
+/** 눈금 한 칸이 차지하는 최소 폭(px) — 날짜 글자("10-01")가 서로 겹치지 않을 만큼 */
+const TICK_MIN_PX = 64;
+
+/** 기간 눈금 생성 — count 개 안팎(타임라인 폭에 맞춰 호출하는 쪽이 정한다) */
+function makeTicks(total: number, count: number) {
+  const step = Math.max(1, Math.ceil(total / Math.max(2, count)));
   const ticks: number[] = [];
   for (let d = 0; d <= total; d += step) ticks.push(d);
   if (ticks[ticks.length - 1] !== total) ticks.push(total);
@@ -163,7 +172,22 @@ export default function Schedule() {
 
   const total = data?.total ?? 1;
   const todayOff = data?.todayOff ?? 0;
-  const ticks = useMemo(() => makeTicks(total), [total]);
+  // 타임라인 폭을 재서, 화면이 좁으면 날짜 눈금을 줄이고 넓으면 늘린다(겹치지 않게)
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const [timelineW, setTimelineW] = useState(560);
+  const hasChart = !!data && data.hasPeriod && data.rows.length > 0;
+  useEffect(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setTimelineW(el.clientWidth));
+    ro.observe(el);
+    setTimelineW(el.clientWidth);
+    return () => ro.disconnect();
+  }, [hasChart]);
+  const ticks = useMemo(
+    () => makeTicks(total, Math.max(3, Math.min(14, Math.floor(timelineW / TICK_MIN_PX)))),
+    [total, timelineW],
+  );
   const startDate = data?.project.start_date;
 
   const equipmentOptions = useMemo(
@@ -417,13 +441,15 @@ export default function Schedule() {
           {/* 간트차트 */}
           <Card lift={false} className="p-card-padding overflow-hidden">
             <div className="overflow-x-auto">
-              <div className="min-w-[760px]">
+              {/* PC(md 이상)는 칸 폭에 딱 맞춰 전체 일자가 한 화면에 들어오고, 폰은 최소 폭을 두고 옆으로 민다.
+                  이름 칸 폭은 --lbl 한 곳에서 정한다(헤더·설비 행·작업 행·오늘 선이 같이 쓴다). */}
+              <div className="min-w-[760px] md:min-w-0 [--lbl:196px] xl:[--lbl:220px]">
                 {/* 타임라인 헤더 */}
                 <div className="flex items-stretch border-b border-border-subtle pb-2 mb-2">
-                  <div className="w-[220px] shrink-0 text-[12px] md:text-[13px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end">
+                  <div className="w-[var(--lbl)] shrink-0 text-[12px] md:text-[13px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end">
                     설비 / 작업
                   </div>
-                  <div className="relative flex-1 h-8">
+                  <div ref={timelineRef} className="relative flex-1 h-8" style={{ marginRight: END_GUTTER }}>
                     {ticks.map((d) => (
                       <div
                         key={d}
@@ -444,7 +470,7 @@ export default function Schedule() {
                   {/* 오늘 기준선 */}
                   <div
                     className="absolute top-0 bottom-0 w-px bg-status-error/70 z-10 pointer-events-none"
-                    style={{ left: `calc(220px + (100% - 220px) * ${todayOff / total})` }}
+                    style={{ left: `calc(var(--lbl) + (100% - var(--lbl) - ${END_GUTTER}px) * ${todayOff / total})` }}
                   >
                     <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] md:text-[12px] font-bold text-status-error bg-surface px-1 rounded">
                       오늘
@@ -460,7 +486,7 @@ export default function Schedule() {
                           className="flex items-center py-2 cursor-pointer hover:bg-surface-container-low rounded-lg transition-colors"
                           onClick={() => setCollapsed((c) => ({ ...c, [g.equip]: isOpen }))}
                         >
-                          <div className="w-[220px] shrink-0 pr-3 flex items-center gap-1.5">
+                          <div className="w-[var(--lbl)] shrink-0 pr-3 flex items-center gap-1.5">
                             <Icon
                               name={isOpen ? "expand_more" : "chevron_right"}
                               className="text-base text-on-surface-variant"
@@ -471,7 +497,7 @@ export default function Schedule() {
                             </span>
                             <span className="text-xs text-on-surface-variant">({g.list.length})</span>
                           </div>
-                          <div className="relative flex-1 h-6">
+                          <div className="relative flex-1 h-6" style={{ marginRight: END_GUTTER }}>
                             <div
                               className="absolute top-1/2 -translate-y-1/2 h-3.5 rounded-full bg-surface-container-highest overflow-hidden"
                               style={{ left: pos(g.minOff), width: pos(Math.max(1, g.maxOff - g.minOff)) }}
@@ -511,9 +537,11 @@ export default function Schedule() {
                                   editing?.id === r.id ? "bg-primary/5" : ""
                                 }`}
                               >
-                                <div className="w-[220px] shrink-0 pr-3 pl-7">
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="text-xs font-medium text-on-surface truncate group-hover:text-primary transition-colors">
+                                <div className="w-[var(--lbl)] shrink-0 pr-3 pl-7">
+                                  {/* 좁은 화면(xl 미만)에서는 이름이 한 줄을 다 쓰고 칩·수정 버튼이 아랫줄로 내려가
+                                      이름이 세 글자만 보이고 잘리는 일이 없다 */}
+                                  <div className="flex items-center gap-1.5 max-xl:flex-wrap">
+                                    <p className="text-xs font-medium text-on-surface truncate min-w-0 max-xl:basis-full group-hover:text-primary transition-colors">
                                       {r.name}
                                     </p>
                                     {r.actual >= 100 ? (
@@ -545,7 +573,7 @@ export default function Schedule() {
                                       <Icon name="edit_calendar" className="text-sm" />
                                     </button>
                                   </div>
-                                  <p className="text-[10px] md:text-[12px] text-on-surface-variant font-mono-data flex items-center gap-1">
+                                  <p className="text-[10px] md:text-[12px] text-on-surface-variant font-mono-data flex items-center gap-1 whitespace-nowrap">
                                     계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}
                                     {r.sch.source === "excel" && (
                                       <span
@@ -557,7 +585,7 @@ export default function Schedule() {
                                     )}
                                   </p>
                                   <p
-                                    className={`text-[10px] md:text-[12px] font-mono-data ${
+                                    className={`text-[10px] md:text-[12px] font-mono-data whitespace-nowrap truncate ${
                                       r.actualBar ? BAR_STYLE[barColor].text : "text-on-surface-variant/50"
                                     }`}
                                   >
@@ -568,7 +596,7 @@ export default function Schedule() {
                                         : "실적 미입력"}
                                   </p>
                                 </div>
-                                <div className="relative flex-1 h-11">
+                                <div className="relative flex-1 h-11" style={{ marginRight: END_GUTTER }}>
                                   {/* 계획 (윗줄) */}
                                   <div
                                     className="absolute top-1.5 h-2.5 rounded-full bg-surface-container-highest"
