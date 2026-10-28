@@ -2,9 +2,10 @@
 
 import { useCallback, useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Card, Icon, Button, FieldChip, EmptyState } from "@/shared/components/ui";
 import { addDays, toDate, ymd } from "../lib/schedule";
+import EntryDialog from "./EntryDialog";
+import { useEntryHistoryHover } from "./EntryHistoryPreview";
 
 /**
  * 공정표(간트) — 설비별로 그룹핑해 계획(윗줄)·실적(아랫줄) 막대를 함께 보여준다.
@@ -99,7 +100,10 @@ export default function Schedule() {
   const [draft, setDraft] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const router = useRouter();
+  /** 실적 입력 팝업을 띄운 작업 id — null 이면 닫힘 */
+  const [entryTaskId, setEntryTaskId] = useState<string | null>(null);
+  /** 행에 마우스를 올리면 정비 이력을 먼저 보여 주는 미리보기 */
+  const { bind: bindHistory, preview: historyPreview, hide: hideHistory } = useEntryHistoryHover();
 
   const reload = useCallback(async () => {
     const json = await (await fetch("/api/overhaul/schedule")).json();
@@ -253,6 +257,16 @@ export default function Schedule() {
           </div>
         )}
       </div>
+
+      {historyPreview}
+
+      {entryTaskId && (
+        <EntryDialog
+          taskId={entryTaskId}
+          onClose={() => setEntryTaskId(null)}
+          onChanged={() => void reload()}
+        />
+      )}
 
       {editing && (
         <Card className="p-card-padding border border-primary/30" lift={false}>
@@ -487,8 +501,12 @@ export default function Schedule() {
                             return (
                               <div
                                 key={r.id}
-                                onClick={() => router.push(`/overhaul/entry?task=${r.id}`)}
-                                title="눌러서 실적 입력으로 이동"
+                                {...bindHistory(r.id)}
+                                onClick={() => {
+                                  hideHistory();
+                                  setEntryTaskId(r.id);
+                                }}
+                                title="눌러서 실적 입력 · 올려 두면 정비 이력"
                                 className={`flex items-center py-1.5 group cursor-pointer border-b border-border-subtle/40 last:border-0 ${
                                   editing?.id === r.id ? "bg-primary/5" : ""
                                 }`}
@@ -518,7 +536,7 @@ export default function Schedule() {
                                     <button
                                       title="계획일정 조정"
                                       onClick={(e) => {
-                                        // 행 클릭(실적 입력 이동)과 겹치지 않게 막는다
+                                        // 행 클릭(실적 입력 팝업)과 겹치지 않게 막는다
                                         e.stopPropagation();
                                         openEditor(r);
                                       }}
