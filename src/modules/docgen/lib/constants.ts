@@ -16,7 +16,7 @@ export const MODE_LABELS: Record<DocMode, string> = {
 /**
  * 화면 제목("매뉴얼 작성")에 쓰는 이름.
  * MODE_LABELS 와 따로 두는 이유: 보관함 표의 '종류' 칸에는 "고장 보고서"라고
- * 띄어 쓰는 게 읽기 좋은데, 메뉴와 제목은 "고장보고서 작성"으로 붙여 쓴다.
+ * 띄어 쓰는 게 읽기 좋은데, 메뉴와 제목은 "고장보고서 등록"처럼 붙여 쓴다.
  * 한쪽을 고치면 다른 쪽 표기가 함께 어긋나므로 이름을 나눠 둔다.
  */
 export const MODE_TITLES: Record<DocMode, string> = {

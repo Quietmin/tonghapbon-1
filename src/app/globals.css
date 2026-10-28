@@ -261,6 +261,10 @@ body {
   .input {
     @apply w-full h-11 px-4 rounded-sm bg-surface-container-low border border-border-subtle text-sm text-on-surface outline-none transition-colors focus:border-primary focus:bg-surface-container-lowest;
   }
+  /* 필수인데 비어 있는 칸 — 제출을 시도했거나 한 번 거쳐 간 뒤에 붙는다(화면을 열자마자 붉게 만들지 않는다) */
+  .input[aria-invalid="true"] {
+    @apply border-error bg-error/10 ring-1 ring-error/40;
+  }
   textarea.input {
     @apply h-auto py-3 leading-relaxed;
   }

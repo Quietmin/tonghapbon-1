@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, EmptyState, Icon } from "@/shared/components/ui";
 import { getCurrentUser } from "@/shared/lib/currentUser";
+import { AccountButton } from "@/shared/components/ProfileGate";
 import {
   OPERATIONS_DEPARTMENT,
   isMaintenanceDepartment,
@@ -32,11 +33,18 @@ export default async function HomeByDepartment() {
   return <HomeDashboard />;
 }
 
-/** "강남지사 계전부 현황" — 지사·부서만 크게 보이고 부제는 두지 않는다 */
+/**
+ * "강남지사 계전부 현황" — 지사·부서만 크게 보이고 부제는 두지 않는다.
+ * 폰에서는 제목과 같은 줄 오른쪽에 계정 설정 버튼이 붙는다(제목은 폰에서 조금 줄여 한 줄에 맞춘다) — 폰에는 사이드바가 없고 이 화면에서는 헤더도
+ * 감춰져 있어 내 지사·부서를 바꿀 곳이 여기뿐이다. PC 는 사이드바 꼭대기 카드가 그 일을 한다.
+ */
 function Header({ title }: { title: string }) {
   return (
-    <section className="pt-2">
-      <h1 className="text-display-lg text-on-surface">{title}</h1>
+    <section className="pt-2 flex items-center justify-between gap-3">
+      <h1 className="text-display-lg max-md:text-[22px] max-md:leading-snug text-on-surface min-w-0 break-keep">
+        {title}
+      </h1>
+      <AccountButton className="md:hidden shrink-0" />
     </section>
   );
 }

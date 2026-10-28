@@ -204,7 +204,7 @@ export default function FaultReportEditor() {
       mode="fault"
       accent="primary"
       faultSummary={faultSummary}
-      // 작성 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 작성 버튼과
+      // 등록 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 등록 버튼과
       // 같은 색으로 둬서, 두 화면을 오갈 때 같은 자리의 같은 버튼으로 읽히게 한다.
       headingAction={
         <ButtonLink href="/failure" variant="primary">
