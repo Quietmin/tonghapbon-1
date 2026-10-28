@@ -6,10 +6,11 @@ import { Icon, RequiredMark } from "./ui";
 /**
  * 내 정보(지사·부서) 선택 — 로그인이 없는 동안의 임시 대용.
  *
- * 처음 접속하면(또는 지사·부서 중 하나라도 비어 있으면) 선택 창이 떠서 고르기 전에는 닫을 수
- * 없다. 선택은 쿠키에 담기고(/api/profile), 서버가 getCurrentUser() 로 읽어 현황 등록의
+ * 처음 접속하면(또는 지사·부서 중 하나라도 비어 있으면) PIMS 마크와 함께 계정 설정 화면이 전체 화면으로
+ * 뜨고, 고르고 [시작하기]를 누르면 홈 화면(/)으로 이동한다 — 어느 주소로 처음 들어왔든 같다. 고르기
+ * 전에는 다른 화면을 쓸 수 없다. 선택은 쿠키에 담기고(/api/profile), 서버가 getCurrentUser() 로 읽어 현황 등록의
  * 기본 지사·부서와 현황 조회의 기본 필터에 쓴다. 이후에는 헤더의 "강남지사 · 계전부" 칩을 눌러
- * 다시 바꿀 수 있다(그때는 닫기 가능).
+ * 다시 바꿀 수 있다(그때는 작은 창이고 닫기 가능).
  *
  * 업무망에서 실제 로그인이 붙으면 이 창은 필요 없어진다 — 서버의 getCurrentUser() 만 세션으로
  * 바꾸면 되고, 이 컴포넌트는 Shell 에서 떼어 내면 그만이다.
@@ -48,6 +49,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // 지사·부서 쿠키가 없으면 첫 접속이다 — 서버 응답(/api/profile)을 기다리지 않고 바로 화면을 띄워
+    // 뒤의 일반 화면이 잠깐 비치지 않게 한다. 쿠키가 있어도 값이 틀렸을 수 있으니 아래 응답이 최종이다.
+    const hasCookie = (name: string) =>
+      document.cookie.split("; ").some((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
+    if (!hasCookie("oh_branch") || !hasCookie("oh_dept")) {
+      setProfile(null);
+      setOpen(true);
+    }
     void (async () => {
       try {
         const json = await (await fetch("/api/profile")).json();
@@ -94,8 +103,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         })
       ).json();
       if (!json.ok) throw new Error(json.error || "저장하지 못했습니다.");
-      // 지사·부서에 매인 화면이 많다 — 서버 데이터와 화면 기본값을 통째로 다시 읽는다
-      window.location.reload();
+      // 지사·부서에 매인 화면이 많다 — 서버 데이터와 화면 기본값을 통째로 다시 읽는다.
+      // 처음 고른 것이면(= 첫 접속 화면) 어느 주소로 들어왔든 홈 화면으로 보낸다.
+      if (forced) window.location.assign("/");
+      else window.location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장하지 못했습니다.");
       setSaving(false);
@@ -120,16 +131,115 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const SELECT =
     "h-11 px-3 rounded-sm bg-surface-container-low border border-border-subtle text-sm text-on-surface outline-none focus:border-primary focus:bg-surface-container-lowest";
 
+  const fields = (
+    <>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-bold text-on-surface-variant">
+          지사
+          <RequiredMark />
+        </span>
+        <select
+          value={draftBranch}
+          onChange={(e) => setDraftBranch(e.target.value)}
+          className={SELECT}
+          required
+          autoFocus={forced}
+        >
+          <option value="">선택</option>
+          {branches.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-bold text-on-surface-variant">
+          부서
+          <RequiredMark />
+        </span>
+        <select
+          value={draftDept}
+          onChange={(e) => setDraftDept(e.target.value)}
+          className={SELECT}
+          required
+        >
+          <option value="">선택</option>
+          {departments.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error text-sm">
+          <Icon name="error" className="text-base" />
+          {error}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <ProfileContext.Provider value={api}>
       {children}
-      {open && (
+      {open && forced && (
+        // 첫 접속 — PIMS 마크와 계정 설정을 전체 화면으로. 뒤의 화면은 완전히 가려 쓸 수 없다.
+        <div
+          className="fixed inset-0 z-[500] overflow-y-auto bg-surface print:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="profileDlgTitle"
+        >
+          <div className="min-h-full flex flex-col items-center justify-center gap-8 px-6 py-10">
+            <div className="flex flex-col items-center text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+              <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-24 md:h-28 w-auto" />
+              <h1 className="mt-4 text-2xl md:text-3xl font-black text-on-surface tracking-tight">
+                플랜트 지능형 관리시스템
+              </h1>
+              <p className="mt-1 text-xs font-semibold text-on-surface-variant tracking-wide">
+                Plant Inteligence Management System
+              </p>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void save();
+              }}
+              className="w-full max-w-md rounded-2xl bg-surface-container-lowest p-6 shadow-xl border border-border-subtle flex flex-col gap-4"
+            >
+              <div>
+                <h2 id="profileDlgTitle" className="text-title-sm text-on-surface flex items-center gap-2">
+                  <Icon name="manage_accounts" className="text-primary" /> 계정 설정
+                </h2>
+                <p className="text-sm text-on-surface-variant mt-1 break-keep">
+                  지사와 부서를 선택해 주세요. 고른 지사·부서 기준으로 현황이 먼저 보이고, 현황 등록에도
+                  자동으로 채워집니다. (업무망 로그인이 연결되기 전까지 임시로 쓰는 선택입니다.)
+                </p>
+              </div>
+              {fields}
+              <button
+                type="submit"
+                disabled={saving || !draftBranch || !draftDept}
+                className="mt-1 px-5 py-3 rounded-sm font-bold text-sm bg-primary text-on-primary hover:opacity-90 disabled:opacity-40"
+              >
+                {saving ? "저장 중…" : "시작하기"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {open && !forced && (
         <div
           className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center bg-black/50 print:hidden"
           role="dialog"
           aria-modal="true"
           aria-labelledby="profileDlgTitle"
-          onClick={forced ? undefined : () => setOpen(false)}
+          onClick={() => setOpen(false)}
         >
           <form
             onClick={(e) => e.stopPropagation()}
@@ -145,7 +255,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
               </span>
               <div className="min-w-0">
                 <h3 id="profileDlgTitle" className="text-title-sm text-on-surface">
-                  {forced ? "지사와 부서를 선택해 주세요" : "내 지사·부서 변경"}
+                  계정 설정 — 내 지사·부서
                 </h3>
                 <p className="text-sm text-on-surface-variant mt-1 break-keep">
                   업무망 로그인이 연결되기 전까지 임시로 쓰는 선택입니다. 고른 지사·부서 기준으로 현황이 먼저
@@ -154,70 +264,23 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-on-surface-variant">
-                지사
-                <RequiredMark />
-              </span>
-              <select
-                value={draftBranch}
-                onChange={(e) => setDraftBranch(e.target.value)}
-                className={SELECT}
-                required
-                autoFocus={forced}
-              >
-                <option value="">선택</option>
-                {branches.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-on-surface-variant">
-                부서
-                <RequiredMark />
-              </span>
-              <select
-                value={draftDept}
-                onChange={(e) => setDraftDept(e.target.value)}
-                className={SELECT}
-                required
-              >
-                <option value="">선택</option>
-                {departments.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {error && (
-              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error text-sm">
-                <Icon name="error" className="text-base" />
-                {error}
-              </div>
-            )}
+            {fields}
 
             <div className="flex justify-end gap-2">
-              {!forced && (
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  disabled={saving}
-                  className="px-4 py-2.5 rounded-sm font-bold text-sm text-on-surface-variant hover:bg-surface-container-high"
-                >
-                  취소
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                disabled={saving}
+                className="px-4 py-2.5 rounded-sm font-bold text-sm text-on-surface-variant hover:bg-surface-container-high"
+              >
+                취소
+              </button>
               <button
                 type="submit"
                 disabled={saving || !draftBranch || !draftDept}
                 className="px-5 py-2.5 rounded-sm font-bold text-sm bg-primary text-on-primary hover:opacity-90 disabled:opacity-40"
               >
-                {saving ? "저장 중…" : forced ? "시작하기" : "저장"}
+                {saving ? "저장 중…" : "저장"}
               </button>
             </div>
           </form>
@@ -242,6 +305,27 @@ export function ProfileChip() {
     >
       <Icon name="badge" className="text-base" />
       <span className="hidden md:inline">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * 첫 화면의 "계정 설정" 버튼 — 눌러서 내 지사·부서를 다시 고른다(로그인이 붙기 전까지의 계정 대용).
+ * 폰에는 사이드바가 없고 첫 화면에서는 헤더도 감춰져 있어, 지사·부서를 바꿀 길이 이 버튼뿐이다.
+ * 아직 고르기 전(profile 이 없음)이면 팝업이 이미 강제로 떠 있으니 그려 두지 않는다.
+ */
+export function AccountButton({ className = "" }: { className?: string }) {
+  const { profile, open } = useProfile();
+  if (!profile) return null;
+  return (
+    <button
+      type="button"
+      onClick={open}
+      aria-label={`계정 설정 — 내 지사·부서: ${profile.branch} ${profile.department}`}
+      className={`h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors whitespace-nowrap ${className}`}
+    >
+      <Icon name="manage_accounts" className="text-base" />
+      계정 설정
     </button>
   );
 }
