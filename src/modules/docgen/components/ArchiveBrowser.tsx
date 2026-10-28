@@ -864,15 +864,15 @@ export default function ArchiveBrowser({
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-on-surface-variant border-b border-border-subtle">
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">종류</th>
-                  <th className="py-2 pr-3 font-bold">파일명</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">지사</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">분야</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">작성자</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">사진</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">크기</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">만든 날짜</th>
-                  <th className="py-2 font-bold" />
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">종류</th>
+                  <th className="py-3 pr-3 font-bold">파일명</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">지사</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">분야</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">작성자</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">사진</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">크기</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">만든 날짜</th>
+                  <th className="py-3 font-bold" />
                 </tr>
               </thead>
               <tbody>
@@ -886,7 +886,7 @@ export default function ArchiveBrowser({
                       openingId === r.id ? "opacity-60" : ""
                     }`}
                   >
-                    <td className="py-2 pr-3 whitespace-nowrap">
+                    <td className="py-3 pr-3 whitespace-nowrap">
                       {/* 종류를 색 배지로 — 전체 조회처럼 섞여 나올 때 줄을 훑기만 해도 갈린다 */}
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -896,16 +896,16 @@ export default function ArchiveBrowser({
                         {MODE_LABELS[r.doc_type] ?? r.doc_type}
                       </span>
                     </td>
-                    <td className="py-2 pr-3">{r.file_name}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.branch ?? "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.field ?? "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{maskName(r.author_name) ?? "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.photo_count}장</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{formatBytes(r.pdf_bytes)}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">
+                    <td className="py-3 pr-3">{r.file_name}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{r.branch ?? "-"}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{r.field ?? "-"}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{maskName(r.author_name) ?? "-"}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{r.photo_count}장</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{formatBytes(r.pdf_bytes)}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">
                       {new Date(r.created_at).toLocaleDateString("ko-KR")}
                     </td>
-                    <td className="py-2">
+                    <td className="py-3">
                       {/* 버튼 영역의 클릭은 행 클릭(미리보기)으로 번지지 않게 막는다 — 수정·삭제를 눌렀는데 미리보기가 뜨면 안 된다 */}
                       <div
                         className="flex items-center justify-end gap-3"

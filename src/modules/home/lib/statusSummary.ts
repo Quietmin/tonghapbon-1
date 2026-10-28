@@ -18,7 +18,7 @@ import {
 
 export interface StatusSummary {
   counts: Record<string, number>;
-  /** 조치가 필요한 것(미완료·조치중) — 유지보수 화면 */
+  /** 조치가 필요한 것(미완료·조치중), 최근 등록순 — 유지보수 화면 */
   needAction: StatusIssueRow[];
   /** 추후 조치 예정, 예정일이 가까운 순 — 유지보수 화면 */
   scheduled: StatusIssueRow[];
@@ -42,8 +42,9 @@ export async function getMaintenanceSummary(
     const base = { branch: branch ?? undefined, department };
     const [counts, needAction, scheduled] = await Promise.all([
       countByStatus(base),
-      listIssues({ ...base, statuses: ["미완료", "조치중"] }, 8, "priority"),
-      listIssues({ ...base, status: "추후 조치 예정" }, 5, "scheduled"),
+      // 화면이 5건씩 끊어 보여 주므로 페이지를 넘길 만큼 넉넉히 가져온다(최대 100건)
+      listIssues({ ...base, statuses: ["미완료", "조치중"] }, 100, "recent"),
+      listIssues({ ...base, status: "추후 조치 예정" }, 100, "scheduled"),
     ]);
     return plain({ ...EMPTY, counts, needAction, scheduled });
   } catch (e) {

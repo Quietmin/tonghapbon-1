@@ -84,7 +84,6 @@ async function OperationsHome({ branch }: { branch: string | null }) {
             rows={summary.list}
             emptyText="아직 등록된 현황이 없습니다. 위의 현황 등록으로 첫 이슈를 올려 보세요."
             moreLabel="현황 조회"
-            table
           />
         </>
       )}
@@ -110,14 +109,20 @@ async function MaintenanceHome({
       ) : (
         <>
           <StatusCountCards counts={summary.counts} />
-          <section className="grid gap-gutter lg:grid-cols-3">
+          {/*
+            좌우 두 단 — 조치 필요 현황(최근 등록순) / 추후 조치 예정 일정(예정일 순). 길어지지 않게
+            조치 상태·설비명·이슈 내용만 보이고 5건씩 끊어 아래 페이지 번호로 넘긴다.
+            예정일은 상태 아래 "예정 11.04" 로 보인다.
+          */}
+          <section className="grid gap-gutter lg:grid-cols-2">
             <IssueListPanel
-              className="lg:col-span-2"
               title="조치 필요 현황"
               rows={summary.needAction}
               emptyText="조치가 필요한 현황이 없습니다."
               moreLabel="현황 조회"
               editable
+              columns={["status", "equipment", "content"]}
+              pageSize={5}
             />
             <IssueListPanel
               title="추후 조치 예정 일정"
@@ -125,7 +130,8 @@ async function MaintenanceHome({
               emptyText="예정된 조치가 없습니다."
               moreLabel="현황 조회"
               editable
-              showSchedule
+              columns={["status", "equipment", "content"]}
+              pageSize={5}
             />
           </section>
         </>
