@@ -196,11 +196,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           <div className="min-h-full flex flex-col items-center justify-center gap-8 px-6 py-10">
             <div className="flex flex-col items-center text-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
-              <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-24 md:h-28 w-auto" />
-              <h1 className="mt-4 text-2xl md:text-3xl font-black text-on-surface tracking-tight">
+              <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-40 md:h-48 w-auto" />
+              <h1 className="mt-5 text-[26px] md:text-4xl font-black text-on-surface tracking-tight">
                 플랜트 지능형 관리시스템
               </h1>
-              <p className="mt-1 text-xs font-semibold text-on-surface-variant tracking-wide">
+              <p className="mt-1.5 text-xs md:text-sm font-semibold text-on-surface-variant tracking-wide">
                 Plant Inteligence Management System
               </p>
             </div>
