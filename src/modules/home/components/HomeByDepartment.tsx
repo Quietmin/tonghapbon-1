@@ -70,9 +70,6 @@ async function OperationsHome({ branch }: { branch: string | null }) {
         </span>
         <span className="min-w-0">
           <span className="block text-headline-md">현황 등록</span>
-          <span className="block text-body-md opacity-90 mt-1">
-            이슈가 생긴 설비와 내용을 올리면 유지보수 담당자가 확인해 조치합니다.
-          </span>
         </span>
         <Icon name="arrow_forward" className="ml-auto text-3xl shrink-0" />
       </Link>
@@ -81,7 +78,7 @@ async function OperationsHome({ branch }: { branch: string | null }) {
         <StatusError summary={summary} />
       ) : (
         <>
-          <StatusCountCards counts={summary.counts} caption={`${branch ?? "전체"} 전체 부서`} />
+          <StatusCountCards counts={summary.counts} />
           <IssueListPanel
             title="현황 목록"
             rows={summary.list}
@@ -112,7 +109,7 @@ async function MaintenanceHome({
         <StatusError summary={summary} />
       ) : (
         <>
-          <StatusCountCards counts={summary.counts} caption={`${department}에 배정된 건`} />
+          <StatusCountCards counts={summary.counts} />
           <section className="grid gap-gutter lg:grid-cols-3">
             <IssueListPanel
               className="lg:col-span-2"

@@ -10,14 +10,7 @@ const TONE: Record<IssueStatus, string> = {
   조치완료: "text-status-success",
 };
 
-export default function StatusCountCards({
-  counts,
-  caption,
-}: {
-  counts: Record<string, number>;
-  /** 카드 아래 한 줄 설명(예: "우리 부서에 배정된 건") */
-  caption: string;
-}) {
+export default function StatusCountCards({ counts }: { counts: Record<string, number> }) {
   return (
     <section className="grid gap-gutter grid-cols-2 xl:grid-cols-4">
       {STATUS_OPTIONS.map((s) => (
@@ -28,7 +21,6 @@ export default function StatusCountCards({
               <span className={`text-display-lg tabular-nums ${TONE[s]}`}>{counts[s] ?? 0}</span>
               <span className="text-title-sm text-on-surface-variant">건</span>
             </span>
-            <span className="text-xs text-on-surface-variant mt-auto">{caption}</span>
           </Card>
         </Link>
       ))}
