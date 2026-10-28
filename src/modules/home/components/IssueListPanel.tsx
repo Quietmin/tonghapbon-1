@@ -6,13 +6,14 @@ import { useState } from "react";
 import { Card } from "@/shared/components/ui";
 import type { StatusIssueRow } from "@/modules/status/lib/repo";
 import { UpdateDialog } from "@/modules/status/components/StatusBoard";
+import IssueDetailDialog from "@/modules/status/components/IssueDetailDialog";
 import { StatusBadge, formatDate, formatDateTime } from "@/modules/status/components/badges";
 
 /**
  * 첫 화면의 현황 목록 카드.
  *
  * editable 이면(유지보수 부서) 행을 눌러 조치 갱신 창을 바로 열고, 저장하면 서버 데이터를
- * 다시 읽어 건수·목록이 함께 바뀐다. 아니면(운영부) 행을 누르면 현황 조회로 간다 —
+ * 다시 읽어 건수·목록이 함께 바뀐다. 아니면(운영부) 같은 자리에 현황 요약 창(보기 전용)이 뜬다 —
  * 조치 상태는 유지보수 담당자가 바꾸는 것이라 운영 화면에서는 보기만 한다.
  */
 export default function IssueListPanel({
@@ -43,6 +44,8 @@ export default function IssueListPanel({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<StatusIssueRow | null>(null);
+  /** 보기 전용 요약 창(운영부) */
+  const [detail, setDetail] = useState<StatusIssueRow | null>(null);
 
   const rowBody = (r: StatusIssueRow) => (
     <>
@@ -102,7 +105,7 @@ export default function IssueListPanel({
               {rows.map((r) => (
                 <tr
                   key={r.id}
-                  onClick={() => (editable ? setSelected(r) : router.push(moreHref))}
+                  onClick={() => (editable ? setSelected(r) : setDetail(r))}
                   className="border-b border-border-subtle last:border-0 text-on-surface cursor-pointer hover:bg-surface-container-high/60 transition-colors"
                 >
                   <td className="py-3 pl-1 pr-3 align-top whitespace-nowrap text-center">
@@ -133,26 +136,19 @@ export default function IssueListPanel({
         <ul className="flex flex-col">
           {rows.map((r) => (
             <li key={r.id} className="border-b border-border-subtle last:border-0">
-              {editable ? (
-                <button
-                  type="button"
-                  onClick={() => setSelected(r)}
-                  className="w-full flex items-start gap-3 py-3 text-left hover:bg-surface-container-high/60 transition-colors"
-                >
-                  {rowBody(r)}
-                </button>
-              ) : (
-                <Link
-                  href={moreHref}
-                  className="flex items-start gap-3 py-3 hover:bg-surface-container-high/60 transition-colors"
-                >
-                  {rowBody(r)}
-                </Link>
-              )}
+              <button
+                type="button"
+                onClick={() => (editable ? setSelected(r) : setDetail(r))}
+                className="w-full flex items-start gap-3 py-3 text-left hover:bg-surface-container-high/60 transition-colors"
+              >
+                {rowBody(r)}
+              </button>
             </li>
           ))}
         </ul>
       )}
+
+      {detail && <IssueDetailDialog row={detail} onClose={() => setDetail(null)} moreHref={moreHref} />}
 
       {selected && (
         <UpdateDialog
