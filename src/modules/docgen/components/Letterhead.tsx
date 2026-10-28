@@ -43,10 +43,13 @@ export interface ManualHeaderProps {
 }
 
 /**
- * 매뉴얼 표제부. 원본 buildManualHeader 의 3행 표를 그대로 옮겼다.
+ * 매뉴얼 표제부. 원본 buildManualHeader 의 3행 표 그대로다.
  *   1행: [로고(3행 병합)] [문서종류(2행 병합)] [분야(2칸 병합)]
  *   2행:                                       [개정번호] [값]
  *   3행:                  [제목]                [페이지]  [n/N]
+ * 로고·문서종류(rowSpan 칸)만 안쪽 내용을 position:absolute+flex 래퍼로 한
+ * 번 더 감싼다 — 이유는 print.css 의 .manual-header 주석 참고(PDF 출력에
+ * 쓰는 html2canvas-pro 가 vertical-align 을 rowSpan 칸에서 정확히 못 그려서).
  */
 export function ManualHeader({
   docType,
@@ -62,13 +65,15 @@ export function ManualHeader({
       <tbody>
         <tr>
           <td className="mh-logo" rowSpan={3}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/manual-logo.gif" alt="" />
-            <div className="mh-org">한국지역난방공사</div>
-            {branch && <div className="mh-branch">{branch}</div>}
+            <div className="mh-logo-inner">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/manual-logo.gif" alt="" />
+              <div className="mh-org">한국지역난방공사</div>
+              {branch && <div className="mh-branch">{branch}</div>}
+            </div>
           </td>
           <td className="mh-doctype" rowSpan={2}>
-            {spaceOutChars(docType)}
+            <div className="mh-doctype-inner">{spaceOutChars(docType)}</div>
           </td>
           <td className="mh-field" colSpan={2}>
             {/* 위 오른쪽 칸은 두 칸을 합쳐 "기계분야" 하나로 읽히게 한다 */}
