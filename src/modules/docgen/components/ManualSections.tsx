@@ -2,6 +2,7 @@
 
 import AutoTextarea from "./AutoTextarea";
 import { SectionHeading } from "./SortedSelect";
+import { Icon } from "@/shared/components/ui";
 
 /**
  * 매뉴얼 1~4번 항목 — 목적 · 준비물 · 주의 사항 · 내용.
@@ -134,6 +135,29 @@ export function ManualSectionsFields({
     });
   }
 
+  /** ri 행 바로 아래에 빈 행을 끼워 넣는다 — 맨 아래 행에서 누르면 결과적으로 끝에 추가하는 것과 같다 */
+  function insertRowAfter(ri: number) {
+    if (!table) return;
+    const row = new Array(columns).fill("");
+    patch({ prepTable: [...table.slice(0, ri + 1), row, ...table.slice(ri + 1)] });
+  }
+
+  function deleteRow(ri: number) {
+    if (!table || table.length <= 1) return;
+    patch({ prepTable: table.filter((_, r) => r !== ri) });
+  }
+
+  /** ci 열 바로 오른쪽에 빈 열을 끼워 넣는다 — 모든 행에 같은 자리로 넣는다 */
+  function insertColAfter(ci: number) {
+    if (!table) return;
+    patch({ prepTable: table.map((row) => [...row.slice(0, ci + 1), "", ...row.slice(ci + 1)]) });
+  }
+
+  function deleteCol(ci: number) {
+    if (!table || columns <= 1) return;
+    patch({ prepTable: table.map((row) => row.filter((_, c) => c !== ci)) });
+  }
+
   return (
     <div className="mt-5 pt-5 border-t border-border-subtle">
       <SectionHead
@@ -171,6 +195,13 @@ export function ManualSectionsFields({
 
         {table ? (
           <div className="mt-2.5">
+            {/* 각 칸 옆·머리글 칸 아래에 그 행/열을 겨눈 추가·삭제 버튼을 둔다 —
+                "마지막 행/열"만 건드리던 예전과 달리 원하는 자리를 직접 고를 수 있다.
+                맨 아래 행·맨 오른쪽 열에서 [+]를 누르면 결과적으로 끝에 추가하는
+                것과 같아서, 끝에 추가하는 용도도 따로 안 둬도 된다. */}
+            <p className="text-[11px] text-on-surface-variant mb-1.5">
+              칸 오른쪽 [+ / −]는 그 행을, 머리글 칸 아래 [+ / −]는 그 열을 겨눕니다.
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse mb-2">
                 <tbody>
@@ -179,7 +210,7 @@ export function ManualSectionsFields({
                       {row.map((cell, ci) => (
                         <td
                           key={ci}
-                          className={`border border-border-subtle p-0 ${
+                          className={`border border-border-subtle p-0 align-top ${
                             ri === 0 ? "bg-surface-container-high" : ""
                           }`}
                         >
@@ -193,8 +224,42 @@ export function ManualSectionsFields({
                               ri === 0 ? "font-bold text-center" : ""
                             }`}
                           />
+                          {/* 열 조작 — 머리글 칸(첫 행)에만 둔다. 열 하나당 자리는 하나뿐이라 */}
+                          {ri === 0 && (
+                            <div className="flex items-center justify-center gap-1 pb-1">
+                              <CellOpButton
+                                icon="add"
+                                title={`${ci + 1}열 오른쪽에 열 추가`}
+                                onClick={() => insertColAfter(ci)}
+                                disabled={value.skip.prep}
+                              />
+                              <CellOpButton
+                                icon="remove"
+                                title={`${ci + 1}열 삭제`}
+                                onClick={() => deleteCol(ci)}
+                                disabled={value.skip.prep || columns <= 1}
+                              />
+                            </div>
+                          )}
                         </td>
                       ))}
+                      {/* 행 조작 — 표 바깥에 붙는 제어용 칸이라 테두리 없이 둔다 */}
+                      <td className="p-0 pl-1 align-top">
+                        <div className="flex items-center gap-1 h-full py-2">
+                          <CellOpButton
+                            icon="add"
+                            title={`${ri + 1}행 아래에 행 추가`}
+                            onClick={() => insertRowAfter(ri)}
+                            disabled={value.skip.prep}
+                          />
+                          <CellOpButton
+                            icon="remove"
+                            title={`${ri + 1}행 삭제`}
+                            onClick={() => deleteRow(ri)}
+                            disabled={value.skip.prep || table.length <= 1}
+                          />
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -202,24 +267,6 @@ export function ManualSectionsFields({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <TableButton
-                label="행 추가"
-                onClick={() => patch({ prepTable: [...table, new Array(columns).fill("")] })}
-              />
-              <TableButton
-                label="열 추가"
-                onClick={() => patch({ prepTable: table.map((row) => [...row, ""]) })}
-              />
-              <TableButton
-                label="행 삭제"
-                disabled={table.length <= 1}
-                onClick={() => patch({ prepTable: table.slice(0, -1) })}
-              />
-              <TableButton
-                label="열 삭제"
-                disabled={columns <= 1}
-                onClick={() => patch({ prepTable: table.map((row) => row.slice(0, -1)) })}
-              />
               <TableButton
                 label="표 삭제"
                 danger
@@ -290,6 +337,36 @@ function TableButton({
       }`}
     >
       {label}
+    </button>
+  );
+}
+
+/** 표 칸 옆에 붙는 작은 아이콘 버튼 — 행/열 추가(add)·삭제(remove)에 쓴다 */
+function CellOpButton({
+  icon,
+  title,
+  onClick,
+  disabled = false,
+}: {
+  icon: "add" | "remove";
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+        icon === "remove"
+          ? "text-error hover:bg-error/10"
+          : "text-on-surface-variant hover:bg-surface-container-high"
+      }`}
+    >
+      <Icon name={icon} className="text-xs" />
     </button>
   );
 }

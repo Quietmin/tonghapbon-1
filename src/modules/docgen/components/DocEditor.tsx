@@ -65,6 +65,51 @@ function clampZoom(v: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v));
 }
 
+/**
+ * 칸 하나의 글자 수 상한 — 이보다 길면 저장 전에 한 번 경고한다.
+ * print.css 의 .man-sec-body/.fr-body 는 이 상한을 무시하고 저장해도 페이지가
+ * 끝없이 늘어나지 않도록(overflow:hidden) 막아 두지만, 그러면 글이 잘려
+ * 보이므로 — 잘리기 전에 먼저 알려서 줄이게 하는 쪽이 낫다.
+ */
+const MAX_FIELD_CHARS = 800;
+
+/** saveMeta/draftExtra 의 키 → 경고 문구에 쓸 한글 이름. 모르는 키는 키 이름 그대로 보여준다 */
+const FIELD_LABELS: Record<string, string> = {
+  purpose: "목적",
+  prep: "준비물",
+  caution: "주의 사항",
+  fault_content: "고장내용(추정 원인)",
+  situation: "상황",
+  action_taken: "조치사항",
+};
+
+/** items(사진 설명·텍스트 칸) + saveMeta/draftExtra(목적·고장내용 등) 중 너무 긴 칸을 찾는다 */
+function findOverlongFields(items: DocItem[], saveMeta: unknown, draftExtra: unknown): string[] {
+  const found: string[] = [];
+
+  items.forEach((it, i) => {
+    const text = isTextItem(it) ? it.body : it.desc;
+    if (text.length > MAX_FIELD_CHARS) {
+      found.push(isTextItem(it) ? `텍스트 칸 ${i + 1}` : `사진 ${i + 1} 설명`);
+    }
+  });
+
+  function scan(obj: unknown) {
+    if (!obj || typeof obj !== "object") return;
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (typeof value === "string") {
+        if (value.length > MAX_FIELD_CHARS) found.push(FIELD_LABELS[key] ?? key);
+      } else if (value && typeof value === "object") {
+        scan(value);
+      }
+    }
+  }
+  scan(saveMeta);
+  scan(draftExtra);
+
+  return found;
+}
+
 /** Gmail 작성 화면 주소 (원본 gmailComposeUrl 과 동일) */
 function gmailComposeUrl(subject: string, body: string): string {
   return `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(
@@ -161,6 +206,8 @@ export default function DocEditor({
   /** 출력을 한 번이라도 시도했는지 — 비어 있는 필수 칸(파일명·사진)을 붉게 표시하는 기준 */
   const [triedOutput, setTriedOutput] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /** [PDF 출력]·[메일로 전송]을 누르면 보관함 저장 여부를 먼저 묻는다 — null 이면 닫힌 상태 */
+  const [savePrompt, setSavePrompt] = useState<{ kind: "pdf" | "mail"; title: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 앨범 선택과 별개로 카메라를 바로 여는 입력. capture 를 같은 input 에 붙이면
@@ -680,16 +727,40 @@ export default function DocEditor({
       );
       return null;
     }
+
+    // 글자 수가 너무 많으면 PDF 첫 페이지가 비정상적으로 늘어나거나 내용이 잘릴 수
+    // 있다 — 저장을 막지는 않되(이미 입력한 내용을 날리면 안 되므로), 먼저 알려서
+    // 줄일 기회를 준다.
+    const overlong = findOverlongFields(items, saveMetaRef.current, draftExtraRef.current);
+    if (overlong.length > 0) {
+      const proceed = window.confirm(
+        `다음 칸의 글자 수가 너무 많습니다(${MAX_FIELD_CHARS}자 초과): ${overlong.join(", ")}\n` +
+          "너무 길면 PDF에서 내용 일부가 잘리거나 첫 페이지가 비정상적으로 길어질 수 있습니다. " +
+          "줄이지 않고 그대로 출력할까요?",
+      );
+      if (!proceed) return null;
+    }
+
     return fileName.trim();
   }
 
   /**
-   * PDF 를 만들어 내려받고, 보관함에도 저장한다.
+   * PDF 를 만들고, 요청에 따라 장치 다운로드·보관함 저장을 골라서 한다.
    * mailWindow 가 있으면(= [메일로 전송]) 다운로드가 끝난 뒤 그 탭을 Gmail 작성
    * 화면으로 돌린다. 창은 클릭 핸들러에서 *미리* 열어 두고 넘겨야 한다 —
    * await 뒤에 window.open 을 부르면 브라우저가 팝업으로 보고 막는다.
+   *
+   * download/saveArchive 조합(savePrompt 팝업의 선택을 그대로 반영한다):
+   *   - [PDF 출력] "보관함 저장 안함": download=true,  saveArchive=false (장치에만)
+   *   - [PDF 출력] "보관함 저장"    : download=false, saveArchive=true  (보관함에만)
+   *   - [메일로 전송] 어느 쪽이든   : download=true  (메일 안내문이 "다운로드된 파일을
+   *     직접 첨부하라"고 하므로 항상 내려받아야 한다). saveArchive 만 선택에 따라 갈린다.
    */
-  async function runExport(title: string, mailWindow: Window | null) {
+  async function runExport(
+    title: string,
+    opts: { mailWindow: Window | null; download: boolean; saveArchive: boolean },
+  ) {
+    const { mailWindow, download, saveArchive } = opts;
     setBusy(true);
     // busy=true 가 되면 미리보기가 축소를 풀고 실제 크기로 돌아간다(아래 effectiveScale
     // 참고) — html2canvas 가 축소된 채로 캡처해 버리기 때문이다. setBusy 는 비동기라
@@ -699,25 +770,38 @@ export default function DocEditor({
     await new Promise(requestAnimationFrame);
     const pages = pageRefs.current.filter((el): el is HTMLDivElement => el !== null);
 
-    try {
-      // 다운로드가 우선이다 — 보관함 저장이 실패해도 사용자는 PDF 를 손에 넣어야 한다.
-      await exportPagesToPdf(pages, title);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "PDF 출력에 실패했습니다.");
-      mailWindow?.close();
-      setBusy(false);
-      return;
+    if (download) {
+      try {
+        await exportPagesToPdf(pages, title);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "PDF 출력에 실패했습니다.");
+        mailWindow?.close();
+        setBusy(false);
+        return;
+      }
     }
 
     if (mailWindow) {
       mailWindow.location.href = gmailComposeUrl(title, mailBodyFor(`${title}.pdf`));
     }
 
-    if (!archiveEnabled) {
+    if (!saveArchive) {
       setNotice(
         mailWindow
           ? "PDF 를 내려받았습니다. 열린 Gmail 화면에서 첨부파일로 추가해 주세요."
-          : "PDF 를 내려받았습니다. (보관함 미설정 — 저장은 건너뜀)",
+          : "PDF 를 내려받았습니다. 보관함에는 저장하지 않았습니다.",
+      );
+      setBusy(false);
+      return;
+    }
+
+    if (!archiveEnabled) {
+      // savePrompt 팝업에서 "보관함 저장"은 archiveEnabled 일 때만 고를 수 있게
+      // 막아 두지만(아래 JSX), 혹시 모를 레이스 대비로 여기서도 한 번 더 가드한다.
+      setNotice(
+        download
+          ? "PDF 를 내려받았습니다. (보관함 미설정 — 저장은 건너뜀)"
+          : "보관함이 설정되지 않아 저장하지 못했습니다.",
       );
       setBusy(false);
       return;
@@ -772,40 +856,57 @@ export default function DocEditor({
         indexDocumentFireAndForget({ documentId: saved.id, sourceId: sourceLink.sourceId, docType: mode });
       }
       setNotice(
-        mailWindow
-          ? "PDF 를 내려받고 보관함에도 저장했습니다. 열린 Gmail 화면에서 첨부파일로 추가해 주세요."
-          : "PDF 를 내려받고 보관함에도 저장했습니다.",
+        download
+          ? mailWindow
+            ? "PDF 를 내려받고 보관함에도 저장했습니다. 열린 Gmail 화면에서 첨부파일로 추가해 주세요."
+            : "PDF 를 내려받고 보관함에도 저장했습니다."
+          : "보관함에 저장했습니다. (장치에는 다운로드하지 않았습니다)",
       );
     } catch (e) {
       // 저장 실패를 조용히 넘기면 "저장된 줄 알았는데 없다"가 된다 — 반드시 알린다.
       const msg = e instanceof Error ? e.message : "보관함 저장에 실패했습니다.";
-      setError(`PDF 는 내려받았지만 보관함 저장에 실패했습니다: ${msg}`);
+      setError(
+        download
+          ? `PDF 는 내려받았지만 보관함 저장에 실패했습니다: ${msg}`
+          : `보관함 저장에 실패했습니다: ${msg} (장치에도 다운로드하지 않았습니다 — 다시 시도해 주세요)`,
+      );
     } finally {
       setBusy(false);
     }
   }
 
+  /** [PDF 출력]·[메일로 전송] 버튼 — 바로 내보내지 않고 저장 방법을 먼저 묻는다 */
   function handleExport() {
     const title = validateForOutput();
-    if (title) void runExport(title, null);
+    if (title) setSavePrompt({ kind: "pdf", title });
+  }
+
+  function handleMail() {
+    const title = validateForOutput();
+    if (title) setSavePrompt({ kind: "mail", title });
   }
 
   /**
-   * 메일로 전송 — PDF 다운로드와 Gmail 작성 화면 열기를 한 번에 (원본 generateMail).
-   * 브라우저 보안상 외부 사이트가 Gmail 에 파일을 자동 첨부할 수는 없어서,
-   * 받는 사람이 직접 첨부하도록 본문에 안내를 넣는다. (원본과 동일)
+   * savePrompt 팝업의 선택 — saveArchive 가 true 면 "보관함 저장", false 면
+   * "보관함 저장 안함". 메일 창은 *이 클릭* 안에서 열어야 팝업 차단을 피한다
+   * (팝업 버튼 클릭도 여전히 사용자 제스처 안이라 window.open 이 허용된다).
    */
-  function handleMail() {
-    const title = validateForOutput();
-    if (!title) return;
-    // PDF 를 만들기 전에(= 사용자 클릭과 같은 흐름에서) 빈 탭을 먼저 연다.
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(
-        '<p style="font-family:sans-serif;padding:24px;color:#374151;">PDF를 준비하고 있습니다. 잠시만 기다려 주세요…</p>',
-      );
+  function confirmSavePrompt(saveArchive: boolean) {
+    const prompt = savePrompt;
+    if (!prompt) return;
+    setSavePrompt(null);
+
+    let mailWindow: Window | null = null;
+    if (prompt.kind === "mail") {
+      mailWindow = window.open("", "_blank");
+      if (mailWindow) {
+        mailWindow.document.write(
+          '<p style="font-family:sans-serif;padding:24px;color:#374151;">PDF를 준비하고 있습니다. 잠시만 기다려 주세요…</p>',
+        );
+      }
     }
-    void runExport(title, win);
+    const download = prompt.kind === "mail" ? true : !saveArchive;
+    void runExport(prompt.title, { mailWindow, download, saveArchive });
   }
 
   // 고장 보고서의 "2. 관련 사진"은 사진 격자라 텍스트 칸을 놓을 자리가 없다.
@@ -971,11 +1072,9 @@ export default function DocEditor({
                 <span className="text-xs leading-tight">촬영</span>
               </Button>
               {allowTextItems && (
-                <Button
-                  variant="ghost"
-                  className="flex-1 !flex-col !gap-1 !px-1"
-                  onClick={addTextItem}
-                >
+                // 사진 추가와 같은 배경·색(기본 variant=primary) — 둘 다 "칸을 늘리는"
+                // 같은 성격의 동작이라 색으로도 같은 무리로 읽히게 한다.
+                <Button className="flex-1 !flex-col !gap-1 !px-1" onClick={addTextItem}>
                   <Icon name="text_fields" className="text-lg" />
                   <span className="text-xs leading-tight">텍스트 칸 추가</span>
                 </Button>
@@ -1151,14 +1250,15 @@ export default function DocEditor({
           </Card>
 
           {/* ---- 출력 ----
-              세 버튼은 같은 폭으로 나란히, 글자는 한 줄 가로쓰기로 — 아이콘을
-              빼서 생긴 자리를 글자에 그대로 준다. 아이콘이 있을 때는 gap 때문에
-              좁은 칸에서 글자가 세로로 꺾여 보였다. */}
+              세 버튼은 같은 폭·같은 색(기본 variant=primary)으로 나란히 — 셋 다
+              "이 문서를 내보내는" 같은 무게의 동작이라 하나만 도드라져 보이지
+              않게 한다. 글자는 한 줄 가로쓰기로, 아이콘은 뺐다(빼서 생긴 자리를
+              글자에 그대로 준다 — 아이콘이 있을 때는 gap 때문에 좁은 칸에서
+              글자가 세로로 꺾여 보였다). */}
           <Card className="p-card-padding flex flex-col gap-3">
             <div className="grid grid-cols-3 gap-2">
               {/* 새로고침하면 작성 중이던 내용이 사라지므로, 잠깐 자리를 비울 때 눌러 둔다 */}
               <Button
-                variant="ghost"
                 className="w-full !px-1 whitespace-nowrap"
                 onClick={() => void handleSaveDraft()}
                 disabled={draftBusy || items.length === 0}
@@ -1175,7 +1275,6 @@ export default function DocEditor({
                 {busy ? "생성 중…" : "PDF 출력"}
               </Button>
               <Button
-                variant="ghost"
                 className="w-full !px-1 whitespace-nowrap"
                 onClick={handleMail}
                 disabled={busy}
@@ -1335,6 +1434,59 @@ export default function DocEditor({
           onCancel={() => setEditingId(null)}
           onSave={(result) => handleEditSave(editingPhoto.id, result)}
         />
+      )}
+
+      {/* [PDF 출력]·[메일로 전송]을 누르면 바로 내보내지 않고 저장 방법을 먼저 묻는다 */}
+      {savePrompt && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60"
+          role="dialog"
+          aria-modal="true"
+          aria-label="저장 방법 선택"
+          onClick={() => setSavePrompt(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-surface-container-lowest rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <p className="text-title-sm text-on-surface">
+                {savePrompt.kind === "mail" ? "메일로 보내기 전에" : "어떻게 저장할까요?"}
+              </p>
+              <p className="text-sm text-on-surface-variant mt-1">
+                {savePrompt.kind === "mail"
+                  ? "장치에 내려받고 Gmail 작성 화면을 엽니다. 보관함에도 함께 저장할까요?"
+                  : "보관함에 저장하거나, 저장 없이 장치에만 내려받을 수 있습니다."}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="ghost"
+                className="w-full !flex-col !items-start !gap-0.5 !py-3"
+                onClick={() => confirmSavePrompt(false)}
+              >
+                <span className="text-sm font-bold">보관함 저장 안함</span>
+                <span className="text-xs font-normal text-on-surface-variant">
+                  {savePrompt.kind === "mail" ? "장치에 다운로드 + 메일로 이동" : "장치에만 다운로드"}
+                </span>
+              </Button>
+              <Button
+                className="w-full !flex-col !items-start !gap-0.5 !py-3"
+                onClick={() => confirmSavePrompt(true)}
+                disabled={!archiveEnabled}
+              >
+                <span className="text-sm font-bold">보관함 저장</span>
+                <span className="text-xs font-normal opacity-80">
+                  {!archiveEnabled
+                    ? "보관함이 설정되지 않았습니다"
+                    : savePrompt.kind === "mail"
+                      ? "보관함 저장 + 다운로드 + 메일로 이동"
+                      : "보관함에만 저장 (다운로드 안 함)"}
+                </span>
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
