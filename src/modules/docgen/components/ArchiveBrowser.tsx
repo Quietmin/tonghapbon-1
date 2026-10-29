@@ -64,7 +64,7 @@ const DELETE_PASSWORD = "2488";
 /** 표의 '종류' 배지 색 — 챕터 색과 같다 (사진대장은 챕터가 없어 회색) */
 const DOC_TYPE_BADGE: Record<DocMode, string> = {
   manual: ACCENT_STYLE.primary.chip,
-  fault: ACCENT_STYLE.tertiary.chip,
+  fault: ACCENT_STYLE.primary.chip,
   report: "bg-surface-container-highest text-on-surface-variant",
 };
 
@@ -224,7 +224,7 @@ export interface ArchiveBrowserProps {
   /** 화면 상단 제목·설명. 챕터 랜딩에 끼울 때는 넘기지 않는다 */
   heading?: { title: string; desc: string; bullets?: string[] };
   /**
-   * 챕터 색 (고장관리는 tertiary). 넘기지 않으면 보고 있는 종류에서 고른다 —
+   * 챕터 색. 넘기지 않으면 primary(남색)다 — 고장관리도 이제 같은 남색이다.
    * 보관함 전체 조회처럼 종류가 섞인 화면은 파랑이다.
    */
   accent?: Accent;
@@ -260,8 +260,8 @@ export default function ArchiveBrowser({
   const configured = isDocgenSupabaseConfigured();
   const isPreview = typeof preview === "number";
   const canDelete = allowDelete ?? !isPreview;
-  /* 고장 보고서만 주황이다 — 종류가 섞인 전체 조회는 파랑으로 둔다 */
-  const tone: Accent = accent ?? (fixedType === "fault" ? "tertiary" : "primary");
+  /* 챕터 색은 모두 남색(primary)이다 — 고장관리도 다른 챕터와 같게 맞췄다 */
+  const tone: Accent = accent ?? "primary";
 
   /*
    * 조회 조건. 원본 search.html 의 입력칸 묶음을 그대로 옮겼다 —
@@ -864,15 +864,15 @@ export default function ArchiveBrowser({
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-on-surface-variant border-b border-border-subtle">
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">종류</th>
-                  <th className="py-2 pr-3 font-bold">파일명</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">지사</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">분야</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">작성자</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">사진</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">크기</th>
-                  <th className="py-2 pr-3 font-bold whitespace-nowrap">만든 날짜</th>
-                  <th className="py-2 font-bold" />
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">종류</th>
+                  <th className="py-3 pr-3 font-bold">파일명</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">지사</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">분야</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">작성자</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">사진</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">크기</th>
+                  <th className="py-3 pr-3 font-bold whitespace-nowrap">만든 날짜</th>
+                  <th className="py-3 font-bold" />
                 </tr>
               </thead>
               <tbody>
@@ -886,7 +886,7 @@ export default function ArchiveBrowser({
                       openingId === r.id ? "opacity-60" : ""
                     }`}
                   >
-                    <td className="py-2 pr-3 whitespace-nowrap">
+                    <td className="py-3 pr-3 whitespace-nowrap">
                       {/* 종류를 색 배지로 — 전체 조회처럼 섞여 나올 때 줄을 훑기만 해도 갈린다 */}
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -896,16 +896,16 @@ export default function ArchiveBrowser({
                         {MODE_LABELS[r.doc_type] ?? r.doc_type}
                       </span>
                     </td>
-                    <td className="py-2 pr-3">{r.file_name}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.branch ?? "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.field ?? "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{maskName(r.author_name) ?? "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.photo_count}장</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{formatBytes(r.pdf_bytes)}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">
+                    <td className="py-3 pr-3">{r.file_name}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{r.branch ?? "-"}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{r.field ?? "-"}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{maskName(r.author_name) ?? "-"}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{r.photo_count}장</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{formatBytes(r.pdf_bytes)}</td>
+                    <td className="py-3 pr-3 whitespace-nowrap">
                       {new Date(r.created_at).toLocaleDateString("ko-KR")}
                     </td>
-                    <td className="py-2">
+                    <td className="py-3">
                       {/* 버튼 영역의 클릭은 행 클릭(미리보기)으로 번지지 않게 막는다 — 수정·삭제를 눌렀는데 미리보기가 뜨면 안 된다 */}
                       <div
                         className="flex items-center justify-end gap-3"

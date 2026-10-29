@@ -732,3 +732,39 @@ create index if not exists status_issue_branch_status_idx
 drop trigger if exists status_issue_set_updated_at on status_issue;
 create trigger status_issue_set_updated_at before update on status_issue
   for each row execute function set_updated_at();
+
+
+-- ============================================================================
+-- 보안 — 앱 테이블의 행 수준 보안(RLS) 켜기
+--
+-- Supabase 는 public 스키마의 테이블을 anon 키로 바로 읽고 쓸 수 있게 열어 준다. 그런데 이 프로젝트는
+-- 문서 보관함(docgen)이 anon 키를 브라우저에 공개하므로, 같은 프로젝트에 앱 테이블을 만들면 RLS 가 꺼진
+-- 상태에서는 누구나 그 키로 현황·고장이력·오버홀 데이터를 읽고 지울 수 있다.
+--
+-- RLS 를 켜고 정책을 만들지 않으면 anon·authenticated 역할은 접근이 전부 막힌다. 이 앱의 서버는
+-- DATABASE_URL 로 postgres 계정에 직접 연결하므로 RLS 를 우회해 그대로 동작한다. 로컬 PGlite 에서는
+-- 접속 계정이 테이블 소유자라 영향이 없다.
+--
+-- docgen_ 테이블은 건드리지 않는다(자체 정책을 갖고 있다). 이 프로젝트에 다른 용도의 테이블이
+-- 있을 수 있어서 "public 의 모든 테이블"이 아니라 아래 목록(이 스키마가 만드는 테이블)만 켠다.
+-- ⚠️ 이 파일에 새 테이블을 추가하면 아래 목록에도 이름을 넣을 것.
+-- ============================================================================
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'equipment', 'device',
+    'overhaul_project', 'overhaul_source', 'overhaul_task', 'overhaul_entry', 'overhaul_entry_photo',
+    'failure_history', 'failure_attachment',
+    'document', 'document_chunk', 'document_tag', 'chat_message',
+    'maintenance_plan_source', 'maintenance_plan', 'maintenance_plan_grade', 'maintenance_record',
+    'design_statement', 'design_statement_item',
+    'status_issue'
+  ]
+  loop
+    if to_regclass('public.' || t) is not null then
+      execute format('alter table public.%I enable row level security', t);
+    end if;
+  end loop;
+end $$;

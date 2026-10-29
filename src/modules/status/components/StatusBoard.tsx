@@ -2,8 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button, Card, EmptyState, Icon } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
+import {
+  CLICKABLE_ROW,
+  HEAD_ROW,
+  TABLE,
+  TD_Y,
+  TH_Y,
+  rowKeyHandler,
+} from "@/shared/lib/tableStyle";
+import { useToast } from "@/shared/components/Toast";
 import { DEPARTMENTS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { StatusBadge, formatDate, formatDateTime } from "./badges";
@@ -227,26 +237,35 @@ export default function StatusBoard({
 
           {/* PC — 표 */}
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className={`${TABLE} table-fixed`}>
+              <colgroup>
+                <col style={{ width: "130px" }} />
+                <col style={{ width: "170px" }} />
+                <col />
+                <col style={{ width: "110px" }} />
+                <col style={{ width: "96px" }} />
+                <col style={{ width: "96px" }} />
+                <col style={{ width: "110px" }} />
+              </colgroup>
               <thead>
-                <tr className="text-left text-on-surface-variant border-b border-border-subtle">
-                  <th className="py-3 pl-5 pr-3 font-bold whitespace-nowrap">조치 상태</th>
-                  <th className="py-3 pr-3 font-bold">설비명</th>
-                  <th className="py-3 pr-3 font-bold">이슈 내용</th>
-                  <th className="py-3 pr-3 font-bold whitespace-nowrap">지사</th>
-                  <th className="py-3 pr-3 font-bold whitespace-nowrap">담당부서</th>
-                  <th className="py-3 pr-3 font-bold whitespace-nowrap">작성자</th>
-                  <th className="py-3 pr-5 font-bold whitespace-nowrap">등록</th>
+                <tr className={HEAD_ROW}>
+                  {["조치 상태", "설비명", "이슈 내용", "지사", "담당부서", "작성자", "등록"].map((h) => (
+                    <th key={h} className={`${TH_Y} px-3 text-center`}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr
                     key={r.id}
+                    tabIndex={0}
                     onClick={() => setSelected(r)}
-                    className="border-b border-border-subtle last:border-0 text-on-surface cursor-pointer hover:bg-surface-container-high/60 transition-colors"
+                    onKeyDown={rowKeyHandler(() => setSelected(r))}
+                    className={CLICKABLE_ROW}
                   >
-                    <td className="py-3 pl-5 pr-3 whitespace-nowrap">
+                    <td className={`${TD_Y} px-3 align-top text-center`}>
                       <StatusBadge status={r.status} />
                       {r.scheduled_date && (
                         <span className="block text-xs text-on-surface-variant mt-1">
@@ -254,14 +273,16 @@ export default function StatusBoard({
                         </span>
                       )}
                     </td>
-                    <td className="py-3 pr-3 font-bold">{r.equipment_name}</td>
-                    <td className="py-3 pr-3 max-w-[360px]">
+                    <td className={`${TD_Y} px-3 align-top text-center`}>
+                      <span className="line-clamp-2 break-keep font-bold">{r.equipment_name}</span>
+                    </td>
+                    <td className={`${TD_Y} px-3 align-top text-center`}>
                       <span className="line-clamp-2 break-keep">{r.content}</span>
                     </td>
-                    <td className="py-3 pr-3 whitespace-nowrap">{r.branch ?? "-"}</td>
-                    <td className="py-3 pr-3 whitespace-nowrap">{r.department}</td>
-                    <td className="py-3 pr-3 whitespace-nowrap">{r.reporter}</td>
-                    <td className="py-3 pr-5 whitespace-nowrap text-on-surface-variant">
+                    <td className={`${TD_Y} px-3 align-top text-center`}>{r.branch ?? "-"}</td>
+                    <td className={`${TD_Y} px-3 align-top text-center`}>{r.department}</td>
+                    <td className={`${TD_Y} px-3 align-top text-center`}>{r.reporter}</td>
+                    <td className={`${TD_Y} px-3 align-top text-center text-on-surface-variant`}>
                       {formatDateTime(r.created_at)}
                     </td>
                   </tr>
@@ -287,7 +308,7 @@ export default function StatusBoard({
 }
 
 /** 유지보수 담당자의 조치 갱신 창 — 상태·조치 내용·조치 예정일·조치자 */
-function UpdateDialog({
+export function UpdateDialog({
   row,
   onClose,
   onSaved,
@@ -296,6 +317,7 @@ function UpdateDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const toast = useToast();
   const [status, setStatus] = useState<IssueStatus>(row.status);
   const [note, setNote] = useState(row.action_note ?? "");
   const [date, setDate] = useState(row.scheduled_date ?? "");
@@ -323,6 +345,7 @@ function UpdateDialog({
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "저장하지 못했습니다.");
+      toast("조치 현황을 저장했습니다");
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장하지 못했습니다.");
@@ -331,7 +354,9 @@ function UpdateDialog({
     }
   }
 
-  return (
+  // body 로 포털 — 첫 화면 카드(glass-card)처럼 backdrop-filter 가 걸린 조상 안에서 그리면 fixed 가
+  // 그 카드 기준이 되어 창이 카드 안에 갇히고 뒤따르는 카드(설비관리 공정 현황)에 가려진다.
+  return createPortal(
     <div
       className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/40"
       role="dialog"
@@ -440,6 +465,7 @@ function UpdateDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

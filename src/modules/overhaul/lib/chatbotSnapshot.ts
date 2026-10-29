@@ -90,9 +90,10 @@ export interface ChatbotSnapshot {
  * DB를 읽기만 하고, 전체·분야별·설비별 공정률과 계획/지연 판정은
  * progress.ts·schedule.ts의 기존 함수를 그대로 재사용한다(새 계산식을 만들지 않음).
  */
-export async function getChatbotSnapshot(): Promise<ChatbotSnapshot> {
+export async function getChatbotSnapshot(branch?: string | null): Promise<ChatbotSnapshot> {
   const queriedAt = new Date().toISOString();
-  const project = await getOrCreateProject();
+  // 지사가 선택돼 있으면(oh_branch 쿠키) 화면과 같은 그 지사의 최근 회차를 본다
+  const project = await getOrCreateProject(branch);
   const [tasks, sources, entries] = await Promise.all([
     listAllTasks(project.id),
     listSources(project.id),

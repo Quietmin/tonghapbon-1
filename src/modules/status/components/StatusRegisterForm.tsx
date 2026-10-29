@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button, Card, Icon } from "@/shared/components/ui";
+import { Button, Card, Icon, RequiredMark } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
 import { DEPARTMENTS } from "../lib/constants";
 
@@ -15,6 +15,15 @@ interface FormState {
   department: string;
   reporter: string;
 }
+
+/** 모두 필수 — 화면에 보이는 이름(빈 칸 안내에 쓴다) */
+const LABELS: Record<keyof FormState, string> = {
+  branch: "지사",
+  equipmentName: "설비명",
+  content: "이슈 내용",
+  department: "담당부서",
+  reporter: "작성자",
+};
 
 const EMPTY: FormState = {
   branch: "",
@@ -47,6 +56,13 @@ export default function StatusRegisterForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<FormState | null>(null);
+  /** 등록을 한 번이라도 시도했는지 / 한 번 거쳐 간 칸 — 비어 있는 필수 칸을 붉게 표시하는 기준 */
+  const [attempted, setAttempted] = useState(false);
+  const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
+
+  const empty = (k: keyof FormState) => form[k].trim() === "";
+  const invalid = (k: keyof FormState) => (attempted || !!touched[k]) && empty(k);
+  const touch = (k: keyof FormState) => setTouched((t) => (t[k] ? t : { ...t, [k]: true }));
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -56,6 +72,16 @@ export default function StatusRegisterForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
+
+    // 브라우저 기본 말풍선 대신 직접 검사한다 — 비어 있는 칸을 모두 붉게 보이고 첫 칸으로 이동한다
+    const missing = (Object.keys(LABELS) as (keyof FormState)[]).filter(empty);
+    if (missing.length > 0) {
+      setAttempted(true);
+      setError(`필수 항목을 입력해 주세요: ${missing.map((k) => LABELS[k]).join(", ")}`);
+      setTimeout(() => document.querySelector<HTMLElement>('form [aria-invalid="true"]')?.focus(), 0);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -91,6 +117,8 @@ export default function StatusRegisterForm({
             onClick={() => {
               // 지사·부서·작성자는 같은 근무자가 이어서 등록하는 경우가 많아 남겨 둔다
               setForm({ ...EMPTY, branch: done.branch, department: done.department, reporter: done.reporter });
+              setAttempted(false);
+              setTouched({});
               setDone(null);
             }}
           >
@@ -108,16 +136,20 @@ export default function StatusRegisterForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       <Card lift={false} className="p-6 flex flex-col gap-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">지사</span>
+            <span className="text-xs font-bold text-on-surface-variant">
+              지사
+              <RequiredMark />
+            </span>
             <select
               value={form.branch}
               onChange={(e) => set("branch", e.target.value)}
               className="input"
-              required
+              onBlur={() => touch("branch")}
+              aria-invalid={invalid("branch")}
             >
               <option value="">선택</option>
               {SORTED_BRANCHES.map((b) => (
@@ -128,12 +160,16 @@ export default function StatusRegisterForm({
             </select>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">담당부서</span>
+            <span className="text-xs font-bold text-on-surface-variant">
+              담당부서
+              <RequiredMark />
+            </span>
             <select
               value={form.department}
               onChange={(e) => set("department", e.target.value)}
               className="input"
-              required
+              onBlur={() => touch("department")}
+              aria-invalid={invalid("department")}
             >
               <option value="">선택</option>
               {DEPARTMENTS.map((d) => (
@@ -144,36 +180,48 @@ export default function StatusRegisterForm({
             </select>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">설비명</span>
+            <span className="text-xs font-bold text-on-surface-variant">
+              설비명
+              <RequiredMark />
+            </span>
             <input
               value={form.equipmentName}
               onChange={(e) => set("equipmentName", e.target.value)}
               placeholder="예: 1호기 순환펌프"
               className="input"
-              required
+              onBlur={() => touch("equipmentName")}
+              aria-invalid={invalid("equipmentName")}
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">작성자</span>
+            <span className="text-xs font-bold text-on-surface-variant">
+              작성자
+              <RequiredMark />
+            </span>
             <input
               value={form.reporter}
               onChange={(e) => set("reporter", e.target.value)}
               placeholder="이름을 입력하세요."
               className="input"
-              required
+              onBlur={() => touch("reporter")}
+              aria-invalid={invalid("reporter")}
             />
           </label>
         </div>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold text-on-surface-variant">이슈 내용</span>
+          <span className="text-xs font-bold text-on-surface-variant">
+              이슈 내용
+              <RequiredMark />
+            </span>
           <textarea
             value={form.content}
             onChange={(e) => set("content", e.target.value)}
             rows={5}
             placeholder="어떤 설비에서 무슨 일이 있었는지 적어 주세요."
             className="input"
-            required
+            onBlur={() => touch("content")}
+            aria-invalid={invalid("content")}
           />
         </label>
       </Card>

@@ -84,8 +84,14 @@ export default function Header() {
         )}
       </div>
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* 내 지사·부서 — 로그인 대용. 눌러서 바꾼다 */}
-        <ProfileChip />
+        {/*
+          내 지사·부서 — 로그인 대용. 눌러서 바꾼다. PC 에서 사이드바가 펼쳐져 있으면 사이드바
+          꼭대기 카드가 같은 정보를 보여 주므로 여기서는 감춘다(사이드바를 숨겼을 때만 보인다).
+          폰에는 사이드바가 없어 늘 보인다.
+        */}
+        <div className={sidebar.open ? "md:hidden" : ""}>
+          <ProfileChip />
+        </div>
         {pathname !== "/" && (
           <Link
             href="/"

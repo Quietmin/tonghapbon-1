@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import DocEditor from "./DocEditor";
-import SortedSelect, { PlainSelect } from "./SortedSelect";
+import SortedSelect, { PlainSelect, TextField } from "./SortedSelect";
 import { ManualHeader } from "./Letterhead";
 import { ButtonLink, Icon } from "@/shared/components/ui";
 import {
@@ -16,6 +16,8 @@ import { BRANCHES, MANUAL_FIELDS, MANUAL_TYPES } from "../lib/constants";
 
 /** 개정번호 — 1~10번 중에서 고른다 (원본은 자유 입력이었지만, 값이 흩어지지 않도록 묶었다) */
 const REVISIONS = Array.from({ length: 10 }, (_, i) => String(i + 1));
+/** 11번 이상은 목록에 없으니 이 항목을 고르면 아래에 직접 입력 칸이 뜬다 */
+const REVISION_CUSTOM = "직접 입력";
 
 /**
  * 매뉴얼 — 사진마다 순번을 매겨 절차를 안내하는 문서.
@@ -33,6 +35,8 @@ export default function ManualEditor() {
   // 지나쳐도 그 값이 조용히 문서에 찍혀, 틀린 지사가 출력될 수 있다.
   const [branch, setBranch] = useState("");
   const [revision, setRevision] = useState("");
+  // "직접 입력"을 고르면 켠다 — 10 넘는 개정번호는 목록에 없어 직접 써야 한다
+  const [revisionCustom, setRevisionCustom] = useState(false);
   // 1~4번 항목(목적·준비물·주의 사항·내용)
   const [sections, setSections] = useState<ManualSectionsValue>(EMPTY_MANUAL_SECTIONS);
 
@@ -71,7 +75,9 @@ export default function ManualEditor() {
         setManualType(typeof m.manual_type === "string" ? m.manual_type : "");
         setField(typeof m.field === "string" ? m.field : "");
         setBranch(typeof m.branch === "string" ? m.branch : "");
-        setRevision(typeof m.revision === "string" ? m.revision : "");
+        const rev = typeof m.revision === "string" ? m.revision : "";
+        setRevision(rev);
+        setRevisionCustom(rev !== "" && !REVISIONS.includes(rev));
         setSections(normalizeManualSections(m.sections));
       }}
       renderMeta={({ fileNameField, authorField }) => (
@@ -105,13 +111,32 @@ export default function ManualEditor() {
           {/* 보관함이 꺼져 있으면 작성자 칸이 없다 — 그때는 개정번호가 한 줄을 다 쓴다 */}
           <div className={`grid gap-4 ${authorField ? "md:grid-cols-2" : ""}`}>
             {authorField}
-            <PlainSelect
-              id="manualRevision"
-              label="개정번호"
-              values={REVISIONS}
-              value={revision}
-              onChange={setRevision}
-            />
+            <div className="flex flex-col gap-4">
+              <PlainSelect
+                id="manualRevision"
+                label="개정번호"
+                values={[...REVISIONS, REVISION_CUSTOM]}
+                value={revisionCustom ? REVISION_CUSTOM : revision}
+                onChange={(v) => {
+                  if (v === REVISION_CUSTOM) {
+                    setRevisionCustom(true);
+                    setRevision("");
+                  } else {
+                    setRevisionCustom(false);
+                    setRevision(v);
+                  }
+                }}
+              />
+              {revisionCustom && (
+                <TextField
+                  id="manualRevisionCustomValue"
+                  label="개정번호 직접 입력"
+                  value={revision}
+                  onChange={setRevision}
+                  placeholder="예: 11"
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -14,7 +14,7 @@ export type AskFn = (
   message: string,
   context: ChatbotSnapshot,
   opts?: { timeoutMs?: number },
-) => Promise<{ ok: true; answer: string } | null>;
+) => Promise<{ ok: true; answer: string } | { ok: false; reason: "disabled" | "error" } | null>;
 
 export async function classifyQuestionWithAI(
   question: string,
@@ -42,7 +42,10 @@ export async function classifyQuestionWithAI(
 }
 
 // 따소미의 실제 답변을 GPT로 받아온다 — /api/overhaul/chatbot에 (질문, 검증된 요약 데이터)만 보낸다.
-export const askDdasomi: AskFn = async (message, context, { timeoutMs = 10000 } = {}) => {
+// 서버가 고장이력·매뉴얼 등을 도구로 조회하는 동안 2~3회 왕복이 생길 수 있어 타임아웃을 넉넉히 잡는다.
+// 실패를 둘로 구분해 돌려준다: "disabled"(서버에 GPT 설정이 없음 — 재시도 무의미)와
+// "error"(일시 오류 — 재시도 가치 있음). 호출부(ddasomiChat)가 안내 문구를 다르게 쓴다.
+export const askDdasomi: AskFn = async (message, context, { timeoutMs = 45000 } = {}) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -52,10 +55,10 @@ export const askDdasomi: AskFn = async (message, context, { timeoutMs = 10000 } 
       body: JSON.stringify({ message, context }),
       signal: controller.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { ok: false, reason: "error" };
     const data = await res.json();
-    if (!data || data.ok !== true) return null;
-    return data;
+    if (data?.ok === true && typeof data.answer === "string") return data;
+    return { ok: false, reason: data?.reason === "disabled" ? "disabled" : "error" };
   } catch {
     return null;
   } finally {

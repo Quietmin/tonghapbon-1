@@ -72,9 +72,8 @@ export const NAV_GROUPS: NavGroup[] = [
       // 업로드 분석·공정표는 작업·공정의 하위 탭으로 합쳤다
       // (/overhaul/tasks/upload, /overhaul/tasks/schedule) — 셋 다 같은 작업항목이라서.
       { href: "/overhaul/tasks", label: "작업·공정", icon: "format_list_bulleted", section: "계약 후 — 공정관리" },
-      // 분해 전·후 사진은 실적 입력 화면에서 날짜별로 함께 다룬다.
-      // 별도 사진 화면은 두지 않는다 (실적과 떨어져 있으면 두 곳을 오가야 한다).
-      { href: "/overhaul/entry", label: "실적 입력", icon: "edit_note", section: "계약 후 — 공정관리" },
+      // 실적 입력은 따로 화면을 두지 않는다 — 작업·공정 목록(과 공정표)에서 작업을 누르면 뜨는
+      // 팝업에서 날짜별 실적·분해 전후 사진을 함께 다룬다. 옛 주소 /overhaul/entry 는 작업·공정으로 넘어간다.
     ],
   },
   {
@@ -95,18 +94,19 @@ export const NAV_GROUPS: NavGroup[] = [
     // 배치만 이 챕터로 옮겼고 서식은 원본 그대로다.
     key: "failure",
     label: "고장관리",
-    // 고장 보고서는 사고 기록이라 다른 챕터와 색부터 갈라 둔다
-    accent: "tertiary",
+    // 메뉴(사이드바·하단 탭·서브 탭)에서는 다른 챕터와 같은 남색으로 보이게 한다. 예전에는 사고
+    // 기록이라 주황으로 갈랐지만 이 탭만 선택했을 때 튀어 보인다는 의견에 따라 맞췄다.
+    // (화면 본문의 고장보고서 조회·작성 화면은 아직 주황 강조색을 그대로 쓴다)
+    accent: "primary",
     short: "고장",
     icon: "report",
     root: "/failure",
-    desc: "지난 고장 보고서를 지사·분야·설비명·고장내용으로 찾아보고, 새 보고서를 작성합니다.",
+    desc: "지난 고장 보고서를 지사·분야·설비명·고장내용으로 찾아보고, 새 보고서를 등록합니다.",
     // 챕터 첫 화면이 곧 조회다 — 따로 "홈"을 두지 않는다.
     // exact — /failure/new 에서도 조회가 켜져 보이면 어디 있는지 알 수 없다.
     items: [
       { href: "/failure", label: "고장보고서 조회", icon: "inventory_2", exact: true },
-      { href: "/failure/new", label: "고장보고서 작성", icon: "edit_note" },
-      { href: "/failure/history/new", label: "수기 등록", icon: "note_add", desktopOnly: true },
+      { href: "/failure/new", label: "고장보고서 등록", icon: "edit_note" },
     ],
   },
   {

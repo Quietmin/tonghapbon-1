@@ -1,25 +1,29 @@
-import Link from "next/link";
-import { Icon } from "@/shared/components/ui";
+import { ButtonLink, Icon, ScreenHeader } from "@/shared/components/ui";
 import BulkUploadQueue from "@/modules/failure/components/BulkUploadQueue";
 
 export const metadata = { title: "일괄 업로드 — 유지보수 마스터" };
 
+/**
+ * 일괄 업로드 — 과거 "고장상보" PDF 여러 개를 큐로 올려 한 건씩 확인하고 등록한다.
+ * 제목 줄은 수기 등록과 같은 모양이다(아이콘 칩 + 제목 + 오른쪽 이동 버튼).
+ */
 export default function FailureBulkUploadPage() {
   return (
     <>
-      <section className="pt-2">
-        <Link
-          href="/failure"
-          className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface mb-2"
-        >
-          <Icon name="arrow_back" className="text-base" />
-          고장관리 홈
-        </Link>
-        <h1 className="text-display-lg text-on-surface">일괄 업로드</h1>
-        <p className="text-body-md text-on-surface-variant mt-2">
-          과거 "고장상보" PDF를 여러 개 올려 한 건씩 확인하고 등록합니다.
-        </p>
-      </section>
+      <ScreenHeader
+        icon="upload_file"
+        title="일괄 업로드"
+        desc={'과거 "고장상보" PDF를 여러 개 올려 한 건씩 확인하고 등록합니다.'}
+        bullets={[]}
+        accent="primary"
+        tone="solid"
+        action={
+          <ButtonLink href="/failure" variant="primary">
+            <Icon name="inventory_2" className="text-lg" />
+            고장보고서 조회
+          </ButtonLink>
+        }
+      />
 
       <BulkUploadQueue />
     </>

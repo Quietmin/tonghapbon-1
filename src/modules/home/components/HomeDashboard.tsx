@@ -128,18 +128,18 @@ function RiskList({ risk, total }: { risk: RiskItem[]; total: number }) {
   );
 }
 
-function RecentList({ recent }: { recent: RecentEntry[] }) {
+function RecentList({ recent, span = "lg:col-span-2" }: { recent: RecentEntry[]; span?: string }) {
   return (
-    <Card lift={false} className="p-5 lg:col-span-2">
+    <Card lift={false} className={`p-5 ${span}`}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-title-sm text-on-surface">최근 실적 입력</h2>
-        <Link href="/overhaul/entry" className="text-sm font-bold text-primary hover:underline">
-          실적 입력하기
+        <Link href="/overhaul/tasks" className="text-sm font-bold text-primary hover:underline">
+          작업·공정에서 입력
         </Link>
       </div>
       {recent.length === 0 ? (
         <p className="py-6 text-center text-sm text-on-surface-variant">
-          아직 입력된 실적이 없습니다. 실적 입력에서 오늘 한 작업을 남겨 보세요.
+          아직 입력된 실적이 없습니다. 작업·공정에서 작업을 눌러 오늘 한 작업을 남겨 보세요.
         </p>
       ) : (
         <ul className="flex flex-col">
@@ -280,6 +280,50 @@ function Kpis({
         sub={`기기 ${deviceCount}개`}
       />
     </section>
+  );
+}
+
+/**
+ * 설비관리 공정 현황만 — 유지보수 부서의 첫 화면에서 현황 영역 아래에 붙인다.
+ * 지사를 안 골랐거나 데이터를 못 읽은 경우는 그리지 않는다(위의 현황 영역이 이미 안내한다).
+ */
+export async function EquipmentSection() {
+  const data = await getHomeDashboard();
+  if (data.kind !== "ready") return null;
+  const { project, stats, equipmentCount, deviceCount, recent } = data;
+
+  if (!project || !stats || stats.taskCount === 0) {
+    return (
+      <Card lift={false} className="p-0">
+        <EmptyState
+          icon="analytics"
+          title="설비관리 공정 현황이 아직 없어요"
+          desc="작업·공정의 엑셀 등록에서 수량산출서를 올리면 공정률과 지연 위험이 여기에 나타납니다."
+          action={
+            <Link
+              href="/overhaul/tasks/upload"
+              className="px-4 py-2.5 rounded-xl font-bold text-sm inline-flex items-center gap-2 bg-primary text-on-primary hover:opacity-90"
+            >
+              <Icon name="upload_file" className="text-base" />
+              엑셀 등록하러 가기
+            </Link>
+          }
+        />
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-gutter">
+      <Kpis stats={stats} equipmentCount={equipmentCount} deviceCount={deviceCount} />
+      <section className="grid gap-gutter lg:grid-cols-2">
+        <FieldProgress byField={stats.byField} />
+        <RiskList risk={stats.risk} total={stats.riskCount} />
+      </section>
+      <section className="grid gap-gutter lg:grid-cols-3">
+        <RecentList recent={recent} span="lg:col-span-3" />
+      </section>
+    </div>
   );
 }
 

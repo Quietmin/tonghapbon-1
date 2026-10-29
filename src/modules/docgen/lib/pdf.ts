@@ -7,6 +7,12 @@
  *
  * 라이브러리는 번들 크기가 크므로 호출 시점에 동적 import 한다
  * (문서 자동생성 화면에 들어오지 않은 사용자는 내려받지 않는다).
+ *
+ * html2canvas(원본 패키지)가 아니라 html2canvas-pro 를 쓴다 — 원본은 한글(CJK)
+ * 텍스트의 줄 높이를 잘못 계산해 글자가 칸 아래쪽으로 쏠려 찍히는 버그가 있다
+ * (실제 화면 스크린샷과 캡처 결과를 픽셀로 비교해 확인함: 원본은 위/아래 여백이
+ * 61px/34px로 어긋났고, html2canvas-pro(2.5.2)는 48px/47px로 실제 화면과 일치했다).
+ * API는 100% 호환이라 import 경로만 바꾸면 된다.
  */
 const A4_WIDTH_MM = 210;
 
@@ -31,7 +37,7 @@ async function waitForImages(el: HTMLElement): Promise<void> {
 
 /** 페이지 하나를 캔버스로. 두 출력 경로(다운로드/보관함)가 같은 방식을 쓰도록 묶어 둔다. */
 async function renderPage(
-  html2canvas: typeof import("html2canvas").default,
+  html2canvas: typeof import("html2canvas-pro").default,
   pageEl: HTMLElement,
 ): Promise<HTMLCanvasElement> {
   await waitForImages(pageEl);
@@ -47,7 +53,7 @@ export async function exportPagesToPdf(pageEls: HTMLElement[], fileName: string)
   if (pageEls.length === 0) throw new Error("출력할 페이지가 없습니다.");
 
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import("html2canvas"),
+    import("html2canvas-pro"),
     import("jspdf"),
   ]);
 
@@ -75,7 +81,7 @@ export async function exportPagesToPdf(pageEls: HTMLElement[], fileName: string)
 /** jsPDF 인스턴스를 파일로 내리지 않고 Blob 으로 받는다 (보관함 업로드용) */
 export async function renderPagesToBlob(pageEls: HTMLElement[]): Promise<Blob> {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import("html2canvas"),
+    import("html2canvas-pro"),
     import("jspdf"),
   ]);
 
