@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { resolveBranch } from "@/modules/overhaul/lib/activeBranch";
 import { CHATBOT_TOOL_DEFS, runChatbotTool } from "@/modules/overhaul/lib/chatbotTools";
+import { detectBranchInMessage } from "@/modules/overhaul/lib/chatbotBranch";
 
 export const dynamic = "force-dynamic";
 // 도구 호출이 2~3회 왕복하면 10초를 넘을 수 있다 — Vercel 함수 상한을 늘린다(Hobby 최대 60초)
@@ -203,12 +204,15 @@ async function callOpenAI({
   message,
   context,
   branch,
+  branchRequested,
   apiKey,
   model,
 }: {
   message: string;
   context: ReturnType<typeof sanitizeContext>;
   branch: string | null;
+  /** 질문에서 사용자가 직접 지사를 지정했는지(내 지사와 다를 수 있다) — 프롬프트에 알린다 */
+  branchRequested?: boolean;
   apiKey: string;
   model: string;
 }) {
@@ -224,7 +228,7 @@ ${JSON.stringify(context)}`
 
 ${FIELD_KNOWLEDGE}
 
-현재 선택된 지사: ${branch ?? "없음(전 지사 조회)"} — 도구 조회는 이 지사 범위로 자동 적용된다.
+${branchRequested ? `사용자가 질문에서 직접 지정한 조회 범위: ${branch ?? "전 지사"} — 도구 조회는 이 범위로 적용된다. 답할 때 이 범위를 처음에 밝히고, 다른 지사 이야기는 하지 않는다.` : `현재 선택된 지사(내 지사): ${branch ?? "없음(전 지사 조회)"} — 도구 조회는 이 지사 범위로 자동 적용된다. 사용자가 다른 지사를 물으면 그 지사 이름이 질문에 있어야 조회 범위가 바뀐다.`}
 
 ${dataBlock}`;
 
@@ -292,11 +296,15 @@ export async function POST(req: Request) {
   if (!message) return fail(400, "invalid_request");
 
   const context = sanitizeContext(body?.context);
-  // 도구 조회 범위 — 화면과 같은 oh_branch 쿠키를 읽는다. 선택 전이면 전 지사.
-  const branch = await resolveBranch();
+  // 도구 조회 범위 — 기본은 화면과 같은 oh_branch 쿠키(내 지사), 선택 전이면 전 지사.
+  // 질문에 지사 이름이 분명히 있으면("청주지사 현황") 그 지사를, "전 지사"면 전체를 쓴다.
+  const myBranch = await resolveBranch();
+  const asked = detectBranchInMessage(message);
+  const branch = asked === "ALL" ? null : (asked ?? myBranch);
+  const branchRequested = asked !== null;
 
   try {
-    const answer = await callOpenAI({ message, context, branch, apiKey, model: MODEL_NAME });
+    const answer = await callOpenAI({ message, context, branch, branchRequested, apiKey, model: MODEL_NAME });
     if (!answer) return fail(200, "upstream_error");
     return NextResponse.json({ ok: true, answer });
   } catch (err: any) {
