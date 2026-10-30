@@ -29,6 +29,20 @@ const MUTATION_RE = /(삭제|지워|수정|변경해|바꿔|등록해|입력해|
 const CROSS_MODULE_RE =
   /고장|장애|failure|매뉴얼|절차서|지침|보관함|보고서|문서|사진대장|현황|이슈|조치|기기|태그|보수\s*계획|중장기|점검\s*주기|설비\s*(마스터|목록|검색|정보)/i;
 
+// 문서(PDF)가 아니라 DB 에 저장된 값을 묻는 질문 — 현황 이슈·설비·기기 태그·보수계획. 이런 질문은 문서 검색이
+// 아니라 서버 GPT 의 조회 도구(list_status_issues 등)가 답해야 한다. 문서 검색에 보내면 질문과 상관없는
+// 매뉴얼이 "관련 문서"로 나온다("청주지사 현황 알려줘" → SFC 매뉴얼 5건). 단, 매뉴얼·보고서 같은 문서 낱말이
+// 함께 있으면 문서를 찾는 질문이다("현황 보고서 찾아줘").
+const STRUCTURED_DATA_RE =
+  /현황|이슈|조치|미완료|기기|태그|보수s*계획|중장기|점검s*주기|설비s*(마스터|목록|검색|정보)/;
+const DOCUMENT_WORD_RE = /매뉴얼|절차서|지침|보관함|보고서|문서|사진대장|파일|PDF/i;
+
+/** 문서 검색을 건너뛰고 조회 도구(GPT)로 바로 보내야 하는 질문인가 */
+export function isStructuredDataQuestion(question: string): boolean {
+  const q = question || "";
+  return STRUCTURED_DATA_RE.test(q) && !DOCUMENT_WORD_RE.test(q);
+}
+
 /** 오버홀 공정 데이터만으로는 답할 수 없는(다른 모듈 조회가 필요한) 질문인가 */
 export function isCrossModuleQuestion(question: string): boolean {
   return CROSS_MODULE_RE.test(question || "");
