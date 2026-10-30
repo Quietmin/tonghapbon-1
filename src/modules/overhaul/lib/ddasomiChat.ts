@@ -1,7 +1,7 @@
 // 따소미 챗봇 응답 결정 로직 — UI(ChatbotDock 등)의 상태 관리에서 분리해 순수 함수로 테스트 가능하게 유지한다.
 //
 // 원본: AI-Do-Sample/src/lib/ddasomiChat.js (그대로)
-import { answerQuestion, isCrossModuleQuestion, type AnswerKind } from "./chatbotRules";
+import { answerQuestion, isCrossModuleQuestion, isStructuredDataQuestion, type AnswerKind } from "./chatbotRules";
 import { toDdasomiText } from "./ddasomiVoice";
 import type { ChatbotSnapshot } from "./chatbotSnapshot";
 import type { AskFn } from "./chatbotAI";
@@ -61,7 +61,13 @@ export async function getDdasomiReply(
 
   // 문서(매뉴얼·고장보고서) 검색이 먼저다 — 빠르고, 결과가 열 수 있는 카드로 나온다.
   // 찾으면 그대로 답하고, 못 찾으면 아래 GPT 경로로 계속 간다(GPT도 도구로 보관함을 본다).
-  if ((local.kind === "no_data" || local.kind === "unsupported") && typeof searchFn === "function") {
+  // 현황·설비·보수계획처럼 DB 값을 묻는 질문은 건너뛴다 — 문서 검색은 질문과 무관한 매뉴얼도 가까운 순으로 돌려줘서
+  // "청주지사 현황"에 SFC 매뉴얼이 나오던 문제가 있었다. 이런 질문은 아래 GPT 조회 도구가 답한다.
+  if (
+    (local.kind === "no_data" || local.kind === "unsupported") &&
+    typeof searchFn === "function" &&
+    !isStructuredDataQuestion(message)
+  ) {
     try {
       const result = await searchFn(message);
       if (result && result.ok && result.matches.length > 0) {
