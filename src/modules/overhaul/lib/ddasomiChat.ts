@@ -59,29 +59,33 @@ export async function getDdasomiReply(
     return { text: toDdasomiText(local), kind: local.kind, suggestions: local.suggestions };
   }
 
-  // 문서(매뉴얼·고장보고서) 검색이 먼저다 — 빠르고, 결과가 열 수 있는 카드로 나온다.
-  // 찾으면 그대로 답하고, 못 찾으면 아래 GPT 경로로 계속 간다(GPT도 도구로 보관함을 본다).
+  // 문서(매뉴얼·고장보고서) 검색이 먼저다 — 결과는 열 수 있는 카드로 나온다.
+  // 찾아도 여기서 끝내지 않고 GPT 에 근거로 넘긴다: "근거 문서 + 단계별 안내"를 한 번에 보여 주기 위해서다.
+  // GPT 가 꺼져 있거나 실패하면 예전처럼 카드만 보여 준다.
+  let matches: DocMatch[] = [];
   if ((local.kind === "no_data" || local.kind === "unsupported") && typeof searchFn === "function") {
     try {
       const result = await searchFn(message);
-      if (result && result.ok && result.matches.length > 0) {
-        return {
-          text: `관련 문서를 ${result.matches.length}건 찾았어요. 아래에서 열어 보세요.`,
-          kind: "documents",
-          matches: result.matches,
-        };
-      }
+      if (result && result.ok && result.matches.length > 0) matches = result.matches;
     } catch {
       // 문서 검색 실패는 조용히 넘기고 아래로 계속 진행한다
     }
   }
+  const docsForAi = matches.slice(0, 5).map((m) => ({
+    title: m.title, docType: m.docType, branch: m.branch, field: m.field, snippet: m.snippet,
+  }));
+  const cardsOnly = (): DdasomiReply => ({
+    text: `관련 문서를 ${matches.length}건 찾았어요. 아래에서 열어 보세요.`,
+    kind: "documents",
+    matches,
+  });
 
   let aiFailReason: "disabled" | "error" = "error";
   if (typeof askFn === "function") {
     try {
-      const result = await askFn(message, snapshot);
+      const result = await askFn(message, snapshot, docsForAi.length ? { docs: docsForAi } : undefined);
       if (result && result.ok && typeof result.answer === "string" && result.answer.trim()) {
-        return { text: result.answer.trim(), kind: "answer" };
+        return { text: result.answer.trim(), kind: "answer", matches: matches.length ? matches : undefined };
       }
       if (result && result.ok === false) aiFailReason = result.reason;
     } catch {
@@ -90,6 +94,9 @@ export async function getDdasomiReply(
   } else {
     aiFailReason = "disabled";
   }
+
+  // GPT 없이도 문서는 찾았다면 카드만이라도 보여 준다.
+  if (matches.length) return cardsOnly();
 
   // GPT를 못 썼거나 실패한 경우: 로컬 규칙이 답을 알면 그걸 쓰고, 로컬도 모르면 이유를 정직하게 보인다.
   // no_data 는 원래의 로컬 안내문("업로드 분석에서...")으로 돌아간다 — GPT 없이도 틀린 말은 하지 않는다.

@@ -10,10 +10,19 @@
 import type { ChatbotSnapshot } from "./chatbotSnapshot";
 import type { Classification } from "./chatbotRules";
 
+/** 보관함 검색 결과 중 GPT 에 근거로 넘길 최소 정보 — 서버가 다시 걸러서(sanitizeDocuments) 프롬프트에 넣는다 */
+export interface AskDoc {
+  title: string;
+  docType: string;
+  branch: string | null;
+  field: string | null;
+  snippet: string;
+}
+
 export type AskFn = (
   message: string,
   context: ChatbotSnapshot,
-  opts?: { timeoutMs?: number },
+  opts?: { timeoutMs?: number; docs?: AskDoc[] },
 ) => Promise<{ ok: true; answer: string } | { ok: false; reason: "disabled" | "error" } | null>;
 
 export async function classifyQuestionWithAI(
@@ -45,14 +54,14 @@ export async function classifyQuestionWithAI(
 // 서버가 고장이력·매뉴얼 등을 도구로 조회하는 동안 2~3회 왕복이 생길 수 있어 타임아웃을 넉넉히 잡는다.
 // 실패를 둘로 구분해 돌려준다: "disabled"(서버에 GPT 설정이 없음 — 재시도 무의미)와
 // "error"(일시 오류 — 재시도 가치 있음). 호출부(ddasomiChat)가 안내 문구를 다르게 쓴다.
-export const askDdasomi: AskFn = async (message, context, { timeoutMs = 45000 } = {}) => {
+export const askDdasomi: AskFn = async (message, context, { timeoutMs = 45000, docs } = {}) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch("/api/overhaul/chatbot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, context }),
+      body: JSON.stringify({ message, context, documents: docs?.slice(0, 5) }),
       signal: controller.signal,
     });
     if (!res.ok) return { ok: false, reason: "error" };

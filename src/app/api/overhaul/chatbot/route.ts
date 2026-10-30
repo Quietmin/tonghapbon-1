@@ -25,7 +25,7 @@ export const maxDuration = 60;
 const MODEL_NAME = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 
 const MAX_MESSAGE_LEN = 500;
-const MAX_BODY_BYTES = 8 * 1024;
+const MAX_BODY_BYTES = 16 * 1024; // context JSON + 검색 문서 요약 5건
 const MAX_OUTPUT_TOKENS = 700;
 /** 도구 호출 왕복 상한 — 모델이 도구를 계속 부르며 맴돌지 못하게 끊는다 */
 const MAX_TOOL_ROUNDS = 4;
@@ -182,6 +182,25 @@ export function sanitizeContext(raw: unknown) {
   };
 }
 
+/**
+ * 클라이언트가 보관함에서 검색해 보낸 문서 요약 — 제목·종류·지사·분야·발췌만, 최대 5건, 길이 제한.
+ * 여기서 걸러지지 않은 값은 프롬프트에 들어가지 않는다.
+ */
+export function sanitizeDocuments(raw: unknown) {
+  if (!Array.isArray(raw)) return [];
+  const s = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+  return raw
+    .slice(0, 5)
+    .map((d: any) => ({
+      title: s(d?.title, 120),
+      docType: s(d?.docType, 20),
+      branch: s(d?.branch, 20),
+      field: s(d?.field, 10),
+      snippet: s(d?.snippet, 400),
+    }))
+    .filter((d) => d.title);
+}
+
 function validateMessage(body: any): string | null {
   if (!body || typeof body !== "object") return null;
   const message = typeof body.message === "string" ? body.message.trim() : "";
@@ -205,12 +224,15 @@ async function callOpenAI({
   context,
   branch,
   branchRequested,
+  documents,
   apiKey,
   model,
 }: {
   message: string;
   context: ReturnType<typeof sanitizeContext>;
   branch: string | null;
+  /** 클라이언트가 보관함에서 미리 찾아 보낸 관련 문서(없으면 빈 배열) */
+  documents?: ReturnType<typeof sanitizeDocuments>;
   /** 질문에서 사용자가 직접 지사를 지정했는지(내 지사와 다를 수 있다) — 프롬프트에 알린다 */
   branchRequested?: boolean;
   apiKey: string;
@@ -230,7 +252,15 @@ ${FIELD_KNOWLEDGE}
 
 ${branchRequested ? `사용자가 질문에서 직접 지정한 조회 범위: ${branch ?? "전 지사"} — 도구 조회는 이 범위로 적용된다. 답할 때 이 범위를 처음에 밝히고, 다른 지사 이야기는 하지 않는다.` : `현재 선택된 지사(내 지사): ${branch ?? "없음(전 지사 조회)"} — 도구 조회는 이 지사 범위로 자동 적용된다. 사용자가 다른 지사를 물으면 그 지사 이름이 질문에 있어야 조회 범위가 바뀐다.`}
 
-${dataBlock}`;
+${dataBlock}${
+    documents && documents.length
+      ? `
+
+보관함에서 이 질문으로 미리 검색된 관련 문서 ${documents.length}건(제목 · 종류 · 지사/분야 · 발췌). 이 문서들은 답변 아래에 카드로 함께 표시된다:
+${documents.map((d, i) => `${i + 1}. [${d.docType ?? "문서"}] ${d.title} (${[d.branch, d.field].filter(Boolean).join(" · ") || "-"}) — ${d.snippet ?? ""}`).join("\n")}
+문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제면 "검색된 문서는 ○○ 관련이라 직접 근거는 아니다"라고 한 줄로 밝힌다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.`
+      : ""
+  }`;
 
   let input: OpenAI.Responses.ResponseInput = [{ role: "user", content: message }];
   let response = await client.responses.create({
@@ -257,7 +287,16 @@ ${dataBlock}`;
     for (const call of calls) {
       // 어떤 도구가 불렸는지만 남긴다(질문·결과 내용은 로그에 넣지 않는다)
       console.log("[api/overhaul/chatbot] tool:", call.name);
-      const output = await runChatbotTool(call.name, call.arguments, branch);
+      // 클라이언트가 보관함에서 이미 찾은 문서가 있으면 search_manuals 는 그 결과로 대신한다 —
+      // 같은 질문을 두 번 검색하지 않고, 서버에 보관함 키가 없는 환경에서도 같은 근거로 답하게 된다.
+      const output =
+        call.name === "search_manuals" && documents && documents.length
+          ? JSON.stringify({
+              shown: documents.length,
+              note: "화면이 보관함에서 미리 검색한 결과(답변 아래 카드로 표시됨). 문서 열람은 카드의 미리보기로.",
+              items: documents.map((d) => ({ doc_type: d.docType, title: d.title, branch: d.branch, field: d.field, snippet: d.snippet })),
+            })
+          : await runChatbotTool(call.name, call.arguments, branch);
       input.push({ type: "function_call_output", call_id: call.call_id, output });
     }
     response = await client.responses.create({
@@ -296,6 +335,7 @@ export async function POST(req: Request) {
   if (!message) return fail(400, "invalid_request");
 
   const context = sanitizeContext(body?.context);
+  const documents = sanitizeDocuments(body?.documents);
   // 도구 조회 범위 — 기본은 화면과 같은 oh_branch 쿠키(내 지사), 선택 전이면 전 지사.
   // 질문에 지사 이름이 분명히 있으면("청주지사 현황") 그 지사를, "전 지사"면 전체를 쓴다.
   const myBranch = await resolveBranch();
@@ -304,7 +344,7 @@ export async function POST(req: Request) {
   const branchRequested = asked !== null;
 
   try {
-    const answer = await callOpenAI({ message, context, branch, branchRequested, apiKey, model: MODEL_NAME });
+    const answer = await callOpenAI({ message, context, branch, branchRequested, documents, apiKey, model: MODEL_NAME });
     if (!answer) return fail(200, "upstream_error");
     return NextResponse.json({ ok: true, answer });
   } catch (err: any) {
