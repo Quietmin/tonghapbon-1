@@ -446,7 +446,7 @@ export default function Schedule() {
               <div className="min-w-[760px] md:min-w-0 [--lbl:196px] xl:[--lbl:220px]">
                 {/* 타임라인 헤더 */}
                 <div className="flex items-stretch border-b border-border-subtle pb-2 mb-2">
-                  <div className="w-[var(--lbl)] shrink-0 text-[12px] md:text-[13px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end">
+                  <div className="w-[var(--lbl)] shrink-0 text-[12px] md:text-[13px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end justify-center text-center">
                     설비 / 작업
                   </div>
                   <div ref={timelineRef} className="relative flex-1 h-8" style={{ marginRight: END_GUTTER }}>
@@ -486,7 +486,7 @@ export default function Schedule() {
                           className="flex items-center py-2 cursor-pointer hover:bg-surface-container-low rounded-lg transition-colors"
                           onClick={() => setCollapsed((c) => ({ ...c, [g.equip]: isOpen }))}
                         >
-                          <div className="w-[var(--lbl)] shrink-0 pr-3 flex items-center gap-1.5">
+                          <div className="w-[var(--lbl)] shrink-0 pr-3 flex items-center justify-center gap-1.5">
                             <Icon
                               name={isOpen ? "expand_more" : "chevron_right"}
                               className="text-base text-on-surface-variant"
@@ -537,10 +537,10 @@ export default function Schedule() {
                                   editing?.id === r.id ? "bg-primary/5" : ""
                                 }`}
                               >
-                                <div className="w-[var(--lbl)] shrink-0 pr-3 pl-7">
+                                <div className="w-[var(--lbl)] shrink-0 px-2 text-center">
                                   {/* 좁은 화면(xl 미만)에서는 이름이 한 줄을 다 쓰고 칩·수정 버튼이 아랫줄로 내려가
                                       이름이 세 글자만 보이고 잘리는 일이 없다 */}
-                                  <div className="flex items-center gap-1.5 max-xl:flex-wrap">
+                                  <div className="flex items-center justify-center gap-1.5 max-xl:flex-wrap">
                                     <p className="text-xs font-medium text-on-surface truncate min-w-0 max-xl:basis-full group-hover:text-primary transition-colors">
                                       {r.name}
                                     </p>
@@ -568,12 +568,12 @@ export default function Schedule() {
                                         e.stopPropagation();
                                         openEditor(r);
                                       }}
-                                      className="ml-auto shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                                      className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
                                     >
                                       <Icon name="edit_calendar" className="text-sm" />
                                     </button>
                                   </div>
-                                  <p className="text-[10px] md:text-[12px] text-on-surface-variant font-mono-data flex items-center gap-1 whitespace-nowrap">
+                                  <p className="text-[10px] md:text-[12px] text-on-surface-variant font-mono-data flex items-center justify-center gap-1 whitespace-nowrap">
                                     계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}
                                     {r.sch.source === "excel" && (
                                       <span
