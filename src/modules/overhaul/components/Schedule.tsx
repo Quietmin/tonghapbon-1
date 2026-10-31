@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Card, Icon, Button, FieldChip, EmptyState } from "@/shared/components/ui";
+import { Card, Icon, Button, FieldChip, EmptyState, StatusChip, ScreenHeader } from "@/shared/components/ui";
 import { addDays, toDate, ymd } from "../lib/schedule";
 import EntryDialog from "./EntryDialog";
 import { useEntryHistoryHover } from "./EntryHistoryPreview";
@@ -61,9 +61,9 @@ interface Payload {
 // 고정된 몇 가지 색만 쓰므로 리터럴 맵으로 고정한다.
 const BAR_STYLE = {
   primary: { bg: "bg-primary", text: "text-primary" },
-  success: { bg: "bg-status-success", text: "text-status-success" },
-  error: { bg: "bg-status-error", text: "text-status-error" },
-  info: { bg: "bg-status-info", text: "text-status-info" },
+  success: { bg: "bg-status-success", text: "text-status-success-text" },
+  error: { bg: "bg-status-error", text: "text-status-error-text" },
+  info: { bg: "bg-status-info", text: "text-status-info-text" },
 } as const;
 type BarColor = keyof typeof BAR_STYLE;
 
@@ -87,37 +87,6 @@ const END_GUTTER = 44;
 
 /** 눈금 한 칸이 차지하는 최소 폭(px) — 날짜 글자("10-01")가 서로 겹치지 않을 만큼 */
 const TICK_MIN_PX = 64;
-
-/**
- * 현황 칸의 칩 — 완료(초록)·지연(빨강)·진행중(주황)·대기(회색). 예전에는 완료·지연 칩이 작업명 옆에 섞여
- * 있어 읽기 애매해서, 이름 칸 옆에 "현황" 칸을 따로 두고 여기에만 모은다.
- */
-function StatusPill({
-  kind,
-  children,
-  title,
-}: {
-  kind: "done" | "late" | "doing" | "wait";
-  children: React.ReactNode;
-  title?: string;
-}) {
-  const style = {
-    done: "bg-status-success/15 text-status-success",
-    late: "bg-status-error/15 text-status-error",
-    doing: "bg-status-warning/15 text-status-warning",
-    wait: "bg-surface-container-highest text-on-surface-variant",
-  }[kind];
-  const icon = kind === "done" ? "check" : kind === "late" ? "warning" : null;
-  return (
-    <span
-      title={title}
-      className={`px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold whitespace-nowrap inline-flex items-center gap-0.5 ${style}`}
-    >
-      {icon && <Icon name={icon} className="text-[11px] md:text-[12px]" />}
-      {children}
-    </span>
-  );
-}
 
 /** 설비 묶음을 늘어놓는 분야 순서 — 기계 → 전기 → 제어. 그 밖의 분야·미분류는 맨 뒤 */
 const FIELD_ORDER = ["기계", "전기", "제어"];
@@ -280,7 +249,7 @@ export default function Schedule() {
   if (!data || data.rows.length === 0) {
     return (
       <>
-        <h1 className="text-display-lg text-on-surface pt-2">공정표</h1>
+        <ScreenHeader icon="calendar_view_week" title="공정표" desc="작업별 계획과 실적을 날짜 막대로 봅니다." bullets={[]} tone="soft" />
         <Card lift={false} className="p-0">
           <EmptyState
             icon="calendar_view_week"
@@ -302,24 +271,26 @@ export default function Schedule() {
 
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-display-lg text-on-surface">공정표</h1>
-          <p className="text-on-surface-variant text-body-md">
-            {data.hasPeriod
-              ? `엑셀에 예정일이 있으면 그 일정을, 없으면 작업명 키워드로 자동 배치합니다. 달력 아이콘으로 직접 조정할 수 있습니다. (오버홀 ${startDate} ~ ${data.project.end_date} · 총 ${total}일)`
-              : "계약기간이 설정되지 않아 전체 기간 대비 배치를 계산할 수 없습니다. 업로드 분석에서 계약기간을 먼저 설정하세요."}
-          </p>
-        </div>
-        {data.hasPeriod && (
-          <div className="text-right">
-            <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
-              오늘 계획공정률
-            </p>
-            <p className="text-2xl font-black text-primary leading-tight">{data.plannedPct}%</p>
-          </div>
-        )}
-      </div>
+      <ScreenHeader
+        icon="calendar_view_week"
+        title="공정표"
+        desc={
+          data.hasPeriod
+            ? `엑셀에 예정일이 있으면 그 일정을, 없으면 작업명 키워드로 자동 배치합니다. 달력 아이콘으로 직접 조정할 수 있습니다. (오버홀 ${startDate} ~ ${data.project.end_date} · 총 ${total}일)`
+            : "계약기간이 설정되지 않아 전체 기간 대비 배치를 계산할 수 없습니다. 엑셀 등록에서 계약기간을 먼저 설정하세요."
+        }
+        bullets={[]}
+        tone="soft"
+        actionOnMobile
+        action={
+          data.hasPeriod ? (
+            <div className="text-right">
+              <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">오늘 계획공정률</p>
+              <p className="text-2xl font-black text-primary leading-tight">{data.plannedPct}%</p>
+            </div>
+          ) : undefined
+        }
+      />
 
       {historyPreview}
 
@@ -412,7 +383,7 @@ export default function Schedule() {
       {!data.hasPeriod ? (
         <Card lift={false} className="p-card-padding">
           <div className="flex items-center gap-3">
-            <Icon name="event_busy" className="text-status-warning" />
+            <Icon name="event_busy" className="text-status-warning-text" />
             <Link href="/overhaul/tasks/upload" className="text-primary text-sm font-semibold hover:underline">
               계약기간 설정하러 가기
             </Link>
@@ -501,7 +472,7 @@ export default function Schedule() {
                         <span className="text-[10px] md:text-[12px] text-on-surface-variant whitespace-nowrap">
                           {startDate ? ymd(addDays(toDate(startDate), d)).slice(5) : ""}
                         </span>
-                        <span className="text-[9px] md:text-[12px] text-on-surface-variant/60">D+{d}</span>
+                        <span className="text-[9px] md:text-[12px] text-on-surface-variant">D+{d}</span>
                       </div>
                     ))}
                   </div>
@@ -514,7 +485,7 @@ export default function Schedule() {
                     className="absolute top-0 bottom-0 w-px bg-status-error/70 z-10 pointer-events-none"
                     style={{ left: `calc(var(--lbl) + var(--st) + (100% - var(--lbl) - var(--st) - ${END_GUTTER}px) * ${todayOff / total})` }}
                   >
-                    <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] md:text-[12px] font-bold text-status-error bg-surface px-1 rounded">
+                    <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] md:text-[12px] font-bold text-status-error-text bg-surface px-1 rounded">
                       오늘
                     </span>
                   </div>
@@ -556,11 +527,13 @@ export default function Schedule() {
                           </div>
                           <div className="w-[var(--st)] shrink-0 flex items-center justify-center">
                             {g.list.every((r) => r.actual >= 100) ? (
-                              <StatusPill kind="done">완료</StatusPill>
+                              <StatusChip status="완료" />
                             ) : g.list.some((r) => r.behind && r.actual < 100) ? (
-                              <StatusPill kind="late" title="이 설비에서 계획보다 뒤처진 작업 수">
-                                지연 {g.list.filter((r) => r.behind && r.actual < 100).length}건
-                              </StatusPill>
+                              <StatusChip
+                                status="지연"
+                                label={`지연 ${g.list.filter((r) => r.behind && r.actual < 100).length}건`}
+                                title="이 설비에서 계획보다 뒤처진 작업 수"
+                              />
                             ) : null}
                           </div>
                           <div className="relative flex-1 h-6" style={{ marginRight: END_GUTTER }}>
@@ -635,7 +608,7 @@ export default function Schedule() {
                                   </p>
                                   <p
                                     className={`text-[10px] md:text-[12px] font-mono-data whitespace-nowrap truncate ${
-                                      r.actualBar ? BAR_STYLE[barColor].text : "text-on-surface-variant/50"
+                                      r.actualBar ? BAR_STYLE[barColor].text : "text-on-surface-variant"
                                     }`}
                                   >
                                     {r.actualBar?.real
@@ -647,22 +620,21 @@ export default function Schedule() {
                                 </div>
                                 <div className="w-[var(--st)] shrink-0 flex items-center justify-center">
                                   {r.actual >= 100 ? (
-                                    <StatusPill kind="done">완료</StatusPill>
+                                    <StatusChip status="완료" />
                                   ) : r.behind ? (
-                                    <StatusPill
-                                      kind="late"
+                                    <StatusChip
+                                      status="지연"
+                                      label={overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
                                       title={
                                         overdueDays > 0
                                           ? `계획 종료일(${r.sch.plannedEndStr})에서 ${overdueDays}일 지났습니다`
                                           : "오늘까지 나갔어야 할 계획 진도보다 뒤처졌습니다"
                                       }
-                                    >
-                                      {overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
-                                    </StatusPill>
+                                    />
                                   ) : r.actual > 0 ? (
-                                    <StatusPill kind="doing">진행중</StatusPill>
+                                    <StatusChip status="진행중" />
                                   ) : (
-                                    <StatusPill kind="wait">대기</StatusPill>
+                                    <StatusChip status="대기" />
                                   )}
                                 </div>
                                 <div className="relative flex-1 h-11" style={{ marginRight: END_GUTTER }}>

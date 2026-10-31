@@ -1,18 +1,3 @@
-import { STATUS_STYLE, type IssueStatus } from "../lib/constants";
-
-/** 조치 상태 칩 — 현황 조회 목록·갱신 창에서 같은 모양으로 쓴다 */
-export function StatusBadge({ status }: { status: IssueStatus }) {
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${
-        STATUS_STYLE[status] ?? "bg-surface-container-highest text-on-surface-variant"
-      }`}
-    >
-      {status}
-    </span>
-  );
-}
-
 /** ISO 시각 → "10.27 15:30". 올해가 아니면 연도를 붙인다 */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "-";

@@ -19,7 +19,7 @@ export default function ModuleStub({
       <h1 className="text-display-lg text-on-surface pt-2">{title}</h1>
       <Card className="p-card-padding" lift={false}>
         <div className="flex items-start gap-3">
-          <Icon name="construction" className="text-status-warning text-2xl" />
+          <Icon name="construction" className="text-status-warning-text text-2xl" />
           <div>
             <p className="text-title-sm text-on-surface">포팅 예정 화면</p>
             <p className="text-sm text-on-surface-variant mt-1">

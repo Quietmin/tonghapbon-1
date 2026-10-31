@@ -10,6 +10,7 @@ import {
   Icon,
   Button,
   EmptyState,
+  ScreenHeader,
 } from "@/shared/components/ui";
 import { fieldColor, type EquipmentProgress } from "../lib/progress";
 import type { OverhaulProject } from "../lib/repo";
@@ -53,7 +54,7 @@ export default function Dashboard() {
   if (!m || m.taskCount === 0) {
     return (
       <>
-        <h1 className="text-display-lg text-on-surface pt-2">대시보드</h1>
+        <ScreenHeader icon="dashboard" title="대시보드" desc="오버홀 공정 현황을 한눈에 봅니다." bullets={[]} tone="soft" />
         <Card lift={false} className="p-0">
           <EmptyState
             icon="analytics"
@@ -104,7 +105,7 @@ export default function Dashboard() {
       {!m.hasPeriod && (
         <div className="bg-surface-container-high p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Icon name="event_busy" className="text-status-warning" />
+            <Icon name="event_busy" className="text-status-warning-text" />
             <div>
               <p className="font-bold text-on-surface">계약기간이 설정되지 않았습니다</p>
               <p className="text-sm text-on-surface-variant">
@@ -122,24 +123,25 @@ export default function Dashboard() {
       )}
 
       {/* 타이틀 */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-display-lg text-on-surface">대시보드</h1>
-          <p className="text-on-surface-variant text-body-md">
-            {m.project.name} 정기 오버홀 공정 현황
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <div className="px-4 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle flex items-center gap-2 text-sm font-semibold">
-            <Icon name="calendar_month" className="text-base" />
-            {today}
+      <ScreenHeader
+        icon="dashboard"
+        title="대시보드"
+        desc={`${m.project.name} 정기 오버홀 공정 현황`}
+        bullets={[]}
+        tone="soft"
+        action={
+          <div className="flex gap-2">
+            <div className="px-4 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle flex items-center gap-2 text-sm font-semibold">
+              <Icon name="calendar_month" className="text-base" />
+              {today}
+            </div>
+            <Button variant="ghost" onClick={() => window.print()}>
+              <Icon name="print" className="text-base" />
+              인쇄 / PDF
+            </Button>
           </div>
-          <Button variant="ghost" onClick={() => window.print()}>
-            <Icon name="print" className="text-base" />
-            인쇄 / PDF
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Bento 요약 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
@@ -156,7 +158,7 @@ export default function Dashboard() {
             </h4>
             <p
               className={`text-xs mt-1 flex items-center gap-1 ${
-                onTrack ? "text-status-success" : "text-error"
+                onTrack ? "text-status-success-text" : "text-error"
               }`}
             >
               <Icon name={onTrack ? "trending_up" : "trending_down"} className="text-sm" />

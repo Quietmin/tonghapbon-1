@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import Dialog, { DialogHeader } from "./Dialog";
 import { Icon, RequiredMark } from "./ui";
 
 /**
@@ -80,15 +81,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   /** 아직 한 번도 고르지 않았으면 닫을 수 없다 */
   const forced = profile === null;
-
-  useEffect(() => {
-    if (!open || forced) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, forced]);
 
   // 첫 접속 화면이 뜨면 지사 선택칸에 바로 포커스를 준다 — 뒤 화면이 inert 라 Tab 이 이 화면 안에서만 돈다
   useEffect(() => {
@@ -182,7 +174,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       </label>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
           <Icon name="error" className="text-base" />
           {error}
         </div>
@@ -246,35 +238,20 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         </div>
       )}
       {open && !forced && (
-        <div
-          className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center bg-black/50 print:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="profileDlgTitle"
-          onClick={() => setOpen(false)}
-        >
+        // 팝업 틀은 공통 Dialog — 어느 화면의 다른 창 위에도 떠야 해서 top
+        <Dialog onClose={() => setOpen(false)} labelledBy="profileDlgTitle" size="sm" top>
           <form
-            onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
               void save();
             }}
-            className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-surface-container-lowest p-6 shadow-xl flex flex-col gap-4"
+            className="flex flex-col gap-4"
           >
-            <div className="flex items-start gap-3">
-              <span className="w-11 h-11 shrink-0 rounded-2xl bg-primary-fixed text-on-primary-fixed-variant flex items-center justify-center">
-                <Icon name="badge" className="text-2xl" />
-              </span>
-              <div className="min-w-0">
-                <h3 id="profileDlgTitle" className="text-title-sm text-on-surface">
-                  계정 설정 — 내 지사·부서
-                </h3>
-                <p className="text-sm text-on-surface-variant mt-1 break-keep">
-                  업무망 로그인이 연결되기 전까지 임시로 쓰는 선택입니다. 고른 지사·부서 기준으로 현황이 먼저
-                  보이고, 현황 등록에도 자동으로 채워집니다.
-                </p>
-              </div>
-            </div>
+            <DialogHeader id="profileDlgTitle" title="계정 설정 — 내 지사·부서" onClose={() => setOpen(false)} />
+            <p className="text-sm text-on-surface-variant break-keep">
+              업무망 로그인이 연결되기 전까지 임시로 쓰는 선택입니다. 고른 지사·부서 기준으로 현황이 먼저
+              보이고, 현황 등록에도 자동으로 채워집니다.
+            </p>
 
             {fields}
 
@@ -296,7 +273,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </ProfileContext.Provider>
   );

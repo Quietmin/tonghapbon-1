@@ -5,6 +5,9 @@ import {
   Card,
   Icon,
   StatusChip,
+  ScreenHeader,
+  ButtonLink,
+  Button,
   FieldChip,
   Avatar,
   EmptyState,
@@ -90,30 +93,26 @@ export default function TaskManagement() {
 
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-display-lg text-on-surface">작업 관리</h1>
-          <p className="text-on-surface-variant text-body-md">
-            {data?.project.name ?? "—"} · 전체 {(s?.taskCount ?? 0).toLocaleString()}개 작업
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <a
-            href="/overhaul/tasks/upload"
-            className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-surface-container-high text-on-surface hover:bg-surface-container-highest border border-border-subtle transition-colors"
-          >
-            <Icon name="upload_file" className="text-base" />
-            엑셀로 일괄 추가
-          </a>
-          <button
-            onClick={() => setEdit("new")}
-            className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-primary text-on-primary hover:opacity-90 transition-opacity"
-          >
-            <Icon name="add" className="text-base" />
-            작업 추가
-          </button>
-        </div>
-      </div>
+      <ScreenHeader
+        icon="format_list_bulleted"
+        title="작업 목록"
+        desc={`${data?.project.name ?? "—"} · 전체 ${(s?.taskCount ?? 0).toLocaleString()}개 작업`}
+        bullets={[]}
+        tone="soft"
+        actionOnMobile
+        action={
+          <>
+            <ButtonLink href="/overhaul/tasks/upload" variant="ghost">
+              <Icon name="upload_file" className="text-base" />
+              엑셀로 일괄 추가
+            </ButtonLink>
+            <Button onClick={() => setEdit("new")}>
+              <Icon name="add" className="text-base" />
+              작업 추가
+            </Button>
+          </>
+        }
+      />
 
       {edit && (
         <TaskEditor
@@ -180,7 +179,7 @@ export default function TaskManagement() {
             title="수량·단위·분야가 불명확해 사람이 확인해야 하는 항목만 봅니다"
             className={`h-11 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 whitespace-nowrap transition-colors border ${
               onlyReview
-                ? "bg-status-warning/15 text-status-warning border-status-warning/40"
+                ? "bg-status-warning/15 text-status-warning-text border-status-warning/40"
                 : "bg-surface-container-low text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
             }`}
           >
@@ -241,7 +240,7 @@ export default function TaskManagement() {
                       <span className="font-mono-data text-xs text-on-surface-variant truncate">{t.tag}</span>
                     )}
                     {t.needs_review && (
-                      <span className="text-status-warning text-xs font-bold shrink-0">확인 필요</span>
+                      <span className="text-status-warning-text text-xs font-bold shrink-0">확인 필요</span>
                     )}
                     <span className="shrink-0">
                       <StatusChip status={status} />
@@ -336,7 +335,7 @@ export default function TaskManagement() {
                           )}
                           {t.needs_review && (
                             <span
-                              className="text-status-warning text-xs font-bold"
+                              className="text-status-warning-text text-xs font-bold"
                               title="수량·단위·분야가 불명확해 확인이 필요한 항목"
                             >
                               확인 필요

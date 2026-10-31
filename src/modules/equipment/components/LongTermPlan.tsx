@@ -167,7 +167,7 @@ export default function LongTermPlan({
                       y === data.thisYear
                         ? "text-primary"
                         : y > data.thisYear
-                          ? "text-on-surface-variant/70"
+                          ? "text-on-surface-variant"
                           : ""
                     }`}
                   >
@@ -186,7 +186,7 @@ export default function LongTermPlan({
                       {!r.equipmentId && (
                         <span
                           title="보수계획에는 있지만 설비 마스터에 등록되지 않은 이름입니다"
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/10 text-status-warning"
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/10 text-status-warning-text"
                         >
                           마스터 미등록
                         </span>

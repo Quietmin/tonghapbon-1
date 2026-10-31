@@ -260,7 +260,7 @@ export default function FailureHistoryForm({
   if (savedId) {
     return (
       <Card className="p-8 flex flex-col items-center text-center gap-3">
-        <Icon name="check_circle" className="text-4xl text-status-success" />
+        <Icon name="check_circle" className="text-4xl text-status-success-text" />
         <p className="text-title-sm font-bold text-on-surface">고장이력이 등록되었습니다.</p>
         <p className="text-sm text-on-surface-variant">
           {form.equipmentName || form.title} · {form.occurredAt || "발생일시 미입력"}
@@ -333,7 +333,7 @@ export default function FailureHistoryForm({
       )}
 
       {extractWarning && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-warning/10 text-status-warning text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-warning/10 text-status-warning-text text-sm">
           <Icon name="info" className="text-base" />
           {extractWarning}
         </div>
@@ -397,7 +397,7 @@ export default function FailureHistoryForm({
       </Section>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
           <Icon name="error" className="text-base" />
           {error}
         </div>

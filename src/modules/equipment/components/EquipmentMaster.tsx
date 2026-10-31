@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Icon } from "@/shared/components/ui";
+import { Button, Icon, ScreenHeader } from "@/shared/components/ui";
 import { EQUIPMENT_FIELDS } from "@/shared/lib/equipmentMeta";
 import BranchOverview from "./BranchOverview";
 import LongTermPlan from "./LongTermPlan";
@@ -74,48 +74,26 @@ export default function EquipmentMaster() {
   if (view === "overview" || !branch) {
     return (
       <>
-        {/* 모바일 — 챕터 이름("설비 관리")을 가운데, 설명은 개조식 bullet로 */}
-        <div className="md:hidden text-center pt-2">
-          <h1 className="text-title-sm font-black text-on-surface">설비 관리</h1>
-          <ul className="mt-2 inline-block text-left">
-            {[
-              "지사별 최근 오버홀 현황 확인",
-              "지사 선택 시 장기 보수계획·설비정보 관리",
-              "선택한 지사는 보수계획·회차·실적까지 연동",
-            ].map((b) => (
-              <li key={b} className="flex gap-1.5 text-sm text-on-surface-variant py-0.5">
-                <span className="text-on-surface-variant/50">·</span>
-                <span>{b}</span>
-              </li>
-            ))}
-          </ul>
-          {branch && (
-            <div className="mt-3">
-              <Button variant="ghost" className="w-full" onClick={() => setView("branch")}>
+        <ScreenHeader
+          icon="precision_manufacturing"
+          title="설비 마스터"
+          desc="지사별 최근 오버홀 현황입니다. 지사를 고르면 그 지사의 장기 유지보수 계획과 설비·기기 정보를 관리합니다 — 여기서 고른 지사는 보수계획·회차·실적 화면에도 그대로 이어집니다."
+          bullets={[
+            "지사별 최근 오버홀 현황 확인",
+            "지사 선택 시 장기 보수계획·설비정보 관리",
+            "선택한 지사는 보수계획·회차·실적까지 연동",
+          ]}
+          tone="soft"
+          actionOnMobile
+          action={
+            branch ? (
+              <Button variant="ghost" onClick={() => setView("branch")}>
                 <Icon name="arrow_forward" className="text-base" />
                 {branch} 계속 보기
               </Button>
-            </div>
-          )}
-        </div>
-
-        {/* 데스크톱 */}
-        <div className="hidden md:flex md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-display-lg text-on-surface pt-2">설비 마스터</h1>
-            <p className="text-body-md text-on-surface-variant mt-2">
-              지사별 최근 오버홀 현황입니다. 지사를 고르면 그 지사의 장기 유지보수 계획과
-              설비·기기 정보를 관리합니다 — 여기서 고른 지사는 보수계획·회차·실적 화면에도
-              그대로 이어집니다.
-            </p>
-          </div>
-          {branch && (
-            <Button variant="ghost" onClick={() => setView("branch")}>
-              <Icon name="arrow_forward" className="text-base" />
-              {branch} 계속 보기
-            </Button>
-          )}
-        </div>
+            ) : undefined
+          }
+        />
         <BranchOverview current={branch ?? null} busy={switching} onPick={(b) => void pick(b)} />
       </>
     );
@@ -124,32 +102,16 @@ export default function EquipmentMaster() {
   // ── 지사 선택 후: 지사 띠 + 장기 계획 + 설비 CRUD ────────────────────────
   return (
     <>
-      {/* 모바일 */}
-      <div className="md:hidden text-center pt-2">
-        <h1 className="text-title-sm font-black text-on-surface">설비 관리</h1>
-        <ul className="mt-2 inline-block text-left">
-          {[
-            "지사의 장기 보수계획·설비 기준정보 관리",
-            "직접 등록 또는 엑셀 업로드로 설비 자동 등록",
-          ].map((b) => (
-            <li key={b} className="flex gap-1.5 text-sm text-on-surface-variant py-0.5">
-              <span className="text-on-surface-variant/50">·</span>
-              <span>{b}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* 데스크톱 */}
-      <div className="hidden md:flex md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-display-lg text-on-surface pt-2">설비 마스터</h1>
-          <p className="text-body-md text-on-surface-variant mt-2">
-            이 지사의 장기 유지보수 계획과 설비·기기 기준 정보입니다. 설비는 직접 추가하거나
-            보수계획·오버홀 엑셀 업로드로 자동 등록됩니다.
-          </p>
-        </div>
-      </div>
+      <ScreenHeader
+        icon="precision_manufacturing"
+        title="설비 마스터"
+        desc="이 지사의 장기 유지보수 계획과 설비·기기 기준 정보입니다. 설비는 직접 추가하거나 보수계획·오버홀 엑셀 업로드로 자동 등록됩니다."
+        bullets={[
+          "지사의 장기 보수계획·설비 기준정보 관리",
+          "직접 등록 또는 엑셀 업로드로 설비 자동 등록",
+        ]}
+        tone="soft"
+      />
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border-subtle bg-surface-container-low px-4 py-2">
         <span className="flex items-center gap-1.5 text-label-caps uppercase text-on-surface-variant">

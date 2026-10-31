@@ -4,10 +4,10 @@ import { STATUS_OPTIONS, type IssueStatus } from "@/modules/status/lib/constants
 
 /** 상태별 건수 카드 4장 — 누르면 현황 조회로 간다 */
 const TONE: Record<IssueStatus, string> = {
-  미완료: "text-status-error",
-  조치중: "text-status-warning",
-  "추후 조치 예정": "text-status-info",
-  조치완료: "text-status-success",
+  미완료: "text-status-error-text",
+  조치중: "text-status-warning-text",
+  "추후 조치 예정": "text-status-info-text",
+  조치완료: "text-status-success-text",
 };
 
 export default function StatusCountCards({ counts }: { counts: Record<string, number> }) {

@@ -14,14 +14,6 @@ export type IssueStatus = (typeof STATUS_OPTIONS)[number];
  */
 export { DEPARTMENTS } from "@/shared/lib/departments";
 
-/** 상태 칩 색 — 미완료는 눈에 띄게, 조치완료는 차분하게 */
-export const STATUS_STYLE: Record<IssueStatus, string> = {
-  미완료: "bg-status-error/10 text-status-error",
-  조치중: "bg-status-warning/10 text-status-warning",
-  "추후 조치 예정": "bg-status-info/10 text-status-info",
-  조치완료: "bg-status-success/10 text-status-success",
-};
-
 /** 한 이슈에 붙일 수 있는 사진 수 — 화면(브라우저)과 서버가 같은 값을 쓴다 */
 export const MAX_ISSUE_PHOTOS = 5;
 

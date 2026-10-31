@@ -97,7 +97,7 @@ export default function ProjectBar() {
 
       <span
         className={`text-xs font-semibold ${
-          active.start_date && active.end_date ? "text-on-surface-variant" : "text-status-warning"
+          active.start_date && active.end_date ? "text-on-surface-variant" : "text-status-warning-text"
         }`}
       >
         {period}

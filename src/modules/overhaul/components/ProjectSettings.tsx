@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Icon, Button, EmptyState } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState, ScreenHeader } from "@/shared/components/ui";
 import type { OverhaulProject } from "../lib/repo";
 
 /**
@@ -216,21 +216,22 @@ export default function ProjectSettings() {
 
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-display-lg text-on-surface pt-2">회차 관리</h1>
-          <p className="text-body-md text-on-surface-variant mt-2">
-            오버홀 회차를 만들고 계약기간을 정합니다. 회차마다 작업항목·실적·사진이 따로
-            쌓이므로, 새 오버홀은 기존 회차를 고치지 말고 새로 만드세요.
-          </p>
-        </div>
-        {!creating && (
-          <Button onClick={() => setCreating({ ...EMPTY_DRAFT })}>
-            <Icon name="add" className="text-base" />
-            새 회차
-          </Button>
-        )}
-      </div>
+      <ScreenHeader
+        icon="settings"
+        title="회차 관리"
+        desc="오버홀 회차를 만들고 계약기간을 정합니다. 회차마다 작업항목·실적·사진이 따로 쌓이므로, 새 오버홀은 기존 회차를 고치지 말고 새로 만드세요."
+        bullets={[]}
+        tone="soft"
+        actionOnMobile
+        action={
+          !creating ? (
+            <Button onClick={() => setCreating({ ...EMPTY_DRAFT })}>
+              <Icon name="add" className="text-base" />
+              새 회차
+            </Button>
+          ) : undefined
+        }
+      />
 
       {error && (
         <Card className="p-4 border border-error/30" lift={false}>
@@ -292,7 +293,7 @@ export default function ProjectSettings() {
                 </h2>
                 <div className="flex items-center gap-2">
                   {missingPeriod && (
-                    <span className="text-xs font-bold text-status-warning">
+                    <span className="text-xs font-bold text-status-warning-text">
                       계약기간을 넣어야 경과일·지연 위험이 계산됩니다
                     </span>
                   )}
@@ -325,7 +326,7 @@ export default function ProjectSettings() {
                   {busy === p.id ? "저장 중…" : "저장"}
                 </Button>
                 {savedId === p.id && (
-                  <span className="text-sm text-status-success font-bold flex items-center gap-1">
+                  <span className="text-sm text-status-success-text font-bold flex items-center gap-1">
                     <Icon name="check_circle" className="text-base" />
                     저장했습니다
                   </span>

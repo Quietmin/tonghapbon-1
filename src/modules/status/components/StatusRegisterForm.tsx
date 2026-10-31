@@ -111,14 +111,14 @@ export default function StatusRegisterForm({
   if (done) {
     return (
       <Card lift={false} className="p-8 flex flex-col items-center text-center gap-3">
-        <Icon name="check_circle" className="text-4xl text-status-success" />
+        <Icon name="check_circle" className="text-4xl text-status-success-text" />
         <p className="text-title-sm font-bold text-on-surface">현황이 등록되었습니다</p>
         <p className="text-sm text-on-surface-variant">
           {done.branch} · {done.equipmentName} · {done.department}
           {donePhotoCount > 0 && ` · 사진 ${donePhotoCount}장`}
         </p>
         {photoWarning && (
-          <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-status-warning/10 text-status-warning text-sm font-bold">
+          <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-status-warning/10 text-status-warning-text text-sm font-bold">
             <Icon name="warning" className="text-base" />
             {photoWarning}
           </p>
@@ -246,7 +246,7 @@ export default function StatusRegisterForm({
       </Card>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
           <Icon name="error" className="text-base" />
           {error}
         </div>

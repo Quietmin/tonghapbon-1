@@ -27,7 +27,7 @@
   --color-surface-container-high: #ededed;
   --color-surface-container-highest: #e5e5e5;
   --color-on-surface: #171717;
-  --color-on-surface-variant: #707070;
+  --color-on-surface-variant: #666666;
   --color-inverse-surface: #1c1c1c;
   --color-inverse-on-surface: #ffffff;
   --color-surface-tint: #28366b;
@@ -86,6 +86,16 @@
   --color-status-warning: #ff9500;
   --color-status-error: #ff3b30;
   --color-status-info: #5856d6;
+
+  /*
+    상태 색 위의 "글자" 전용 짙은 색. 위의 밝은 색(iOS 계열)은 점·막대·배경 칩에는 좋지만, 흰 바탕이나 옅은 칩
+    위의 글자로 쓰면 대비가 부족하다(완료 2.2:1, 진행중 2.2:1, 지연 3.6:1 — 읽기 기준 4.5:1 미달).
+    글자에는 text-status-*-text 를 쓴다. 칩 배경과 흰 바탕 위에서 모두 4.5:1 이상이다.
+  */
+  --color-status-success-text: #177a35;
+  --color-status-warning-text: #9a5200;
+  --color-status-error-text: #b3261e;
+  --color-status-info-text: #4240b8;
 
   /*
    * DESIGN.md 라운드 스케일(xs4·sm6·md8·lg12·xl16, pill은 뱃지·아바타 전용).

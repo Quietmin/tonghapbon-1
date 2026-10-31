@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Icon } from "@/shared/components/ui";
+import { Icon, ScreenHeader } from "@/shared/components/ui";
 
 /**
  * 오버홀 화면(/overhaul/*)의 지사 관문.
@@ -64,12 +64,13 @@ export default function BranchGate({ children }: { children: React.ReactNode }) 
     const sorted = [...branches].sort((a, b) => a.localeCompare(b, "ko"));
     return (
       <div className="max-w-3xl">
-        <h1 className="text-display-lg text-on-surface pt-2">지사 선택</h1>
-        <p className="text-body-md text-on-surface-variant mt-2">
-          유지보수 업무는 지사별로 따로 운영됩니다. 소속 지사를 고르면 설비 마스터와
-          보수계획·회차·실적 이력이 모두 그 지사 것만 보입니다. 한 번 고르면 기억되고,
-          위쪽 지사 표시에서 언제든 바꿀 수 있습니다.
-        </p>
+        <ScreenHeader
+          icon="apartment"
+          title="지사 선택"
+          desc="유지보수 업무는 지사별로 따로 운영됩니다. 소속 지사를 고르면 설비 마스터와 보수계획·회차·실적 이력이 모두 그 지사 것만 보입니다. 한 번 고르면 기억되고, 위쪽 지사 표시에서 언제든 바꿀 수 있습니다."
+          bullets={[]}
+          tone="soft"
+        />
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {sorted.map((b) => (
             <button

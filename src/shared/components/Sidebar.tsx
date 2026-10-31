@@ -148,7 +148,7 @@ export default function Sidebar() {
                     return (
                       <div key={item.href}>
                         {showSection && (
-                          <p className="px-3 mt-3 mb-1 text-[12px] font-bold uppercase tracking-wider text-on-surface-variant/60">
+                          <p className="px-3 mt-3 mb-1 text-[12px] font-bold uppercase tracking-wider text-on-surface-variant">
                             {item.section}
                           </p>
                         )}

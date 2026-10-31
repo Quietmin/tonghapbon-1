@@ -285,7 +285,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 과거 등급이 반복되는 패턴을 찾아 추정한 등급 (확정 아님 — 확인 권장)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-status-info border border-dashed border-status-info/50 ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-status-info-text border border-dashed border-status-info/50 ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -456,7 +456,7 @@ export default function MaintenanceMatrix() {
             <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
               판단 필요
             </p>
-            <p className="text-2xl font-black text-status-warning">{data.summary.needsDecision}</p>
+            <p className="text-2xl font-black text-status-warning-text">{data.summary.needsDecision}</p>
           </div>
           <div>
             <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
@@ -604,7 +604,7 @@ export default function MaintenanceMatrix() {
                         y === data.thisYear
                           ? "text-primary"
                           : y >= data.futureFrom
-                            ? "text-on-surface-variant/70"
+                            ? "text-on-surface-variant"
                             : ""
                       }`}
                     >
@@ -669,7 +669,7 @@ export default function MaintenanceMatrix() {
                         {r.judge.needsDecision && (
                           <Icon
                             name="help"
-                            className="text-[13px] text-status-warning"
+                            className="text-[13px] text-status-warning-text"
                           />
                         )}
                       </div>

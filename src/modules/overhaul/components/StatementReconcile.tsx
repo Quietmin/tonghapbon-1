@@ -195,7 +195,7 @@ export default function StatementReconcile({
           <span className="block mt-1">
             {linkedCount > 0 ? (
               <>
-                <b className="text-status-success">{linkedCount}건</b>은 수량산출서의 항목ID가
+                <b className="text-status-success-text">{linkedCount}건</b>은 수량산출서의 항목ID가
                 되돌아와 정확히 이어졌습니다(<b>연결</b>). 나머지는 이름으로 짐작한
                 것이니(<b>추정</b>) 눈으로 확인하세요.
               </>
@@ -209,7 +209,7 @@ export default function StatementReconcile({
           </span>
         )}
         {statement.reconciled_at && (
-          <span className="block mt-1 text-status-warning">
+          <span className="block mt-1 text-status-warning-text">
             이미 {statement.reconciled_at.slice(0, 10)}에 반영된 내역서입니다 — 다시 반영하면 값을
             덮어씁니다.
           </span>
@@ -239,7 +239,7 @@ export default function StatementReconcile({
                         {" · "}
                         <span
                           className={`font-bold ${
-                            c.matchKind === "linked" ? "text-status-success" : "text-status-warning"
+                            c.matchKind === "linked" ? "text-status-success-text" : "text-status-warning-text"
                           }`}
                           title={
                             c.matchKind === "linked"
@@ -330,7 +330,7 @@ export default function StatementReconcile({
                 key={e.planId}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-status-success/10"
               >
-                <Icon name="add_circle" className="text-status-success text-base" />
+                <Icon name="add_circle" className="text-status-success-text text-base" />
                 <span className="flex-1 text-sm text-on-surface">{e.name}</span>
                 <input
                   value={e.grade}

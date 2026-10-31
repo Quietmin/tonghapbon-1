@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Card, Icon } from "@/shared/components/ui";
+import { Card, Icon, StatusChip } from "@/shared/components/ui";
 import {
   CLICKABLE_ROW,
   HEAD_ROW,
@@ -15,7 +15,7 @@ import {
 import type { StatusIssueRow } from "@/modules/status/lib/repo";
 import { UpdateDialog } from "@/modules/status/components/StatusBoard";
 import IssueDetailDialog from "@/modules/status/components/IssueDetailDialog";
-import { StatusBadge, formatDate, formatDateTime } from "@/modules/status/components/badges";
+import { formatDate, formatDateTime } from "@/modules/status/components/badges";
 
 /** 표에 넣을 수 있는 열 — 화면마다 필요한 열만 골라 쓴다 */
 export type IssueColumn =
@@ -157,7 +157,7 @@ export default function IssueListPanel({
       case "status":
         return (
           <>
-            <StatusBadge status={r.status} />
+            <StatusChip status={r.status} />
             {/* 예정일 열이 따로 없을 때만 상태 아래에 붙인다 */}
             {!hasScheduleColumn && r.scheduled_date && (
               <span className="block text-xs text-on-surface-variant mt-1">
@@ -178,7 +178,7 @@ export default function IssueListPanel({
         return <span className="text-on-surface-variant">{formatDateTime(r.created_at)}</span>;
       case "scheduled":
         return (
-          <span className="font-bold text-status-info tabular-nums">
+          <span className="font-bold text-status-info-text tabular-nums">
             {r.scheduled_date ? formatDate(r.scheduled_date) : "미정"}
           </span>
         );
@@ -218,12 +218,12 @@ export default function IssueListPanel({
                 <div className="flex items-center gap-2 min-w-0">
                   {columns.includes("status") && (
                     <span className="shrink-0">
-                      <StatusBadge status={r.status} />
+                      <StatusChip status={r.status} />
                     </span>
                   )}
                   <span className="font-bold text-on-surface text-sm truncate">{r.equipment_name}</span>
                   {hasScheduleColumn && r.scheduled_date && (
-                    <span className="ml-auto shrink-0 text-xs font-bold text-status-info tabular-nums">
+                    <span className="ml-auto shrink-0 text-xs font-bold text-status-info-text tabular-nums">
                       {formatDate(r.scheduled_date)}
                     </span>
                   )}

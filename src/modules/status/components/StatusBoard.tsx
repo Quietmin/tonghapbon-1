@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Button, Card, EmptyState, Icon } from "@/shared/components/ui";
+import Dialog, { DialogHeader } from "@/shared/components/Dialog";
+import { Button, Card, EmptyState, Icon, StatusChip } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
 import {
   CLICKABLE_ROW,
@@ -16,7 +16,7 @@ import {
 import { useToast } from "@/shared/components/Toast";
 import { DEPARTMENTS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
-import { StatusBadge, formatDate, formatDateTime } from "./badges";
+import { formatDate, formatDateTime } from "./badges";
 import { FaultReportLink, IssuePhotos } from "./StatusPhotos";
 
 const SORTED_BRANCHES = [...BRANCHES].sort((a, b) => a.localeCompare(b, "ko"));
@@ -179,7 +179,7 @@ export default function StatusBoard({
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
           <Icon name="error" className="text-base" />
           {error}
         </div>
@@ -220,7 +220,7 @@ export default function StatusBoard({
                   className="w-full text-left p-4 flex flex-col gap-2 active:bg-surface-container-high"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <StatusBadge status={r.status} />
+                    <StatusChip status={r.status} />
                     <span className="text-xs text-on-surface-variant whitespace-nowrap">
                       {formatDateTime(r.created_at)}
                     </span>
@@ -267,7 +267,7 @@ export default function StatusBoard({
                     className={CLICKABLE_ROW}
                   >
                     <td className={`${TD_Y} px-3 align-top text-center`}>
-                      <StatusBadge status={r.status} />
+                      <StatusChip status={r.status} />
                       {r.scheduled_date && (
                         <span className="block text-xs text-on-surface-variant mt-1">
                           예정 {formatDate(r.scheduled_date)}
@@ -355,121 +355,96 @@ export function UpdateDialog({
     }
   }
 
-  // body 로 포털 — 첫 화면 카드(glass-card)처럼 backdrop-filter 가 걸린 조상 안에서 그리면 fixed 가
-  // 그 카드 기준이 되어 창이 카드 안에 갇히고 뒤따르는 카드(설비관리 공정 현황)에 가려진다.
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/40"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="statusDlgTitle"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-surface-container-lowest p-6 shadow-xl flex flex-col gap-4"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 mb-2">
-              <StatusBadge status={row.status} />
-            </div>
-            <h3 id="statusDlgTitle" className="text-title-sm text-on-surface break-keep">
-              {row.equipment_name}
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
-          >
-            <Icon name="close" />
-          </button>
+  // 팝업 틀(포털·Esc·스크롤 잠금·포커스)은 공통 Dialog 가 맡는다
+  return (
+    <Dialog onClose={onClose} labelledBy="statusDlgTitle">
+      <DialogHeader
+        id="statusDlgTitle"
+        above={<StatusChip status={row.status} />}
+        title={row.equipment_name}
+        onClose={onClose}
+      />
+
+      <p className="text-sm text-on-surface whitespace-pre-wrap break-keep">{row.content}</p>
+      <p className="text-xs text-on-surface-variant">
+        {[row.branch, row.department, `작성 ${row.reporter}`, formatDateTime(row.created_at)]
+          .filter(Boolean)
+          .join(" · ")}
+        {row.status_updated_at && ` · 상태 변경 ${formatDateTime(row.status_updated_at)}`}
+      </p>
+
+      <IssuePhotos issueId={row.id} />
+
+      <div className="border-t border-border-subtle pt-4 flex flex-col gap-4">
+        <h4 className="text-sm font-bold text-on-surface">조치 현황 갱신</h4>
+
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="조치 상태">
+          {STATUS_OPTIONS.map((s) => {
+            const on = status === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setStatus(s)}
+                className={`h-11 rounded-sm border text-sm font-bold transition-colors ${
+                  on
+                    ? "bg-primary text-on-primary border-primary"
+                    : "bg-surface-container-low text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
+                }`}
+              >
+                {s}
+              </button>
+            );
+          })}
         </div>
 
-        <p className="text-sm text-on-surface whitespace-pre-wrap break-keep">{row.content}</p>
-        <p className="text-xs text-on-surface-variant">
-          {[row.branch, row.department, `작성 ${row.reporter}`, formatDateTime(row.created_at)]
-            .filter(Boolean)
-            .join(" · ")}
-          {row.status_updated_at && ` · 상태 변경 ${formatDateTime(row.status_updated_at)}`}
-        </p>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-bold text-on-surface-variant">조치 내용</span>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            placeholder="어떤 조치를 했는지, 또는 앞으로 할 계획을 적어 주세요."
+            className="input"
+          />
+        </label>
 
-        <IssuePhotos issueId={row.id} />
-
-        <div className="border-t border-border-subtle pt-4 flex flex-col gap-4">
-          <h4 className="text-sm font-bold text-on-surface">조치 현황 갱신</h4>
-
-          <div className="grid grid-cols-2 gap-2" role="group" aria-label="조치 상태">
-            {STATUS_OPTIONS.map((s) => {
-              const on = status === s;
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setStatus(s)}
-                  className={`h-11 rounded-sm border text-sm font-bold transition-colors ${
-                    on
-                      ? "bg-primary text-on-primary border-primary"
-                      : "bg-surface-container-low text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
-                  }`}
-                >
-                  {s}
-                </button>
-              );
-            })}
-          </div>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">조치 내용</span>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              placeholder="어떤 조치를 했는지, 또는 앞으로 할 계획을 적어 주세요."
+            <span className="text-xs font-bold text-on-surface-variant">
+              조치 예정일{status === "추후 조치 예정" ? " (추후 조치 예정일 때 입력)" : ""}
+            </span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-on-surface-variant">조치자</span>
+            <input
+              value={by}
+              onChange={(e) => setBy(e.target.value)}
+              placeholder="이름을 입력하세요."
               className="input"
             />
           </label>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-on-surface-variant">
-                조치 예정일{status === "추후 조치 예정" ? " (추후 조치 예정일 때 입력)" : ""}
-              </span>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-on-surface-variant">조치자</span>
-              <input
-                value={by}
-                onChange={(e) => setBy(e.target.value)}
-                placeholder="이름을 입력하세요."
-                className="input"
-              />
-            </label>
-          </div>
-        </div>
-
-        {error && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error text-sm">
-            <Icon name="error" className="text-base" />
-            {error}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <FaultReportLink row={row} />
-          <Button variant="ghost" onClick={onClose} disabled={saving}>
-            취소
-          </Button>
-          <Button variant="primary" onClick={() => void save()} disabled={saving}>
-            {saving ? "저장 중…" : "저장"}
-          </Button>
         </div>
       </div>
-    </div>,
-    document.body,
+
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
+          <Icon name="error" className="text-base" />
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <FaultReportLink row={row} />
+        <Button variant="ghost" onClick={onClose} disabled={saving}>
+          취소
+        </Button>
+        <Button variant="primary" onClick={() => void save()} disabled={saving}>
+          {saving ? "저장 중…" : "저장"}
+        </Button>
+      </div>
+    </Dialog>
   );
 }

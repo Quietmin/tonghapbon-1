@@ -172,7 +172,7 @@ export default function TaskEditor({
           {task ? "작업항목 수정" : "작업항목 추가"}
         </h2>
         {task?.needs_review && (
-          <span className="text-xs font-bold text-status-warning flex items-center gap-1">
+          <span className="text-xs font-bold text-status-warning-text flex items-center gap-1">
             <Icon name="warning" className="text-sm" />
             확인이 필요한 항목입니다 — 저장하면 표시가 사라집니다
           </span>

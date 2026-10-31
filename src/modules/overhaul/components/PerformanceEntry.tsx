@@ -264,7 +264,7 @@ function HistoryTimeline({
                         </span>
                       )}
                       {delayed && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] md:text-[12px] font-bold bg-status-error/10 text-status-error">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] md:text-[12px] font-bold bg-status-error/10 text-status-error-text">
                           지연
                         </span>
                       )}
@@ -683,7 +683,7 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
               </span>
             )}
             {!saveError && saved && (
-              <span className="text-status-success flex items-center gap-1.5">
+              <span className="text-status-success-text flex items-center gap-1.5">
                 <Icon name="check_circle" className="text-base" fill /> {form.date} 실적이 저장되었습니다.
               </span>
             )}

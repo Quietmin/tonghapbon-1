@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import Dialog from "@/shared/components/Dialog";
 import { Button, Card, EmptyState, Icon, RequiredMark, ScreenHeader, type Accent } from "@/shared/components/ui";
 import {
   MAX_PHOTOS,
@@ -1131,7 +1132,7 @@ export default function DocEditor({
             </div>
 
             {error && (
-              <p className="mt-3 text-sm font-bold text-status-error flex items-center gap-1.5">
+              <p className="mt-3 text-sm font-bold text-status-error-text flex items-center gap-1.5">
                 <Icon name="error" className="text-base" />
                 {error}
               </p>
@@ -1206,7 +1207,7 @@ export default function DocEditor({
                           type="button"
                           onClick={() => remove(item.id)}
                           title="삭제"
-                          className="w-7 h-7 rounded-lg hover:bg-status-error/10 flex items-center justify-center text-status-error"
+                          className="w-7 h-7 rounded-lg hover:bg-status-error/10 flex items-center justify-center text-status-error-text"
                         >
                           <Icon name="delete" className="text-base" />
                         </button>
@@ -1301,7 +1302,7 @@ export default function DocEditor({
             </div>
 
             {notice && (
-              <p className="text-sm font-bold text-status-success flex items-center gap-1.5">
+              <p className="text-sm font-bold text-status-success-text flex items-center gap-1.5">
                 <Icon name="check_circle" className="text-base" />
                 {notice}
               </p>
@@ -1438,55 +1439,44 @@ export default function DocEditor({
 
       {/* [PDF 출력]·[메일로 전송]을 누르면 바로 내보내지 않고 저장 방법을 먼저 묻는다 */}
       {savePrompt && (
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60"
-          role="dialog"
-          aria-modal="true"
-          aria-label="저장 방법 선택"
-          onClick={() => setSavePrompt(null)}
-        >
-          <div
-            className="w-full max-w-sm bg-surface-container-lowest rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div>
-              <p className="text-title-sm text-on-surface">
-                {savePrompt.kind === "mail" ? "메일로 보내기 전에" : "어떻게 저장할까요?"}
-              </p>
-              <p className="text-sm text-on-surface-variant mt-1">
-                {savePrompt.kind === "mail"
-                  ? "장치에 내려받고 Gmail 작성 화면을 엽니다. 보관함에도 함께 저장할까요?"
-                  : "보관함에 저장하거나, 저장 없이 장치에만 내려받을 수 있습니다."}
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="ghost"
-                className="w-full !flex-col !items-start !gap-0.5 !py-3"
-                onClick={() => confirmSavePrompt(false)}
-              >
-                <span className="text-sm font-bold">보관함 저장 안함</span>
-                <span className="text-xs font-normal text-on-surface-variant">
-                  {savePrompt.kind === "mail" ? "장치에 다운로드 + 메일로 이동" : "장치에만 다운로드"}
-                </span>
-              </Button>
-              <Button
-                className="w-full !flex-col !items-start !gap-0.5 !py-3"
-                onClick={() => confirmSavePrompt(true)}
-                disabled={!archiveEnabled}
-              >
-                <span className="text-sm font-bold">보관함 저장</span>
-                <span className="text-xs font-normal opacity-80">
-                  {!archiveEnabled
-                    ? "보관함이 설정되지 않았습니다"
-                    : savePrompt.kind === "mail"
-                      ? "보관함 저장 + 다운로드 + 메일로 이동"
-                      : "보관함에만 저장 (다운로드 안 함)"}
-                </span>
-              </Button>
-            </div>
+        <Dialog onClose={() => setSavePrompt(null)} label="저장 방법 선택" size="sm">
+          <div>
+            <p className="text-title-sm text-on-surface">
+              {savePrompt.kind === "mail" ? "메일로 보내기 전에" : "어떻게 저장할까요?"}
+            </p>
+            <p className="text-sm text-on-surface-variant mt-1">
+              {savePrompt.kind === "mail"
+                ? "장치에 내려받고 Gmail 작성 화면을 엽니다. 보관함에도 함께 저장할까요?"
+                : "보관함에 저장하거나, 저장 없이 장치에만 내려받을 수 있습니다."}
+            </p>
           </div>
-        </div>
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="ghost"
+              className="w-full !flex-col !items-start !gap-0.5 !py-3"
+              onClick={() => confirmSavePrompt(false)}
+            >
+              <span className="text-sm font-bold">보관함 저장 안함</span>
+              <span className="text-xs font-normal text-on-surface-variant">
+                {savePrompt.kind === "mail" ? "장치에 다운로드 + 메일로 이동" : "장치에만 다운로드"}
+              </span>
+            </Button>
+            <Button
+              className="w-full !flex-col !items-start !gap-0.5 !py-3"
+              onClick={() => confirmSavePrompt(true)}
+              disabled={!archiveEnabled}
+            >
+              <span className="text-sm font-bold">보관함 저장</span>
+              <span className="text-xs font-normal opacity-80">
+                {!archiveEnabled
+                  ? "보관함이 설정되지 않았습니다"
+                  : savePrompt.kind === "mail"
+                    ? "보관함 저장 + 다운로드 + 메일로 이동"
+                    : "보관함에만 저장 (다운로드 안 함)"}
+              </span>
+            </Button>
+          </div>
+        </Dialog>
       )}
     </>
   );

@@ -1,3 +1,4 @@
+import { ScreenHeader } from "@/shared/components/ui";
 import Link from "next/link";
 import MaintenanceMatrix from "@/modules/overhaul/components/MaintenanceMatrix";
 import PlanTabs from "@/modules/overhaul/components/PlanTabs";
@@ -14,17 +15,22 @@ export default function OverhaulMatrixPage() {
   return (
     <>
       <PlanTabs />
-      <div>
-        <h1 className="text-display-lg text-on-surface pt-2">설비별 전체 현황</h1>
-        <p className="text-body-md text-on-surface-variant mt-2">
-          설비별로 어느 해에 무엇을 보수했는지 한 장으로 봅니다. 과거는 자료가 있는 첫 해부터
-          전부, 앞으로는 점검주기로 계산한 예정 연도까지 보여줍니다. 표의 근거가 되는 설비 목록은{" "}
-          <Link href="/overhaul/plan" className="text-primary font-semibold hover:underline">
-            중장기보수계획
-          </Link>
-          에서 관리계획 엑셀을 등록하면 채워집니다.
-        </p>
-      </div>
+      <ScreenHeader
+        icon="grid_on"
+        title="설비별 전체 현황"
+        bullets={[]}
+        tone="soft"
+        desc={
+          <>
+            설비별로 어느 해에 무엇을 보수했는지 한 장으로 봅니다. 과거는 자료가 있는 첫 해부터 전부, 앞으로는
+            점검주기로 계산한 예정 연도까지 보여줍니다. 표의 근거가 되는 설비 목록은{" "}
+            <Link href="/overhaul/plan" className="text-primary font-semibold hover:underline">
+              중장기보수계획
+            </Link>
+            에서 관리계획 엑셀을 등록하면 채워집니다.
+          </>
+        }
+      />
       <MaintenanceMatrix />
     </>
   );

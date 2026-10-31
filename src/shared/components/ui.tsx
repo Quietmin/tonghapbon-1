@@ -43,41 +43,60 @@ export function Card({
   );
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  완료: "bg-status-success/10 text-status-success",
-  진행중: "bg-status-warning/10 text-status-warning",
-  대기: "bg-surface-container-highest text-on-surface-variant",
-  지연: "bg-status-error/10 text-status-error",
-  조치중: "bg-status-warning/10 text-status-warning",
-  조치완료: "bg-status-success/10 text-status-success",
+/**
+ * 상태 칩 — 앱 전체에서 상태를 보이는 유일한 부품. 작업 진행 상태(완료·진행중·대기·지연)와 현황 조치
+ * 상태(미완료·조치중·추후 조치 예정·조치완료)를 한 표로 묶어, 같은 뜻이면 어디서나 같은 색·모양이다.
+ * 글자색은 짙은 *-text 색(흰 바탕·옅은 칩 위에서 4.5:1 이상), 점은 밝은 색이다.
+ */
+type StatusTone = "success" | "warning" | "error" | "info" | "neutral";
+
+const TONE_STYLE: Record<StatusTone, { chip: string; dot: string }> = {
+  success: { chip: "bg-status-success/15 text-status-success-text", dot: "bg-status-success" },
+  warning: { chip: "bg-status-warning/15 text-status-warning-text", dot: "bg-status-warning" },
+  error: { chip: "bg-status-error/10 text-status-error-text", dot: "bg-status-error" },
+  info: { chip: "bg-status-info/10 text-status-info-text", dot: "bg-status-info" },
+  neutral: { chip: "bg-surface-container-highest text-on-surface-variant", dot: "bg-outline" },
 };
 
-export function StatusChip({ status }: { status: string }) {
-  const dot =
-    status === "진행중" || status === "조치중"
-      ? "bg-status-warning"
-      : status === "지연"
-        ? "bg-status-error"
-        : status === "완료" || status === "조치완료"
-          ? "bg-status-success"
-          : null;
+const STATUS_TONE: Record<string, StatusTone> = {
+  완료: "success",
+  조치완료: "success",
+  진행중: "warning",
+  조치중: "warning",
+  지연: "error",
+  미완료: "error",
+  "추후 조치 예정": "info",
+  대기: "neutral",
+};
+
+export function StatusChip({
+  status,
+  label,
+  title,
+}: {
+  /** 상태 이름 — 색을 정한다 */
+  status: string;
+  /** 칩에 다른 글자를 보이고 싶을 때(예: status="지연" label="지연 3일"). 색은 status 를 따른다 */
+  label?: string;
+  title?: string;
+}) {
+  const tone = TONE_STYLE[STATUS_TONE[status] ?? "neutral"];
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${
-        STATUS_STYLE[status] || STATUS_STYLE["대기"]
-      }`}
+      title={title}
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${tone.chip}`}
     >
-      {dot && <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />}
-      {status}
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tone.dot}`} />
+      {label ?? status}
     </span>
   );
 }
 
 const FIELD_STYLE: Record<string, string> = {
   기계: "bg-primary/10 text-primary",
-  전기: "bg-status-success/10 text-status-success",
-  제어: "bg-status-info/10 text-status-info",
-  전산: "bg-status-info/10 text-status-info",
+  전기: "bg-status-success/10 text-status-success-text",
+  제어: "bg-status-info/10 text-status-info-text",
+  전산: "bg-status-info/10 text-status-info-text",
   인적실수: "bg-tertiary/10 text-tertiary",
   기타: "bg-surface-container-highest text-on-surface-variant",
   미분류: "bg-surface-container-highest text-on-surface-variant",
@@ -183,10 +202,10 @@ export function Avatar({
   const initials = name ? (name.length <= 2 ? name : name.slice(0, 2)) : "--";
   const bg = name
     ? "bg-primary-fixed text-on-primary-fixed-variant"
-    : "bg-outline-variant text-on-surface-variant";
+    : "bg-surface-container-highest text-on-surface-variant";
   return (
     <div
-      className={`${size} rounded-full flex items-center justify-center text-[10px] md:text-[12px] font-bold shrink-0 ${bg} ${className}`}
+      className={`${size} rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${bg} ${className}`}
     >
       {initials}
     </div>
@@ -295,16 +314,20 @@ export function ScreenHeader({
   accent = "primary",
   tone = "solid",
   action,
+  actionOnMobile = false,
 }: {
   icon: string;
   title: string;
-  desc: string;
+  /** 제목 아래 설명. 링크 등을 넣을 수 있다 */
+  desc: ReactNode;
   bullets?: string[];
   accent?: Accent;
   /** solid = 작성, soft = 조회 */
   tone?: "solid" | "soft";
   /** 오른쪽에 서는 버튼. 좁은 폭에서는 아래로 내려가 가로폭을 다 쓴다 */
   action?: ReactNode;
+  /** 폰에서도 action 을 제목 아래에 보일지 — 폰에서 꼭 필요한 버튼(작업 추가 등)이 있는 화면만 true */
+  actionOnMobile?: boolean;
 }) {
   return (
     <section className="pt-2 flex flex-col gap-4">
@@ -316,12 +339,13 @@ export function ScreenHeader({
           <ul className="mt-2 inline-block text-left">
             {bullets.map((b) => (
               <li key={b} className="flex gap-1.5 text-sm text-on-surface-variant py-0.5">
-                <span className="text-on-surface-variant/50">·</span>
+                <span aria-hidden="true" className="text-on-surface-variant/50">·</span>
                 <span>{b}</span>
               </li>
             ))}
           </ul>
         )}
+        {actionOnMobile && action && <div className="mt-3 flex flex-wrap justify-center gap-2">{action}</div>}
       </div>
 
       {/* 데스크톱 */}

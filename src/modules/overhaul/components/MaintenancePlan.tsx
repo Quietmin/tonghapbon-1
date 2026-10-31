@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, Icon, Button, EmptyState } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState, ScreenHeader } from "@/shared/components/ui";
 import { exportDesignStatement } from "../lib/statementExporter";
 import StatementArchive from "./StatementArchive";
 
@@ -96,8 +96,8 @@ interface SavedStatementItem {
 type Tab = "필수" | "선택" | "불필요" | "참고";
 
 const CLASS_STYLE: Record<string, string> = {
-  필수: "bg-status-error/10 text-status-error",
-  선택: "bg-status-warning/10 text-status-warning",
+  필수: "bg-status-error/10 text-status-error-text",
+  선택: "bg-status-warning/10 text-status-warning-text",
   불필요: "bg-surface-container-highest text-on-surface-variant",
 };
 
@@ -338,13 +338,13 @@ export default function MaintenancePlan() {
 
   return (
     <>
-      <div>
-        <h1 className="text-display-lg text-on-surface pt-2">오버홀 수량산출</h1>
-        <p className="text-body-md text-on-surface-variant mt-2">
-          설비별 중장기 유지보수 관리계획을 한 번 등록하면, 연도만 고르면 그 해에 보수할 대상을
-          시스템이 점검주기로 판정합니다. 확정한 목록은 수량산출서 엑셀로 뽑아 시공사에 전달합니다.
-        </p>
-      </div>
+      <ScreenHeader
+        icon="event_note"
+        title="오버홀 수량산출"
+        desc="설비별 중장기 유지보수 관리계획을 한 번 등록하면, 연도만 고르면 그 해에 보수할 대상을 시스템이 점검주기로 판정합니다. 확정한 목록은 수량산출서 엑셀로 뽑아 시공사에 전달합니다."
+        bullets={[]}
+        tone="soft"
+      />
 
       {/* 계획 등록 */}
       <Card className="p-card-padding" lift={false}>
@@ -372,7 +372,7 @@ export default function MaintenancePlan() {
                     field === f
                       ? "bg-primary text-on-primary"
                       : empty
-                        ? "bg-surface-container-high text-on-surface-variant/40"
+                        ? "bg-surface-container text-on-surface-variant border border-dashed border-outline-variant"
                         : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
                   }`}
                 >
@@ -556,7 +556,7 @@ export default function MaintenancePlan() {
                         c === "필수"
                           ? "text-error"
                           : c === "선택"
-                            ? "text-status-warning"
+                            ? "text-status-warning-text"
                             : "text-on-surface-variant"
                       }`}
                     >
@@ -575,7 +575,7 @@ export default function MaintenancePlan() {
 
             {(s?.needsDecisionCount ?? 0) > 0 && (
               <div className="mt-4 p-3 rounded-xl bg-status-warning/10 flex items-start gap-2">
-                <Icon name="help" className="text-status-warning text-base mt-0.5" />
+                <Icon name="help" className="text-status-warning-text text-base mt-0.5" />
                 <p className="text-sm text-on-surface">
                   <b>사용자 판단이 필요한 항목 {s!.needsDecisionCount}건</b>이 있습니다. 점검주기가
                   조건에 따라 다르거나("실내 3년 / 실외 2년"), 직전 보수 이력이 없어 시스템이 도래
@@ -688,7 +688,7 @@ export default function MaintenancePlan() {
                               {r.judge.classification}
                             </span>
                             {r.judge.needsDecision && (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/15 text-status-warning flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/15 text-status-warning-text flex items-center gap-1">
                                 <Icon name="help" className="text-[12px] md:text-[13px]" />
                                 판단 필요
                               </span>
@@ -885,7 +885,7 @@ export default function MaintenancePlan() {
             </div>
 
             {confirmed && (
-              <p className="text-sm text-status-success font-bold flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border-subtle">
+              <p className="text-sm text-status-success-text font-bold flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border-subtle">
                 <Icon name="check_circle" className="text-base" />
                 {confirmed.year}년도 수량산출서 {confirmed.count}건을 확정하고 엑셀로
                 내보냈습니다.
