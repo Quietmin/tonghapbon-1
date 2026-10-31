@@ -19,11 +19,11 @@ export default function ModuleStub({
       <h1 className="text-display-lg text-on-surface pt-2">{title}</h1>
       <Card className="p-card-padding" lift={false}>
         <div className="flex items-start gap-3">
-          <Icon name="construction" className="text-status-warning-text text-2xl" />
-          <div>
+          <Icon name="construction" className="text-status-warning-text text-2xl shrink-0" />
+          <div className="min-w-0">
             <p className="text-title-sm text-on-surface">포팅 예정 화면</p>
             <p className="text-sm text-on-surface-variant mt-1">
-              이식 원본: <code className="font-mono-data">{from}</code>
+              이식 원본: <code className="font-mono-data break-all">{from}</code>
             </p>
             {note && <p className="text-sm text-on-surface-variant mt-2">{note}</p>}
           </div>

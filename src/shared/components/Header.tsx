@@ -70,7 +70,7 @@ export default function Header() {
         </Link>
         {group && (
           <>
-            <span className="hidden sm:inline text-outline-variant">/</span>
+            <span aria-hidden="true" className="hidden sm:inline text-outline-variant">/</span>
             <span className="hidden sm:flex items-center gap-1.5 text-sm font-bold text-on-surface-variant whitespace-nowrap">
               <Icon name={group.icon} className="text-base" />
               {group.label}
