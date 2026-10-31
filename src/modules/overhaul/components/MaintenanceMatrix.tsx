@@ -488,8 +488,8 @@ export default function MaintenanceMatrix() {
         </p>
       </Card>
 
-      {/* 필터 */}
-      <div className="flex flex-col lg:flex-row gap-3">
+      {/* 필터 — 컨트롤이 많아 한 줄에 다 못 담는 폭(1024~1440px)에서는 줄을 바꿔 쌓는다(잘려서 못 누르는 일 방지) */}
+      <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center gap-3">
         <div className="flex gap-1 p-1 bg-surface-container-high rounded-xl w-full lg:w-fit">
           {["전체", ...fields].map((f) => (
             <button
@@ -505,7 +505,7 @@ export default function MaintenanceMatrix() {
             </button>
           ))}
         </div>
-        <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 border border-transparent focus-within:border-primary transition-colors">
+        <div className="flex-1 lg:min-w-[240px] flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 border border-transparent focus-within:border-primary transition-colors">
           <Icon name="search" className="text-on-surface-variant text-base" />
           <input
             value={q}

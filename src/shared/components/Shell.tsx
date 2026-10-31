@@ -31,7 +31,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         // 아래 여백(pb-24)은 폰 하단탭(h-16=64px)을 피하려고 둔 것 — 하단탭이
         // 이제 안전영역만큼 더 커질 수 있어(MobileNav 참고) 그만큼을 같이 더한다.
         // 그러지 않으면 안전영역이 있는 기기에서 본문 맨 아래 한 줄이 탭에 가려진다.
-        className={`flex-1 w-full min-h-screen flex flex-col pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-12 transition-[margin-left] duration-200 ease-out ${
+        // min-w-0: flex 항목은 기본적으로 안쪽 내용의 최소 너비(표 등) 아래로 줄어들지 못한다. 그러면 본문이
+        // 사이드바 옆 공간보다 넓어져 헤더 오른쪽(지사·부서 칩, 홈 버튼, 배너)이 화면 밖으로 잘렸다(768~1280px).
+        // 0 으로 풀어 두면 넓은 표는 자기 가로 스크롤 영역(overflow-x-auto) 안에서만 밀린다.
+        className={`flex-1 w-full min-w-0 min-h-screen flex flex-col pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-12 transition-[margin-left] duration-200 ease-out ${
           sidebar.open ? "md:ml-[280px]" : "md:ml-0"
         }`}
       >
