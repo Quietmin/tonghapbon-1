@@ -88,6 +88,44 @@ const END_GUTTER = 44;
 /** 눈금 한 칸이 차지하는 최소 폭(px) — 날짜 글자("10-01")가 서로 겹치지 않을 만큼 */
 const TICK_MIN_PX = 64;
 
+/**
+ * 현황 칸의 칩 — 완료(초록)·지연(빨강)·진행중(주황)·대기(회색). 예전에는 완료·지연 칩이 작업명 옆에 섞여
+ * 있어 읽기 애매해서, 이름 칸 옆에 "현황" 칸을 따로 두고 여기에만 모은다.
+ */
+function StatusPill({
+  kind,
+  children,
+  title,
+}: {
+  kind: "done" | "late" | "doing" | "wait";
+  children: React.ReactNode;
+  title?: string;
+}) {
+  const style = {
+    done: "bg-status-success/15 text-status-success",
+    late: "bg-status-error/15 text-status-error",
+    doing: "bg-status-warning/15 text-status-warning",
+    wait: "bg-surface-container-highest text-on-surface-variant",
+  }[kind];
+  const icon = kind === "done" ? "check" : kind === "late" ? "warning" : null;
+  return (
+    <span
+      title={title}
+      className={`px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold whitespace-nowrap inline-flex items-center gap-0.5 ${style}`}
+    >
+      {icon && <Icon name={icon} className="text-[11px] md:text-[12px]" />}
+      {children}
+    </span>
+  );
+}
+
+/** 설비 묶음을 늘어놓는 분야 순서 — 기계 → 전기 → 제어. 그 밖의 분야·미분류는 맨 뒤 */
+const FIELD_ORDER = ["기계", "전기", "제어"];
+const fieldRank = (f: string | null) => {
+  const i = FIELD_ORDER.indexOf(f ?? "");
+  return i === -1 ? FIELD_ORDER.length : i;
+};
+
 /** 기간 눈금 생성 — count 개 안팎(타임라인 폭에 맞춰 호출하는 쪽이 정한다) */
 function makeTicks(total: number, count: number) {
   const step = Math.max(1, Math.ceil(total / Math.max(2, count)));
@@ -229,7 +267,8 @@ export default function Schedule() {
           behind: list.some((r) => r.behind),
         };
       })
-      .sort((a, b) => a.minOff - b.minOff);
+      // 분야 순서(기계 → 전기 → 제어)가 먼저, 같은 분야 안에서는 시작이 빠른 설비부터
+      .sort((a, b) => fieldRank(a.field) - fieldRank(b.field) || a.minOff - b.minOff);
   }, [rows]);
 
   const pos = (off: number) => `${(off / total) * 100}%`;
@@ -443,11 +482,14 @@ export default function Schedule() {
             <div className="overflow-x-auto">
               {/* PC(md 이상)는 칸 폭에 딱 맞춰 전체 일자가 한 화면에 들어오고, 폰은 최소 폭을 두고 옆으로 민다.
                   이름 칸 폭은 --lbl 한 곳에서 정한다(헤더·설비 행·작업 행·오늘 선이 같이 쓴다). */}
-              <div className="min-w-[760px] md:min-w-0 [--lbl:196px] xl:[--lbl:220px]">
+              <div className="min-w-[760px] md:min-w-0 [--lbl:196px] xl:[--lbl:220px] [--st:84px]">
                 {/* 타임라인 헤더 */}
                 <div className="flex items-stretch border-b border-border-subtle pb-2 mb-2">
                   <div className="w-[var(--lbl)] shrink-0 text-[12px] md:text-[13px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end justify-center text-center">
                     설비 / 작업
+                  </div>
+                  <div className="w-[var(--st)] shrink-0 text-[12px] md:text-[13px] font-semibold uppercase tracking-widest text-on-surface-variant flex items-end justify-center text-center">
+                    현황
                   </div>
                   <div ref={timelineRef} className="relative flex-1 h-8" style={{ marginRight: END_GUTTER }}>
                     {ticks.map((d) => (
@@ -470,7 +512,7 @@ export default function Schedule() {
                   {/* 오늘 기준선 */}
                   <div
                     className="absolute top-0 bottom-0 w-px bg-status-error/70 z-10 pointer-events-none"
-                    style={{ left: `calc(var(--lbl) + (100% - var(--lbl) - ${END_GUTTER}px) * ${todayOff / total})` }}
+                    style={{ left: `calc(var(--lbl) + var(--st) + (100% - var(--lbl) - var(--st) - ${END_GUTTER}px) * ${todayOff / total})` }}
                   >
                     <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] md:text-[12px] font-bold text-status-error bg-surface px-1 rounded">
                       오늘
@@ -486,16 +528,27 @@ export default function Schedule() {
                           className="flex items-center py-2 cursor-pointer hover:bg-surface-container-low rounded-lg transition-colors"
                           onClick={() => setCollapsed((c) => ({ ...c, [g.equip]: isOpen }))}
                         >
-                          <div className="w-[var(--lbl)] shrink-0 pr-3 flex items-center justify-center gap-1.5">
+                          {/* 펼침 화살표는 칸 왼쪽 가장자리에 고정 — 설비 이름 길이와 상관없이 모든 설비 줄의
+                              화살표가 한 세로줄로 늘어선다. 이름·칩은 그 오른쪽에서 가운데로 모은다 */}
+                          <div className="relative w-[var(--lbl)] shrink-0 pl-7 pr-3 flex items-center justify-center gap-1.5">
                             <Icon
                               name={isOpen ? "expand_more" : "chevron_right"}
-                              className="text-base text-on-surface-variant"
+                              className="absolute left-1.5 top-1/2 -translate-y-1/2 text-base text-on-surface-variant"
                             />
                             <FieldChip field={g.field ?? "미분류"} />
                             <span className="font-mono-data text-sm font-bold text-on-surface truncate">
                               {g.equip}
                             </span>
                             <span className="text-xs text-on-surface-variant">({g.list.length})</span>
+                          </div>
+                          <div className="w-[var(--st)] shrink-0 flex items-center justify-center">
+                            {g.list.every((r) => r.actual >= 100) ? (
+                              <StatusPill kind="done">완료</StatusPill>
+                            ) : g.list.some((r) => r.behind && r.actual < 100) ? (
+                              <StatusPill kind="late" title="이 설비에서 계획보다 뒤처진 작업 수">
+                                지연 {g.list.filter((r) => r.behind && r.actual < 100).length}건
+                              </StatusPill>
+                            ) : null}
                           </div>
                           <div className="relative flex-1 h-6" style={{ marginRight: END_GUTTER }}>
                             <div
@@ -544,23 +597,6 @@ export default function Schedule() {
                                     <p className="text-xs font-medium text-on-surface truncate min-w-0 max-xl:basis-full group-hover:text-primary transition-colors">
                                       {r.name}
                                     </p>
-                                    {r.actual >= 100 ? (
-                                      <span className="px-1.5 py-0.5 rounded-full text-[9px] md:text-[12px] font-bold bg-status-success/15 text-status-success shrink-0 flex items-center gap-0.5">
-                                        <Icon name="check" className="text-[10px] md:text-[12px]" /> 완료
-                                      </span>
-                                    ) : r.behind ? (
-                                      <span
-                                        title={
-                                          overdueDays > 0
-                                            ? `계획 종료일(${r.sch.plannedEndStr})에서 ${overdueDays}일 지났습니다`
-                                            : "오늘까지 나갔어야 할 계획 진도보다 뒤처졌습니다"
-                                        }
-                                        className="px-1.5 py-0.5 rounded-full text-[9px] md:text-[12px] font-bold bg-status-error/15 text-status-error shrink-0 flex items-center gap-0.5"
-                                      >
-                                        <Icon name="warning" className="text-[10px] md:text-[12px]" />
-                                        {overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
-                                      </span>
-                                    ) : null}
                                     <button
                                       title="계획일정 조정"
                                       onClick={(e) => {
@@ -595,6 +631,26 @@ export default function Schedule() {
                                         ? `실적 ${r.actual}% · 일자 미입력`
                                         : "실적 미입력"}
                                   </p>
+                                </div>
+                                <div className="w-[var(--st)] shrink-0 flex items-center justify-center">
+                                  {r.actual >= 100 ? (
+                                    <StatusPill kind="done">완료</StatusPill>
+                                  ) : r.behind ? (
+                                    <StatusPill
+                                      kind="late"
+                                      title={
+                                        overdueDays > 0
+                                          ? `계획 종료일(${r.sch.plannedEndStr})에서 ${overdueDays}일 지났습니다`
+                                          : "오늘까지 나갔어야 할 계획 진도보다 뒤처졌습니다"
+                                      }
+                                    >
+                                      {overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
+                                    </StatusPill>
+                                  ) : r.actual > 0 ? (
+                                    <StatusPill kind="doing">진행중</StatusPill>
+                                  ) : (
+                                    <StatusPill kind="wait">대기</StatusPill>
+                                  )}
                                 </div>
                                 <div className="relative flex-1 h-11" style={{ marginRight: END_GUTTER }}>
                                   {/* 계획 (윗줄) */}
