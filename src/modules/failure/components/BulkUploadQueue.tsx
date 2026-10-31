@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Dialog, { DialogHeader } from "@/shared/components/Dialog";
-import { Card, Button, Icon } from "@/shared/components/ui";
+import { Card, Button, Icon, EmptyState } from "@/shared/components/ui";
 import FailureHistoryForm from "./FailureHistoryForm";
 import type { AttachmentInput, FailureHistoryInput } from "@/modules/failure/lib/repo";
 
@@ -166,7 +166,7 @@ export default function BulkUploadQueue() {
       </Card>
 
       {items.length === 0 ? (
-        <p className="text-sm text-on-surface-variant text-center py-8">아직 올린 파일이 없습니다.</p>
+        <EmptyState compact icon="upload_file" title="아직 올린 파일이 없습니다." />
       ) : (
         <div className="flex flex-col gap-3">
           {items.map((item) => (

@@ -105,11 +105,13 @@ export function PhotoPicker({
               type="button"
               onClick={() => onChange(photos.filter((x) => x.key !== p.key))}
               aria-label="이 사진 빼기"
-              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-error transition-colors"
+              className="group/x absolute top-0 right-0 w-10 h-10 flex items-start justify-end p-1"
             >
-              <Icon name="close" className="text-sm" />
+              <span className="w-6 h-6 rounded-full bg-black/55 text-white flex items-center justify-center group-hover/x:bg-error transition-colors">
+                <Icon name="close" className="text-sm" />
+              </span>
             </button>
-            <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-[10px] text-center py-0.5">
+            <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-xs text-center py-0.5">
               {p.note}
             </span>
           </div>
@@ -123,7 +125,7 @@ export function PhotoPicker({
             className="aspect-[4/3] rounded-lg border-2 border-dashed border-outline-variant bg-surface-container-low hover:border-primary hover:bg-primary/5 transition-colors flex flex-col items-center justify-center gap-0.5 disabled:opacity-60"
           >
             <Icon name={working ? "hourglass_top" : "add_a_photo"} className="text-xl text-on-surface-variant" />
-            <span className="text-[11px] font-semibold text-on-surface-variant px-1 text-center leading-tight">
+            <span className="text-xs font-semibold text-on-surface-variant px-1 text-center leading-tight">
               {working ?? "사진 추가"}
             </span>
           </button>

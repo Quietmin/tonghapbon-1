@@ -81,7 +81,7 @@ function Labeled({ label, hint, children }: { label: string; hint?: string; chil
     <label className="flex flex-col gap-1">
       <span className="text-label-caps uppercase text-on-surface-variant">{label}</span>
       {children}
-      {hint && <span className="text-[11px] md:text-[12px] text-on-surface-variant">{hint}</span>}
+      {hint && <span className="text-xs text-on-surface-variant">{hint}</span>}
     </label>
   );
 }

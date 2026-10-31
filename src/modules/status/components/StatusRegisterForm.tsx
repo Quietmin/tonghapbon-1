@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button, Card, Icon, RequiredMark } from "@/shared/components/ui";
+import { Button, Card, Icon, RequiredMark, InlineError } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
 import { DEPARTMENTS } from "../lib/constants";
 import { PhotoPicker, type PickedPhoto } from "./StatusPhotos";
@@ -246,10 +246,7 @@ export default function StatusRegisterForm({
       </Card>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
-          <Icon name="error" className="text-base" />
-          {error}
-        </div>
+        <InlineError>{error}</InlineError>
       )}
 
       <div className="flex justify-end pb-6">

@@ -26,7 +26,7 @@ export default function Header() {
           aria-label={sidebar.open ? "메뉴 숨기기" : "메뉴 보기"}
           aria-expanded={sidebar.open}
           title={sidebar.open ? "메뉴 숨기기" : "메뉴 보기"}
-          className="hidden md:flex w-9 h-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+          className="hidden md:flex w-10 h-10 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
         >
           <Icon name={sidebar.open ? "menu_open" : "menu"} />
         </button>
@@ -45,7 +45,7 @@ export default function Header() {
           href="/"
           aria-label="처음 화면으로"
           title="처음 화면으로"
-          className="flex items-center gap-3 sm:gap-4 min-w-0"
+          className="flex items-center gap-3 sm:gap-4 min-w-0 min-h-10"
         >
         {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
         <img
@@ -91,7 +91,7 @@ export default function Header() {
           <Link
             href="/"
             // 폰 전용 — PC 는 위의 PIMS 아이콘·제목 링크가 같은 일을 한다
-            className="md:hidden h-9 px-3 flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors"
+            className="md:hidden h-10 px-3 flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors"
           >
             <Icon name="home" className="text-base" />
             <span className="hidden sm:inline">처음 화면</span>

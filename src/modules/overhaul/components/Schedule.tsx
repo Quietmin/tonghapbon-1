@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Card, Icon, Button, FieldChip, EmptyState, StatusChip, ScreenHeader } from "@/shared/components/ui";
+import { Card, Icon, Button, FieldChip, EmptyState, StatusChip, ScreenHeader, LoadingState } from "@/shared/components/ui";
 import { addDays, toDate, ymd } from "../lib/schedule";
 import EntryDialog from "./EntryDialog";
 import { useEntryHistoryHover } from "./EntryHistoryPreview";
@@ -243,7 +243,7 @@ export default function Schedule() {
   const pos = (off: number) => `${(off / total) * 100}%`;
 
   if (loading) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   if (!data || data.rows.length === 0) {
@@ -469,10 +469,10 @@ export default function Schedule() {
                         className="absolute top-0 bottom-0 flex flex-col items-center -translate-x-1/2"
                         style={{ left: pos(d) }}
                       >
-                        <span className="text-[10px] md:text-[12px] text-on-surface-variant whitespace-nowrap">
+                        <span className="text-xs text-on-surface-variant whitespace-nowrap">
                           {startDate ? ymd(addDays(toDate(startDate), d)).slice(5) : ""}
                         </span>
-                        <span className="text-[9px] md:text-[12px] text-on-surface-variant">D+{d}</span>
+                        <span className="text-xs text-on-surface-variant">D+{d}</span>
                       </div>
                     ))}
                   </div>
@@ -485,7 +485,7 @@ export default function Schedule() {
                     className="absolute top-0 bottom-0 w-px bg-status-error/70 z-10 pointer-events-none"
                     style={{ left: `calc(var(--lbl) + var(--st) + (100% - var(--lbl) - var(--st) - ${END_GUTTER}px) * ${todayOff / total})` }}
                   >
-                    <span className="absolute -top-0.5 -translate-x-1/2 text-[9px] md:text-[12px] font-bold text-status-error-text bg-surface px-1 rounded">
+                    <span className="absolute -top-0.5 -translate-x-1/2 text-xs font-bold text-status-error-text bg-surface px-1 rounded">
                       오늘
                     </span>
                   </div>
@@ -547,7 +547,7 @@ export default function Schedule() {
                               />
                             </div>
                             <span
-                              className="absolute top-1/2 -translate-y-1/2 text-[10px] md:text-[12px] font-bold text-on-surface-variant"
+                              className="absolute top-1/2 -translate-y-1/2 text-xs font-bold text-on-surface-variant"
                               style={{ left: `calc(${pos(g.maxOff)} + 6px)` }}
                             >
                               {g.progress}%
@@ -590,16 +590,16 @@ export default function Schedule() {
                                         e.stopPropagation();
                                         openEditor(r);
                                       }}
-                                      className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                                      className="shrink-0 w-10 h-10 -my-2 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
                                     >
                                       <Icon name="edit_calendar" className="text-sm" />
                                     </button>
                                   </div>
-                                  <p className="text-[10px] md:text-[12px] text-on-surface-variant font-mono-data flex items-center justify-center gap-1 whitespace-nowrap">
+                                  <p className="text-xs text-on-surface-variant font-mono-data flex items-center justify-center gap-1 whitespace-nowrap">
                                     계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}
                                     {r.sch.source === "excel" && (
                                       <span
-                                        className="text-[9px] md:text-[12px] font-bold text-primary not-italic"
+                                        className="text-xs font-bold text-primary not-italic"
                                         title="엑셀에서 받았거나 손으로 지정한 일정"
                                       >
                                         지정
@@ -607,7 +607,7 @@ export default function Schedule() {
                                     )}
                                   </p>
                                   <p
-                                    className={`text-[10px] md:text-[12px] font-mono-data whitespace-nowrap truncate ${
+                                    className={`text-xs font-mono-data whitespace-nowrap truncate ${
                                       r.actualBar ? BAR_STYLE[barColor].text : "text-on-surface-variant"
                                     }`}
                                   >
@@ -670,7 +670,7 @@ export default function Schedule() {
                                   )}
                                   {/* 진행률 라벨 */}
                                   <span
-                                    className={`absolute top-[13px] text-[10px] md:text-[12px] font-bold ${BAR_STYLE[barColor].text}`}
+                                    className={`absolute top-[13px] text-xs font-bold ${BAR_STYLE[barColor].text}`}
                                     style={{ left: `calc(${pos(labelOff)} + 6px)` }}
                                   >
                                     {r.actual}%

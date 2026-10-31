@@ -112,7 +112,7 @@ function PreviewCard({ taskId, x, y }: { taskId: string; x: number; y: number })
                   )}
                   <span className="text-on-surface-variant whitespace-nowrap">누적 {rate}%</span>
                   {delayed && (
-                    <span className="ml-auto px-1.5 py-0.5 rounded-full text-[11px] font-bold bg-status-error/10 text-status-error-text">
+                    <span className="ml-auto px-1.5 py-0.5 rounded-full text-xs font-bold bg-status-error/10 text-status-error-text">
                       지연
                     </span>
                   )}
@@ -133,7 +133,7 @@ function PreviewCard({ taskId, x, y }: { taskId: string; x: number; y: number })
         </ul>
       )}
 
-      <p className="mt-3 pt-2 border-t border-border-subtle text-[11px] text-on-surface-variant">
+      <p className="mt-3 pt-2 border-t border-border-subtle text-xs text-on-surface-variant">
         눌러서 실적 입력
       </p>
     </div>,

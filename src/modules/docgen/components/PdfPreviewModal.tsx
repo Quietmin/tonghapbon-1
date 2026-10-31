@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Dialog from "@/shared/components/Dialog";
-import { Button, Icon } from "@/shared/components/ui";
+import { Button, Icon, LoadingState } from "@/shared/components/ui";
 
 /**
  * 보관함 [열기] — 전에는 서명 URL 을 새 탭으로 바로 열었는데(window.open), 폰
@@ -122,7 +122,7 @@ export default function PdfPreviewModal({
           type="button"
           onClick={onClose}
           aria-label="닫기"
-          className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+          className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high"
         >
           <Icon name="close" className="text-lg" />
         </button>
@@ -141,7 +141,7 @@ export default function PdfPreviewModal({
         style={{ touchAction: "pan-y" }}
       >
         {status === "loading" && (
-          <p className="py-10 text-center text-sm text-on-surface-variant">PDF 불러오는 중…</p>
+          <LoadingState label="PDF 불러오는 중…" rows={3} />
         )}
         {status === "error" && (
           <div className="py-10 text-center text-sm text-on-surface-variant px-4">

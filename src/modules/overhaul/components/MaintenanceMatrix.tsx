@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, Icon, Button, EmptyState } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState, LoadingState, ErrorState } from "@/shared/components/ui";
 import { exportMaintenanceMatrix } from "../lib/matrixExporter";
 
 /**
@@ -195,7 +195,7 @@ function PlanItemForm({
         </h3>
         <button
           onClick={onCancel}
-          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant"
+          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant"
         >
           <Icon name="close" className="text-lg" />
         </button>
@@ -249,7 +249,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 계약변경 등으로 보수하지 않음 (확인된 사실)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface-variant bg-surface-container-highest ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-xs font-bold text-on-surface-variant bg-surface-container-highest ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -261,7 +261,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 실적으로 확인된 보수${cell.done ? ` (${cell.done}급)` : ""}`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-primary ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-xs font-bold text-on-primary ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         } bg-status-success`}
       >
@@ -273,7 +273,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 관리계획 엑셀상 ${cell.planned}급 (실적 미확인)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface bg-primary/15 border border-primary/30 ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-xs font-bold text-on-surface bg-primary/15 border border-primary/30 ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -285,7 +285,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 과거 등급이 반복되는 패턴을 찾아 추정한 등급 (확정 아님 — 확인 권장)`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-status-info-text border border-dashed border-status-info/50 ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-xs font-bold text-status-info-text border border-dashed border-status-info/50 ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -297,7 +297,7 @@ function GradeCell({ cell, isThisYear }: { cell: MatrixCell; isThisYear: boolean
     return (
       <div
         title={`${cell.year}년 · 반복 패턴이 확인되지 않아 등급을 추정할 수 없음 — 확인 필요`}
-        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold text-on-surface-variant border border-dashed border-outline-variant ${
+        className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center text-xs font-bold text-on-surface-variant border border-dashed border-outline-variant ${
           isThisYear ? "ring-2 ring-primary ring-offset-1" : ""
         }`}
       >
@@ -407,16 +407,11 @@ export default function MaintenanceMatrix() {
   };
 
   if (loading) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
   if (error) {
     return (
-      <Card className="p-4 border border-error/30" lift={false}>
-        <p className="text-sm text-error flex items-center gap-2">
-          <Icon name="error" className="text-base" />
-          {error}
-        </p>
-      </Card>
+      <ErrorState message={error} onRetry={() => window.location.reload()} />
     );
   }
   if (!data || data.rows.length === 0) {
@@ -495,7 +490,7 @@ export default function MaintenanceMatrix() {
             <button
               key={f}
               onClick={() => setField(f)}
-              className={`flex-1 lg:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+              className={`flex-1 lg:flex-none px-4 min-h-10 rounded-lg text-sm font-bold transition-colors ${
                 field === f
                   ? "bg-surface-container-lowest text-primary shadow-sm"
                   : "text-on-surface-variant hover:text-on-surface"
@@ -505,13 +500,13 @@ export default function MaintenanceMatrix() {
             </button>
           ))}
         </div>
-        <div className="flex-1 lg:min-w-[240px] flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 border border-transparent focus-within:border-primary transition-colors">
+        <div className="flex-1 lg:min-w-[240px] flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 min-h-11 border border-transparent focus-within:border-primary transition-colors">
           <Icon name="search" className="text-on-surface-variant text-base" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="설비명, Tag No., 대분류 검색"
-            className="flex-1 bg-transparent outline-none text-sm"
+            className="flex-1 self-stretch min-w-0 bg-transparent outline-none text-sm"
           />
         </div>
         <label className="flex items-center gap-2 px-4 h-11 rounded-xl bg-surface-container-low cursor-pointer whitespace-nowrap">
@@ -586,7 +581,7 @@ export default function MaintenanceMatrix() {
           <div className="overflow-x-auto">
             <table className="text-left border-collapse">
               <thead>
-                <tr className="text-on-surface-variant text-[11px] md:text-[12px] font-semibold uppercase tracking-widest border-b border-border-subtle">
+                <tr className="text-on-surface-variant text-xs font-semibold uppercase tracking-widest border-b border-border-subtle">
                   <th className="py-3 pl-card-padding pr-3 sticky left-0 bg-surface-container-lowest z-10 min-w-[220px]">
                     대분류 / 설비명
                   </th>
@@ -624,12 +619,12 @@ export default function MaintenanceMatrix() {
                     <td className="py-2 pl-card-padding pr-3 sticky left-0 bg-surface-container-lowest z-10">
                       <div className="flex items-center gap-1.5">
                         {r.field && (
-                          <span className="text-[10px] md:text-[12px] font-bold px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
+                          <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
                             {r.field}
                           </span>
                         )}
                         {!r.isActive && (
-                          <span className="text-[10px] md:text-[12px] font-bold px-1.5 py-0.5 rounded bg-error/10 text-error">
+                          <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-error/10 text-error">
                             사용중지
                           </span>
                         )}
@@ -637,7 +632,7 @@ export default function MaintenanceMatrix() {
                       <p className="font-semibold text-on-surface text-sm truncate max-w-[200px]">
                         {r.name}
                       </p>
-                      <p className="text-[11px] md:text-[12px] text-on-surface-variant truncate max-w-[200px]">
+                      <p className="text-xs text-on-surface-variant truncate max-w-[200px]">
                         {r.category ?? "—"}
                       </p>
                     </td>
@@ -681,7 +676,7 @@ export default function MaintenanceMatrix() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setFormTarget(r)}
-                          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant"
+                          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant"
                           title="수정"
                         >
                           <Icon name="edit" className="text-base" />
@@ -689,7 +684,7 @@ export default function MaintenanceMatrix() {
                         <button
                           onClick={() => toggleActive(r)}
                           disabled={togglingId === r.id}
-                          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant disabled:opacity-40"
+                          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant disabled:opacity-40"
                           title={r.isActive ? "사용중지" : "다시 사용"}
                         >
                           <Icon name={r.isActive ? "visibility_off" : "visibility"} className="text-base" />

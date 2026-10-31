@@ -176,7 +176,7 @@ export default function BranchMap({
     <div className="flex flex-col gap-3">
       <svg
         viewBox={`0 0 ${CANVAS.w} ${CANVAS.h}`}
-        className="w-full max-w-[700px] mx-auto"
+        className="w-full max-w-[700px] mx-auto max-md:pointer-events-none"
         role="group"
         aria-label="지사 위치"
       >

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Dialog, { DialogHeader } from "@/shared/components/Dialog";
-import { Button, Card, EmptyState, Icon, StatusChip } from "@/shared/components/ui";
+import { Button, Card, EmptyState, Icon, StatusChip, InlineError } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
 import {
   CLICKABLE_ROW,
@@ -107,7 +107,7 @@ export default function StatusBoard({
                 type="button"
                 aria-pressed={on}
                 onClick={() => setFilter("status", c.key)}
-                className={`px-3.5 py-2 rounded-full text-sm font-bold border transition-colors ${
+                className={`px-3.5 min-h-10 rounded-full text-sm font-bold border transition-colors ${
                   on
                     ? "bg-primary text-on-primary border-primary"
                     : "bg-surface-container-lowest text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
@@ -171,7 +171,7 @@ export default function StatusBoard({
           <button
             type="button"
             onClick={() => setFilters({ ...EMPTY_FILTERS })}
-            className="text-sm font-bold text-primary hover:underline"
+            className="inline-flex items-center min-h-10 px-2 text-sm font-bold text-primary hover:underline"
           >
             조건 모두 해제
           </button>
@@ -179,10 +179,7 @@ export default function StatusBoard({
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
-          <Icon name="error" className="text-base" />
-          {error}
-        </div>
+        <InlineError>{error}</InlineError>
       )}
 
       {!loading && !error && rows.length === 0 ? (
@@ -430,10 +427,7 @@ export function UpdateDialog({
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
-          <Icon name="error" className="text-base" />
-          {error}
-        </div>
+        <InlineError>{error}</InlineError>
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">

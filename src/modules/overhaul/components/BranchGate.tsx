@@ -101,7 +101,7 @@ export default function BranchGate({ children }: { children: React.ReactNode }) 
           value={branch}
           disabled={switching}
           onChange={(e) => void pick(e.target.value)}
-          className="h-8 px-3 rounded-lg bg-surface-container-lowest border border-border-subtle text-sm font-bold outline-none focus:border-primary disabled:opacity-50"
+          className="h-10 px-3 rounded-lg bg-surface-container-lowest border border-border-subtle text-sm font-bold outline-none focus:border-primary disabled:opacity-50"
         >
           {[...branches].sort((a, b) => a.localeCompare(b, "ko")).map((b) => (
             <option key={b} value={b}>

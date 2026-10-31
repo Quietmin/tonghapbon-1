@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, Button, Icon } from "@/shared/components/ui";
+import { Card, Button, Icon, InlineError } from "@/shared/components/ui";
 import { BRANCHES, FAULT_FIELDS, sortKorean } from "@/modules/docgen/lib/constants";
 import type { AttachmentInput, FailureHistoryInput } from "@/modules/failure/lib/repo";
 
@@ -397,10 +397,7 @@ export default function FailureHistoryForm({
       </Section>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
-          <Icon name="error" className="text-base" />
-          {error}
-        </div>
+        <InlineError>{error}</InlineError>
       )}
 
       <div className="flex justify-end gap-2 pb-6">

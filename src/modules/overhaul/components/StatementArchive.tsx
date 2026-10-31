@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, Icon, Button, EmptyState } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState, LoadingState, ErrorState } from "@/shared/components/ui";
 import { exportDesignStatement } from "../lib/statementExporter";
 import StatementReconcile from "./StatementReconcile";
 
@@ -94,16 +94,11 @@ export default function StatementArchive() {
   // 목록을 지우지 않고 아래에 띠로 띄운다.
   if (error && !statements) {
     return (
-      <Card className="p-4 border border-error/30" lift={false}>
-        <p className="text-sm text-error flex items-center gap-2">
-          <Icon name="error" className="text-base" />
-          {error}
-        </p>
-      </Card>
+      <ErrorState message={error} onRetry={() => window.location.reload()} />
     );
   }
   if (!statements) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
   if (statements.length === 0) {
     return (
@@ -128,12 +123,7 @@ export default function StatementArchive() {
       </Card>
 
       {error && (
-        <Card className="p-4 border border-error/30" lift={false}>
-          <p className="text-sm text-error flex items-center gap-2">
-            <Icon name="error" className="text-base" />
-            {error}
-          </p>
-        </Card>
+        <ErrorState message={error} />
       )}
 
       {openStatement && (
@@ -162,11 +152,11 @@ export default function StatementArchive() {
                 </p>
               </div>
               {s.reconciled_at ? (
-                <span className="text-[11px] md:text-[12px] font-bold px-2 py-1 rounded-full bg-status-success/10 text-status-success-text whitespace-nowrap">
+                <span className="text-xs font-bold px-2 py-1 rounded-full bg-status-success/10 text-status-success-text whitespace-nowrap">
                   반영됨 · {s.reconciled_at.slice(0, 10)}
                 </span>
               ) : (
-                <span className="text-[11px] md:text-[12px] font-bold px-2 py-1 rounded-full bg-status-warning/10 text-status-warning-text whitespace-nowrap">
+                <span className="text-xs font-bold px-2 py-1 rounded-full bg-status-warning/10 text-status-warning-text whitespace-nowrap">
                   반영 필요
                 </span>
               )}
@@ -185,7 +175,7 @@ export default function StatementArchive() {
               </Button>
               <button
                 onClick={() => remove(s.id, s.title)}
-                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
                 title="이 내역서 삭제"
               >
                 <Icon name="delete" className="text-lg" />

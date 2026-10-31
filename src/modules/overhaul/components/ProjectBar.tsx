@@ -105,7 +105,7 @@ export default function ProjectBar() {
 
       <Link
         href="/overhaul/project"
-        className="ml-auto flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+        className="ml-auto flex items-center gap-1 min-h-10 px-1 text-xs font-bold text-primary hover:underline"
       >
         <Icon name="settings" className="text-sm" />
         회차 관리

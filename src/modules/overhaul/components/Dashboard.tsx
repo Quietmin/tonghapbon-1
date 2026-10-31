@@ -11,6 +11,7 @@ import {
   Button,
   EmptyState,
   ScreenHeader,
+  LoadingState,
 } from "@/shared/components/ui";
 import { fieldColor, type EquipmentProgress } from "../lib/progress";
 import type { OverhaulProject } from "../lib/repo";
@@ -48,7 +49,7 @@ export default function Dashboard() {
   }, []);
 
   if (loading) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   if (!m || m.taskCount === 0) {
@@ -234,7 +235,7 @@ export default function Dashboard() {
         <Card className="lg:col-span-8 p-card-padding">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-title-sm text-on-surface">설비별 현황</h2>
-            <Link href="/overhaul/tasks" className="text-primary text-sm font-semibold hover:underline">
+            <Link href="/overhaul/tasks" className="text-primary text-sm font-semibold hover:underline inline-flex items-center min-h-10 px-1">
               전체 작업 보기
             </Link>
           </div>

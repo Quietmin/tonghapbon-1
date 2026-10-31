@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, Icon, Button, EmptyState, ScreenHeader } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState, ScreenHeader, LoadingState, ErrorState } from "@/shared/components/ui";
 import { exportDesignStatement } from "../lib/statementExporter";
 import StatementArchive from "./StatementArchive";
 
@@ -330,7 +330,7 @@ export default function MaintenancePlan() {
   }, [data, chosen, units, field]);
 
   if (loading && !data) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   const s = data?.summary;
@@ -368,7 +368,7 @@ export default function MaintenancePlan() {
                     setSelected(new Set());
                   }}
                   title={empty ? "이 분야로 등록된 계획이 없습니다" : undefined}
-                  className={`px-3 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                  className={`px-3.5 min-h-10 rounded-full text-sm font-bold transition-colors ${
                     field === f
                       ? "bg-primary text-on-primary"
                       : empty
@@ -393,7 +393,7 @@ export default function MaintenancePlan() {
                     href={`/api/overhaul/plan/file?id=${src.id}`}
                     download={src.file_name}
                     title="원본 엑셀 내려받기"
-                    className="text-sm font-bold text-on-surface truncate block hover:text-primary hover:underline"
+                    className="text-sm font-bold text-on-surface truncate block py-2.5 hover:text-primary hover:underline"
                   >
                     {src.file_name}
                   </a>
@@ -407,13 +407,13 @@ export default function MaintenancePlan() {
                   href={`/api/overhaul/plan/file?id=${src.id}`}
                   download={src.file_name}
                   title="원본 엑셀 내려받기"
-                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
                 >
                   <Icon name="download" className="text-lg" />
                 </a>
                 <button
                   onClick={() => removeSource(src.id, src.file_name)}
-                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
                   title="이 계획 삭제"
                 >
                   <Icon name="delete" className="text-lg" />
@@ -434,7 +434,7 @@ export default function MaintenancePlan() {
               <button
                 key={f}
                 onClick={() => setUploadField(f)}
-                className={`px-3 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                className={`px-3.5 min-h-10 rounded-full text-sm font-bold transition-colors ${
                   uploadField === f
                     ? "bg-primary text-on-primary"
                     : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
@@ -488,12 +488,7 @@ export default function MaintenancePlan() {
       </Card>
 
       {error && (
-        <Card className="p-4 border border-error/30" lift={false}>
-          <p className="text-sm text-error flex items-center gap-2">
-            <Icon name="error" className="text-base" />
-            {error}
-          </p>
-        </Card>
+        <ErrorState message={error} />
       )}
 
       {!hasPlan ? null : (
@@ -509,7 +504,7 @@ export default function MaintenancePlan() {
               <button
                 key={t.key}
                 onClick={() => setView(t.key)}
-                className={`flex-1 lg:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5 justify-center ${
+                className={`flex-1 lg:flex-none px-4 min-h-10 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5 justify-center ${
                   view === t.key
                     ? "bg-surface-container-lowest text-primary shadow-sm"
                     : "text-on-surface-variant hover:text-on-surface"
@@ -603,7 +598,7 @@ export default function MaintenancePlan() {
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`flex-1 lg:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                  className={`flex-1 lg:flex-none px-4 min-h-10 rounded-lg text-sm font-bold transition-colors ${
                     tab === t.key
                       ? "bg-surface-container-lowest text-primary shadow-sm"
                       : "text-on-surface-variant hover:text-on-surface"
@@ -613,13 +608,13 @@ export default function MaintenancePlan() {
                 </button>
               ))}
             </div>
-            <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 border border-transparent focus-within:border-primary transition-colors">
+            <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 min-h-11 border border-transparent focus-within:border-primary transition-colors">
               <Icon name="search" className="text-on-surface-variant text-base" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="설비명, Tag No., 대분류 검색"
-                className="flex-1 bg-transparent outline-none text-sm"
+                className="flex-1 self-stretch min-w-0 bg-transparent outline-none text-sm"
               />
             </div>
           </div>
@@ -648,13 +643,15 @@ export default function MaintenancePlan() {
                     <tr className="text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest border-b border-border-subtle">
                       <th className="py-3 pl-card-padding w-10">
                         {tab !== "참고" && (
-                          <input
-                            type="checkbox"
-                            checked={paged.length > 0 && paged.every((r) => selected.has(r.id))}
-                            onChange={() => toggleAll(paged)}
-                            className="w-4 h-4"
-                            title="이 페이지 전체 선택"
-                          />
+                          <label className="inline-flex items-center justify-center w-10 h-10 -m-2.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={paged.length > 0 && paged.every((r) => selected.has(r.id))}
+                              onChange={() => toggleAll(paged)}
+                              className="w-4 h-4"
+                              title="이 페이지 전체 선택"
+                            />
+                          </label>
                         )}
                       </th>
                       <th className="py-3 pr-3">대분류 / 설비명</th>
@@ -670,31 +667,33 @@ export default function MaintenancePlan() {
                       <tr key={r.id} className="hover:bg-surface-container-low transition-colors">
                         <td className="py-3 pl-card-padding">
                           {tab !== "참고" && (
-                            <input
-                              type="checkbox"
-                              checked={selected.has(r.id)}
-                              onChange={() => toggle(r.id)}
-                              className="w-4 h-4"
-                            />
+                            <label className="inline-flex items-center justify-center w-10 h-10 -m-2.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selected.has(r.id)}
+                                onChange={() => toggle(r.id)}
+                                className="w-4 h-4"
+                              />
+                            </label>
                           )}
                         </td>
                         <td className="py-3 pr-3">
                           <div className="flex items-center gap-2 mb-0.5">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold ${
+                              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                                 CLASS_STYLE[r.judge.classification]
                               }`}
                             >
                               {r.judge.classification}
                             </span>
                             {r.judge.needsDecision && (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/15 text-status-warning-text flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-status-warning/15 text-status-warning-text flex items-center gap-1">
                                 <Icon name="help" className="text-[12px] md:text-[13px]" />
                                 판단 필요
                               </span>
                             )}
                             {r.plannedGrade && (
-                              <span className="text-[11px] md:text-[12px] font-bold text-on-surface-variant">
+                              <span className="text-xs font-bold text-on-surface-variant">
                                 계획 {r.plannedGrade}급
                               </span>
                             )}
@@ -728,13 +727,13 @@ export default function MaintenancePlan() {
                             <input
                               value={units[r.id] ?? "EA"}
                               onChange={(e) => setUnits({ ...units, [r.id]: e.target.value })}
-                              className="w-16 h-8 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-sm text-center outline-none focus:border-primary"
+                              className="w-16 h-10 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-sm text-center outline-none focus:border-primary"
                             />
                           )}
                         </td>
                         <td className="py-3 pr-card-padding text-sm whitespace-nowrap">
                           {r.isOverhaul ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-primary/10 text-primary">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
                               O/H
                             </span>
                           ) : (
@@ -758,7 +757,7 @@ export default function MaintenancePlan() {
                     onChange={(e) =>
                       setPageSize(e.target.value === "all" ? "all" : Number(e.target.value))
                     }
-                    className="h-8 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-sm font-bold outline-none focus:border-primary"
+                    className="h-10 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-sm font-bold outline-none focus:border-primary"
                   >
                     {[10, 20, 50, 100].map((n) => (
                       <option key={n} value={n}>
@@ -771,7 +770,7 @@ export default function MaintenancePlan() {
                     <button
                       type="button"
                       onClick={() => toggleAll(visible)}
-                      className="ml-1 text-sm font-bold text-primary hover:underline"
+                      className="ml-1 inline-flex items-center min-h-10 px-1 text-sm font-bold text-primary hover:underline"
                     >
                       {visible.every((r) => selected.has(r.id))
                         ? "검색결과 전체 해제"

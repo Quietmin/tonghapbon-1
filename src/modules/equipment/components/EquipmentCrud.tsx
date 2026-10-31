@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { Button, Card, EmptyState, FieldChip, Icon } from "@/shared/components/ui";
+import { Button, Card, EmptyState, FieldChip, Icon, LoadingState, ErrorState } from "@/shared/components/ui";
 import { EQUIPMENT_FIELDS, EQUIPMENT_TYPES } from "@/shared/lib/equipmentMeta";
 import type { Device, EquipmentWithCount } from "@/shared/lib/equipment";
 
@@ -353,7 +353,7 @@ export default function EquipmentCrud({
   };
 
   if (!items && !error) {
-    return <p className="py-10 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   const visible = items ? (fieldFilter ? items.filter((e) => e.field === fieldFilter) : items) : null;
@@ -373,12 +373,7 @@ export default function EquipmentCrud({
       </div>
 
       {error && (
-        <Card className="p-4 border border-error/30" lift={false}>
-          <p className="text-sm text-error flex items-center gap-2">
-            <Icon name="error" className="text-base" />
-            {error}
-          </p>
-        </Card>
+        <ErrorState message={error} />
       )}
 
       {editing && (

@@ -1169,7 +1169,7 @@ export default function DocEditor({
                               type="button"
                               onClick={() => setEditingId(item.id)}
                               title="편집 (자르기·마킹)"
-                              className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                              className="w-10 h-10 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
                             >
                               <Icon name="edit" className="text-base" />
                             </button>
@@ -1177,7 +1177,7 @@ export default function DocEditor({
                               type="button"
                               onClick={() => pickReplacement(item.id)}
                               title="사진 변경 (설명·순서는 그대로)"
-                              className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                              className="w-10 h-10 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
                             >
                               <Icon name="swap_horiz" className="text-base" />
                             </button>
@@ -1185,7 +1185,7 @@ export default function DocEditor({
                               type="button"
                               onClick={() => rotate(item.id)}
                               title="90도 회전"
-                              className="w-7 h-7 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
+                              className="w-10 h-10 rounded-lg hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
                             >
                               <Icon name="rotate_right" className="text-base" />
                             </button>
@@ -1207,7 +1207,7 @@ export default function DocEditor({
                           type="button"
                           onClick={() => remove(item.id)}
                           title="삭제"
-                          className="w-7 h-7 rounded-lg hover:bg-status-error/10 flex items-center justify-center text-status-error-text"
+                          className="w-10 h-10 rounded-lg hover:bg-status-error/10 flex items-center justify-center text-status-error-text"
                         >
                           <Icon name="delete" className="text-base" />
                         </button>
@@ -1339,7 +1339,7 @@ export default function DocEditor({
                 disabled={baseScale <= ZOOM_MIN}
                 aria-label="미리보기 축소"
                 title="축소 (Ctrl+휠)"
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-10 h-10 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Icon name="remove" className="text-base" />
               </button>
@@ -1347,7 +1347,7 @@ export default function DocEditor({
                 type="button"
                 onClick={zoomReset}
                 title="눌러서 칸 폭에 맞추기"
-                className="w-14 h-8 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-xs font-bold text-on-surface tabular-nums hover:bg-surface-container-high"
+                className="w-14 h-10 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-xs font-bold text-on-surface tabular-nums hover:bg-surface-container-high"
               >
                 {Math.round(baseScale * 100)}%
               </button>
@@ -1357,7 +1357,7 @@ export default function DocEditor({
                 disabled={baseScale >= ZOOM_MAX}
                 aria-label="미리보기 확대"
                 title="확대 (Ctrl+휠)"
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-10 h-10 flex items-center justify-center rounded-lg border border-border-subtle bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Icon name="add" className="text-base" />
               </button>

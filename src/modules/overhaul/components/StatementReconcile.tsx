@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, Icon, Button } from "@/shared/components/ui";
+import { Card, Icon, Button, LoadingState } from "@/shared/components/ui";
 
 /**
  * 준공 후 "이력 반영" — 확정했던 수량산출서를 실제 결과와 맞춰보고 보수계획의
@@ -183,7 +183,7 @@ export default function StatementReconcile({
         </h3>
         <button
           onClick={onClose}
-          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant"
+          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant"
         >
           <Icon name="close" className="text-lg" />
         </button>
@@ -223,7 +223,7 @@ export default function StatementReconcile({
       )}
 
       {!candidates ? (
-        <p className="text-sm text-on-surface-variant py-6 text-center">불러오는 중…</p>
+        <LoadingState rows={3} />
       ) : (
         <div className="divide-y divide-border-subtle border border-border-subtle rounded-xl overflow-hidden">
           {candidates.map((c) => {
@@ -271,7 +271,7 @@ export default function StatementReconcile({
                     value={grades.get(c.itemId) ?? ""}
                     onChange={(e) => setGrades((prev) => new Map(prev).set(c.itemId, e.target.value))}
                     placeholder="등급"
-                    className="w-14 h-8 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-xs text-center outline-none focus:border-primary"
+                    className="w-14 h-10 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-xs text-center outline-none focus:border-primary"
                   />
                 )}
                 <div className="flex gap-1 p-1 bg-surface-container-high rounded-lg">
@@ -302,7 +302,7 @@ export default function StatementReconcile({
               value={addQuery}
               onChange={(e) => setAddQuery(e.target.value)}
               placeholder="설비명, Tag No.로 검색해서 추가"
-              className="flex-1 bg-transparent outline-none text-sm"
+              className="flex-1 self-stretch min-w-0 bg-transparent outline-none text-sm"
             />
           </div>
           {addResults.length > 0 && (
@@ -340,11 +340,11 @@ export default function StatementReconcile({
                     )
                   }
                   placeholder="등급"
-                  className="w-14 h-8 px-2 rounded-lg bg-surface-container-lowest border border-border-subtle text-xs text-center outline-none focus:border-primary"
+                  className="w-14 h-10 px-2 rounded-lg bg-surface-container-lowest border border-border-subtle text-xs text-center outline-none focus:border-primary"
                 />
                 <button
                   onClick={() => removeExtra(e.planId)}
-                  className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-highest text-on-surface-variant"
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-highest text-on-surface-variant"
                 >
                   <Icon name="close" className="text-sm" />
                 </button>

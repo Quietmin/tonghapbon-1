@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, Button, Icon, StatusChip, FieldChip, ProgressBar } from "@/shared/components/ui";
+import { Card, Button, Icon, StatusChip, FieldChip, ProgressBar, LoadingState } from "@/shared/components/ui";
 import { taskProgress, taskStatus } from "../lib/progress";
 import { compressImage, formatBytes } from "../lib/imageCompress";
 import type { OverhaulTask, OverhaulEntry } from "../lib/repo";
@@ -115,7 +115,7 @@ function PhotoGroup({
     <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-xs font-bold text-on-surface">{label}</span>
-        <span className="text-[11px] md:text-[12px] text-on-surface-variant">
+        <span className="text-xs text-on-surface-variant">
           {items.length}/{MAX_PER_SLOT}장
         </span>
       </div>
@@ -142,12 +142,14 @@ function PhotoGroup({
               type="button"
               onClick={() => remove(it.key)}
               title="이 사진 빼기"
-              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-error transition-colors"
+              className="group/x absolute top-0 right-0 w-10 h-10 flex items-start justify-end p-1"
             >
-              <Icon name="close" className="text-sm" />
+              <span className="w-6 h-6 rounded-full bg-black/55 text-white flex items-center justify-center group-hover/x:bg-error transition-colors">
+                <Icon name="close" className="text-sm" />
+              </span>
             </button>
             {it.note && (
-              <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-[9px] md:text-[12px] text-center py-0.5">
+              <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-xs text-center py-0.5">
                 {it.note}
               </span>
             )}
@@ -165,7 +167,7 @@ function PhotoGroup({
               name={working ? "hourglass_top" : "add_a_photo"}
               className="text-xl text-on-surface-variant"
             />
-            <span className="text-[10px] md:text-[12px] font-semibold text-on-surface-variant px-1 text-center leading-tight">
+            <span className="text-xs font-semibold text-on-surface-variant px-1 text-center leading-tight">
               {working ?? "사진 추가"}
             </span>
           </button>
@@ -264,7 +266,7 @@ function HistoryTimeline({
                         </span>
                       )}
                       {delayed && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] md:text-[12px] font-bold bg-status-error/10 text-status-error-text">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-status-error/10 text-status-error-text">
                           지연
                         </span>
                       )}
@@ -545,7 +547,7 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
   );
 
   if (loading) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
   if (!task || !form) {
     return <p className="py-20 text-center text-sm text-on-surface-variant">작업을 불러오지 못했습니다.</p>;

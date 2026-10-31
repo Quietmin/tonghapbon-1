@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Card, Icon, StatusChip } from "@/shared/components/ui";
+import { Card, Icon, StatusChip, EmptyState } from "@/shared/components/ui";
 import {
   CLICKABLE_ROW,
   HEAD_ROW,
@@ -57,7 +57,7 @@ function Pagination({
   const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
 
   const btn =
-    "min-w-9 h-9 px-2 rounded-lg text-sm font-bold flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed";
+    "min-w-10 h-10 px-2 rounded-lg text-sm font-bold flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed";
   return (
     <nav className="flex items-center justify-center gap-1 pt-4" aria-label="페이지 이동">
       <button
@@ -195,7 +195,7 @@ export default function IssueListPanel({
       </div>
 
       {rows.length === 0 ? (
-        <p className="py-8 text-center text-sm text-on-surface-variant">{emptyText}</p>
+        <EmptyState compact icon="inbox" title={emptyText} />
       ) : (
         <>
         {/* 폰(md 미만) — 표는 칸이 좁아 이슈 내용이 잘리므로 카드 목록으로 보인다. 누르기·키보드는 표와 같다 */}

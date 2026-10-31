@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Icon, ScreenHeader } from "@/shared/components/ui";
+import { Button, Icon, ScreenHeader, LoadingState } from "@/shared/components/ui";
 import { EQUIPMENT_FIELDS } from "@/shared/lib/equipmentMeta";
 import BranchOverview from "./BranchOverview";
 import LongTermPlan from "./LongTermPlan";
@@ -67,7 +67,7 @@ export default function EquipmentMaster() {
   }, []);
 
   if (branch === undefined) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   // ── 전 지사 개요 ─────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ export default function EquipmentMaster() {
           value={branch}
           disabled={switching}
           onChange={(e) => void pick(e.target.value)}
-          className="h-8 px-3 rounded-lg bg-surface-container-lowest border border-border-subtle text-sm font-bold outline-none focus:border-primary disabled:opacity-50"
+          className="h-10 px-3 rounded-lg bg-surface-container-lowest border border-border-subtle text-sm font-bold outline-none focus:border-primary disabled:opacity-50"
         >
           {[...branches].sort((a, b) => a.localeCompare(b, "ko")).map((b) => (
             <option key={b} value={b}>

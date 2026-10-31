@@ -105,7 +105,7 @@ const FIELD_STYLE: Record<string, string> = {
 export function FieldChip({ field }: { field: string }) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold ${
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
         FIELD_STYLE[field] || FIELD_STYLE["미분류"]
       }`}
     >
@@ -372,24 +372,89 @@ export function EmptyState({
   title,
   desc,
   action,
+  compact = false,
 }: {
   icon?: string;
   title: string;
   desc?: string;
   action?: ReactNode;
+  /** 카드 안의 작은 목록처럼 좁은 자리용 — 여백·아이콘을 줄인다 */
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-      <div className="w-16 h-16 rounded-2xl bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4">
-        <Icon name={icon} className="text-3xl" />
+    <div className={`flex flex-col items-center justify-center text-center px-6 ${compact ? "py-8" : "py-16"}`}>
+      <div
+        className={`rounded-2xl bg-surface-container-high flex items-center justify-center text-on-surface-variant ${
+          compact ? "w-12 h-12 mb-3" : "w-16 h-16 mb-4"
+        }`}
+      >
+        <Icon name={icon} className={compact ? "text-2xl" : "text-3xl"} />
       </div>
-      <h4 className="text-title-sm text-on-surface mb-1">{title}</h4>
+      <h4 className={`text-on-surface mb-1 ${compact ? "text-sm font-bold" : "text-title-sm"}`}>{title}</h4>
       {/* whitespace-pre-line — desc 안의 줄바꿈을 그대로 살린다. 문장을 한 줄씩
           끊어 주지 않으면 브라우저가 아무 데서나 꺾어 너저분해 보인다. */}
       {desc && (
         <p className="text-sm text-on-surface-variant max-w-sm mb-4 whitespace-pre-line">{desc}</p>
       )}
       {action}
+    </div>
+  );
+}
+
+/**
+ * 불러오는 중 — 글자 한 줄 대신 표 모양의 뼈대가 반짝인다. 화면이 비어 있다가 갑자기 차는 느낌을 줄이고, 어느
+ * 화면에서나 같은 모양이다. 스크린리더에는 label 이 읽힌다.
+ */
+export function LoadingState({ label = "불러오는 중…", rows = 4 }: { label?: string; rows?: number }) {
+  return (
+    <div role="status" aria-busy="true" className="py-8 flex flex-col gap-3 animate-pulse">
+      <span className="sr-only">{label}</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <div
+          key={i}
+          aria-hidden="true"
+          className="h-12 rounded-xl bg-surface-container-high"
+          style={{ opacity: 1 - i * 0.18 }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 화면 전체(또는 한 영역)를 못 불러왔을 때. 무슨 일인지 쓰고, onRetry 가 있으면 다시 시도 버튼을 보인다.
+ */
+export function ErrorState({ message, onRetry }: { message: ReactNode; onRetry?: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-3 px-4 py-3.5 rounded-xl border border-status-error/30 bg-status-error/10 text-status-error-text text-sm"
+    >
+      <Icon name="error" className="text-lg shrink-0" />
+      <span className="flex-1 min-w-0 font-medium break-words">{message}</span>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="shrink-0 min-h-10 px-3 rounded-lg font-bold hover:bg-status-error/10 inline-flex items-center gap-1"
+        >
+          <Icon name="refresh" className="text-base" />
+          다시 시도
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 폼·창 안의 오류 띠 — 저장 실패, 입력 확인 안내 등 */
+export function InlineError({ children }: { children: ReactNode }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm"
+    >
+      <Icon name="error" className="text-base shrink-0" />
+      <span className="min-w-0 break-words">{children}</span>
     </div>
   );
 }

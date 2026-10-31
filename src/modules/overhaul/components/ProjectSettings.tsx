@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Icon, Button, EmptyState, ScreenHeader } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState, ScreenHeader, LoadingState, ErrorState } from "@/shared/components/ui";
 import type { OverhaulProject } from "../lib/repo";
 
 /**
@@ -211,7 +211,7 @@ export default function ProjectSettings() {
   };
 
   if (!projects) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   return (
@@ -234,12 +234,7 @@ export default function ProjectSettings() {
       />
 
       {error && (
-        <Card className="p-4 border border-error/30" lift={false}>
-          <p className="text-sm text-error flex items-center gap-2">
-            <Icon name="error" className="text-base" />
-            {error}
-          </p>
-        </Card>
+        <ErrorState message={error} />
       )}
 
       {creating && (
@@ -286,7 +281,7 @@ export default function ProjectSettings() {
                   />
                   {p.name}
                   {isActive && (
-                    <span className="text-[11px] md:text-[12px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                       보고 있는 회차
                     </span>
                   )}
@@ -311,7 +306,7 @@ export default function ProjectSettings() {
                         ? "마지막 회차는 지울 수 없습니다"
                         : "이 회차와 딸린 자료 전체 삭제"
                     }
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
                   >
                     <Icon name="delete" className="text-lg" />
                   </button>

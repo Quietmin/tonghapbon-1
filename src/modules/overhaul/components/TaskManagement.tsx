@@ -12,6 +12,7 @@ import {
   Avatar,
   EmptyState,
   ProgressBar,
+  LoadingState,
 } from "@/shared/components/ui";
 import { taskProgress } from "../lib/progress";
 import TaskEditor from "./TaskEditor";
@@ -143,13 +144,13 @@ export default function TaskManagement() {
       <Card lift={false} className="p-card-padding">
         {/* 필터 바 */}
         <div className="flex flex-col lg:flex-row gap-3 mb-5">
-          <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 border border-transparent focus-within:border-primary focus-within:bg-surface-container-lowest transition-colors">
+          <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 min-h-11 border border-transparent focus-within:border-primary focus-within:bg-surface-container-lowest transition-colors">
             <Icon name="search" className="text-on-surface-variant text-base" />
             <input
               value={q}
               onChange={(e) => reset(setQ)(e.target.value)}
               placeholder="작업명, 규격 검색 (여러 낱말로 좁힐 수 있습니다)"
-              className="flex-1 bg-transparent outline-none text-sm"
+              className="flex-1 self-stretch min-w-0 bg-transparent outline-none text-sm"
             />
           </div>
           <select
@@ -191,7 +192,7 @@ export default function TaskManagement() {
 
         {/* 테이블 */}
         {loading && !data ? (
-          <p className="py-16 text-center text-sm text-on-surface-variant">불러오는 중…</p>
+          <LoadingState />
         ) : rows.length === 0 ? (
           <EmptyState
             icon={s?.taskCount ? (onlyReview ? "verified" : "search_off") : "table_rows"}
@@ -278,7 +279,7 @@ export default function TaskManagement() {
                         e.stopPropagation();
                         setEdit(t);
                       }}
-                      className="w-9 h-9 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                      className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
                     >
                       <Icon name="edit" className="text-base" />
                     </button>
@@ -388,7 +389,7 @@ export default function TaskManagement() {
                             e.stopPropagation();
                             setEdit(t);
                           }}
-                          className="mx-auto w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                          className="mx-auto w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
                         >
                           <Icon name="edit" className="text-base" />
                         </button>
@@ -412,7 +413,7 @@ export default function TaskManagement() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={data.page === 1}
-                className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
               >
                 <Icon name="chevron_left" />
               </button>
@@ -422,7 +423,7 @@ export default function TaskManagement() {
               <button
                 onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                 disabled={data.page >= data.totalPages}
-                className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
               >
                 <Icon name="chevron_right" />
               </button>

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import Dialog, { DialogHeader } from "./Dialog";
-import { Icon, RequiredMark } from "./ui";
+import { Icon, RequiredMark, InlineError } from "./ui";
 
 /**
  * 내 정보(지사·부서) 선택 — 로그인이 없는 동안의 임시 대용.
@@ -174,10 +174,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       </label>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm">
-          <Icon name="error" className="text-base" />
-          {error}
-        </div>
+        <InlineError>{error}</InlineError>
       )}
     </>
   );
@@ -290,7 +287,7 @@ export function ProfileChip() {
       onClick={open}
       aria-label={`내 지사·부서: ${label} (눌러서 변경)`}
       title="내 지사·부서 변경"
-      className="h-9 px-2.5 md:px-3 flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors whitespace-nowrap"
+      className="h-10 px-2.5 md:px-3 flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors whitespace-nowrap"
     >
       <Icon name="badge" className="text-base" />
       <span className="hidden md:inline">{label}</span>
@@ -311,7 +308,7 @@ export function AccountButton({ className = "" }: { className?: string }) {
       type="button"
       onClick={open}
       aria-label={`계정 설정 — 내 지사·부서: ${profile.branch} ${profile.department}`}
-      className={`h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors whitespace-nowrap ${className}`}
+      className={`h-10 px-3.5 inline-flex items-center gap-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface-variant transition-colors whitespace-nowrap ${className}`}
     >
       <Icon name="manage_accounts" className="text-base" />
       계정 설정

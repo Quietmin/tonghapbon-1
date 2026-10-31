@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, EmptyState, FieldChip, Icon } from "@/shared/components/ui";
+import { Card, EmptyState, FieldChip, Icon, LoadingState } from "@/shared/components/ui";
 import type { LongTermCell, LongTermPayload } from "@/modules/equipment/lib/longTermRepo";
 
 /**
@@ -12,7 +12,7 @@ import type { LongTermCell, LongTermPayload } from "@/modules/equipment/lib/long
  */
 
 function YearCell({ cell, isThisYear }: { cell: LongTermCell; isThisYear: boolean }) {
-  const base = "w-9 h-7 mx-auto rounded-md flex items-center justify-center text-[11px] md:text-[12px] font-bold";
+  const base = "w-9 h-7 mx-auto rounded-md flex items-center justify-center text-xs font-bold";
   const ring = isThisYear ? " ring-2 ring-primary ring-offset-1" : "";
   if (cell.done) {
     return (
@@ -111,7 +111,7 @@ export default function LongTermPlan({
             ))}
           </select>
         </h2>
-        <div className="flex flex-wrap items-center gap-3 text-[11px] md:text-[12px] text-on-surface-variant">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-on-surface-variant">
           <span className="flex items-center gap-1">
             <span className="w-3.5 h-3.5 rounded bg-status-success inline-block" />
             실적
@@ -139,7 +139,7 @@ export default function LongTermPlan({
       )}
 
       {!data && !error ? (
-        <p className="py-10 text-center text-sm text-on-surface-variant">불러오는 중…</p>
+        <LoadingState />
       ) : data && rows.length === 0 ? (
         <EmptyState
           icon="calendar_month"
@@ -186,7 +186,7 @@ export default function LongTermPlan({
                       {!r.equipmentId && (
                         <span
                           title="보수계획에는 있지만 설비 마스터에 등록되지 않은 이름입니다"
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold bg-status-warning/10 text-status-warning-text"
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-status-warning/10 text-status-warning-text"
                         >
                           마스터 미등록
                         </span>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Card, Icon, Button, FieldChip, EmptyState, ScreenHeader } from "@/shared/components/ui";
+import { Card, Icon, Button, FieldChip, EmptyState, ScreenHeader, ErrorState } from "@/shared/components/ui";
 import type { ParsedTask } from "../lib/excelParser";
 
 /**
@@ -213,7 +213,7 @@ export default function UploadAnalysis() {
               <button
                 key={f}
                 onClick={() => setFieldHint(f)}
-                className={`px-3 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                className={`px-3.5 min-h-10 rounded-full text-sm font-bold transition-colors ${
                   fieldHint === f
                     ? "bg-primary text-on-primary"
                     : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
@@ -274,12 +274,7 @@ export default function UploadAnalysis() {
       </Card>
 
       {error && (
-        <Card className="p-4 border border-error/30" lift={false}>
-          <p className="text-sm text-error flex items-center gap-2">
-            <Icon name="error" className="text-base" />
-            {error}
-          </p>
-        </Card>
+        <ErrorState message={error} />
       )}
 
       {done && (
@@ -454,7 +449,7 @@ export default function UploadAnalysis() {
                       href={`/api/overhaul/sources/file?id=${s.id}`}
                       download={s.file_name}
                       title="원본 엑셀 내려받기"
-                      className="text-sm font-bold text-on-surface truncate block hover:text-primary hover:underline"
+                      className="text-sm font-bold text-on-surface truncate block py-2.5 hover:text-primary hover:underline"
                     >
                       {s.file_name}
                     </a>
@@ -468,13 +463,13 @@ export default function UploadAnalysis() {
                     href={`/api/overhaul/sources/file?id=${s.id}`}
                     download={s.file_name}
                     title="원본 엑셀 내려받기"
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
                   >
                     <Icon name="download" className="text-lg" />
                   </a>
                   <button
                     onClick={() => removeSource(s.id, s.file_name)}
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
                     title="이 파일의 작업항목 전체 삭제"
                   >
                     <Icon name="delete" className="text-lg" />
