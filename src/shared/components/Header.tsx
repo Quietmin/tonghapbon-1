@@ -11,14 +11,9 @@ export default function Header() {
   const pathname = usePathname();
   const sidebar = useSidebar();
   const group = activeGroup(pathname);
-  // 모바일 첫 화면은 로고 + 타이틀을 본문 가운데 크게 따로 두므로(page.tsx),
-  // 폭이 좁을 때 이 줄까지 보이면 같은 걸 두 번 보여주는 꼴이 된다 — 거기서만
-  // 숨긴다. 데스크톱은 첫 화면에도 이 헤더가 유일한 타이틀이라 그대로 둔다.
-  const hideOnMobile = pathname === "/";
-
   return (
     <header
-      className={`${hideOnMobile ? "max-md:hidden" : ""} sticky top-0 z-40 bg-surface-glass backdrop-blur-xl border-b border-border-subtle px-gutter h-16 flex justify-between items-center w-full print:hidden`}
+      className={`sticky top-0 z-40 bg-surface-glass backdrop-blur-xl border-b border-border-subtle px-gutter h-16 flex justify-between items-center w-full print:hidden`}
     >
       <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         {/*

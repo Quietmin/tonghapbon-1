@@ -90,6 +90,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, forced]);
 
+  // 첫 접속 화면이 뜨면 지사 선택칸에 바로 포커스를 준다 — 뒤 화면이 inert 라 Tab 이 이 화면 안에서만 돈다
+  useEffect(() => {
+    if (!(open && forced)) return;
+    // 화면이 막 그려진 직후라 칸이 아직 없을 수 있다 — 한 박자 늦춰 준다
+    const t = setTimeout(() => document.getElementById("profileBranchSelect")?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [open, forced]);
+
   async function save() {
     if (saving) return;
     setSaving(true);
@@ -139,11 +147,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           <RequiredMark />
         </span>
         <select
+          id="profileBranchSelect"
           value={draftBranch}
           onChange={(e) => setDraftBranch(e.target.value)}
           className={SELECT}
           required
-          autoFocus={forced}
         >
           <option value="">선택</option>
           {branches.map((b) => (
@@ -184,7 +192,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ProfileContext.Provider value={api}>
-      {children}
+      {/* 첫 접속 화면이 떠 있는 동안은 뒤의 화면 전체를 inert 로 둔다 — 눈에만 가려질 뿐 Tab 키로 사이드바·버튼에
+          닿거나 스크린리더가 읽는 일이 없게 한다. display: contents 라 레이아웃에는 영향이 없다. */}
+      <div style={{ display: "contents" }} inert={open && forced}>
+        {children}
+      </div>
       {open && forced && (
         // 첫 접속 — PIMS 마크와 계정 설정을 전체 화면으로. 뒤의 화면은 완전히 가려 쓸 수 없다.
         <div
