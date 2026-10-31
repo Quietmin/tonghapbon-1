@@ -519,10 +519,23 @@ export default function Schedule() {
                     </span>
                   </div>
 
-                  {groups.map((g) => {
+                  {groups.map((g, gi) => {
                     const isOpen = !collapsed[g.equip];
+                    // 분야가 처음 나오는 설비 앞에 소제목 줄을 둔다(기계 → 전기 → 제어)
+                    const fieldName = g.field ?? "미분류";
+                    const startsField = gi === 0 || (groups[gi - 1].field ?? "미분류") !== fieldName;
+                    const sameField = groups.filter((x) => (x.field ?? "미분류") === fieldName);
                     return (
                       <div key={g.equip}>
+                        {startsField && (
+                          <div className="flex items-center gap-2 pt-3 pb-1.5 mt-1 first:mt-0 border-b border-border-subtle/60">
+                            <FieldChip field={fieldName} />
+                            <span className="text-xs font-bold text-on-surface-variant">
+                              {fieldName} 분야 · 설비 {sameField.length}개 · 작업{" "}
+                              {sameField.reduce((n, x) => n + x.list.length, 0)}건
+                            </span>
+                          </div>
+                        )}
                         {/* 설비 요약 행 */}
                         <div
                           className="flex items-center py-2 cursor-pointer hover:bg-surface-container-low rounded-lg transition-colors"

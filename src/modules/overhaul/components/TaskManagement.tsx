@@ -233,9 +233,9 @@ export default function TaskManagement() {
                       open();
                     }
                   }}
-                  className="py-3 px-1 flex flex-col gap-1.5 cursor-pointer active:bg-surface-container-low focus-visible:bg-surface-container-low outline-none"
+                  className="py-3 px-1 flex flex-col gap-1.5 text-center cursor-pointer active:bg-surface-container-low focus-visible:bg-surface-container-low outline-none"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center justify-center gap-2 min-w-0">
                     <FieldChip field={t.field ?? "미분류"} />
                     {t.tag && (
                       <span className="font-mono-data text-xs text-on-surface-variant truncate">{t.tag}</span>
@@ -243,7 +243,7 @@ export default function TaskManagement() {
                     {t.needs_review && (
                       <span className="text-status-warning text-xs font-bold shrink-0">확인 필요</span>
                     )}
-                    <span className="ml-auto shrink-0">
+                    <span className="shrink-0">
                       <StatusChip status={status} />
                     </span>
                   </div>
@@ -267,7 +267,7 @@ export default function TaskManagement() {
                     />
                     <span className="text-xs font-bold tabular-nums w-10 text-right">{p}%</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-2">
                     <Avatar name={t.assignee} />
                     <span className="text-sm">
                       {t.assignee || <span className="text-on-surface-variant">미지정</span>}
@@ -279,7 +279,7 @@ export default function TaskManagement() {
                         e.stopPropagation();
                         setEdit(t);
                       }}
-                      className="ml-auto w-9 h-9 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                      className="w-9 h-9 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
                     >
                       <Icon name="edit" className="text-base" />
                     </button>
