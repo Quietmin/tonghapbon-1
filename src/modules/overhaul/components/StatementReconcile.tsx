@@ -267,7 +267,7 @@ export default function StatementReconcile({
                   </p>
                 </div>
                 {outcome === "done" && (
-                  <input
+                  <input aria-label="등급"
                     value={grades.get(c.itemId) ?? ""}
                     onChange={(e) => setGrades((prev) => new Map(prev).set(c.itemId, e.target.value))}
                     placeholder="등급"
@@ -298,7 +298,7 @@ export default function StatementReconcile({
         <div className="relative">
           <div className="flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-10 border border-transparent focus-within:border-primary transition-colors">
             <Icon name="search" className="text-on-surface-variant text-base" />
-            <input
+            <input aria-label="설비명, Tag No.로 검색해서 추가"
               value={addQuery}
               onChange={(e) => setAddQuery(e.target.value)}
               placeholder="설비명, Tag No.로 검색해서 추가"
@@ -332,7 +332,7 @@ export default function StatementReconcile({
               >
                 <Icon name="add_circle" className="text-status-success-text text-base" />
                 <span className="flex-1 text-sm text-on-surface">{e.name}</span>
-                <input
+                <input aria-label="등급"
                   value={e.grade}
                   onChange={(ev) =>
                     setExtras((prev) =>

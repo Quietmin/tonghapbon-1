@@ -146,14 +146,14 @@ export default function TaskManagement() {
         <div className="flex flex-col lg:flex-row gap-3 mb-5">
           <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 min-h-11 border border-transparent focus-within:border-primary focus-within:bg-surface-container-lowest transition-colors">
             <Icon name="search" className="text-on-surface-variant text-base" />
-            <input
+            <input aria-label="작업명, 규격 검색 (여러 낱말로 좁힐 수 있습니다)"
               value={q}
               onChange={(e) => reset(setQ)(e.target.value)}
               placeholder="작업명, 규격 검색 (여러 낱말로 좁힐 수 있습니다)"
               className="flex-1 self-stretch min-w-0 bg-transparent outline-none text-sm"
             />
           </div>
-          <select
+          <select aria-label="분야"
             value={field}
             onChange={(e) => reset(setField)(e.target.value)}
             className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary"
@@ -164,7 +164,7 @@ export default function TaskManagement() {
               </option>
             ))}
           </select>
-          <select
+          <select aria-label="설비"
             value={equipment}
             onChange={(e) => reset(setEquipment)(e.target.value)}
             className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary"
@@ -413,6 +413,7 @@ export default function TaskManagement() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={data.page === 1}
+                aria-label="이전 쪽"
                 className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
               >
                 <Icon name="chevron_left" />
@@ -423,6 +424,7 @@ export default function TaskManagement() {
               <button
                 onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                 disabled={data.page >= data.totalPages}
+                aria-label="다음 쪽"
                 className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
               >
                 <Icon name="chevron_right" />

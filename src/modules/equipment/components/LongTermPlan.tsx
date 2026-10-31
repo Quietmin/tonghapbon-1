@@ -95,7 +95,7 @@ export default function LongTermPlan({
         <h2 className="text-title-sm text-on-surface flex items-center gap-2">
           <Icon name="calendar_month" className="text-base text-primary" />
           장기 유지보수 계획
-          <select
+          <select aria-label="기준 년도"
             value={baseYear ?? nowYear}
             onChange={(e) => {
               const y = Number(e.target.value);

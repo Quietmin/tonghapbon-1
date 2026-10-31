@@ -158,7 +158,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           부서
           <RequiredMark />
         </span>
-        <select
+        <select aria-label="부서"
           value={draftDept}
           onChange={(e) => setDraftDept(e.target.value)}
           className={SELECT}

@@ -74,7 +74,7 @@ export default function ProjectBar() {
       </span>
 
       {projects.length > 1 ? (
-        <select
+        <select aria-label="회차 선택"
           value={active.id}
           disabled={switching}
           onChange={(e) => void pick(e.target.value)}

@@ -302,6 +302,16 @@ export default function FailureHistoryForm({
           const file = e.dataTransfer.files?.[0];
           if (file) void handleFile(file);
         }}
+        role="button"
+        tabIndex={0}
+        aria-label="파일 올리기 — 눌러서 고르거나 끌어다 놓기"
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
         onClick={() => fileInputRef.current?.click()}
         className={`p-6 flex flex-col items-center gap-2 text-center cursor-pointer border-2 border-dashed transition-colors ${
           dragOver ? "border-primary bg-primary/5" : "border-border-subtle"

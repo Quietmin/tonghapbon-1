@@ -83,7 +83,7 @@ function EquipmentForm({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
         <div className="col-span-2 md:col-span-1">
           <p className={label}>설비명</p>
-          <input
+          <input aria-label="예: 1호기 HRSG"
             className="input mt-1"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -122,7 +122,7 @@ function EquipmentForm({
         </div>
         <div className="col-span-2 md:col-span-4">
           <p className={label}>비고</p>
-          <input
+          <input aria-label="메모 (선택)"
             className="input mt-1"
             value={form.note}
             onChange={(e) => setForm({ ...form, note: e.target.value })}
@@ -213,7 +213,7 @@ function DeviceFormCard({
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div>
           <p className={label}>태그</p>
-          <input
+          <input aria-label="예: PIT-7610"
             className="input mt-1"
             value={form.tag}
             onChange={(e) => setForm({ ...form, tag: e.target.value })}
@@ -222,7 +222,7 @@ function DeviceFormCard({
         </div>
         <div>
           <p className={label}>기기명</p>
-          <input
+          <input aria-label="예: 압력계 (선택)"
             className="input mt-1"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -231,7 +231,7 @@ function DeviceFormCard({
         </div>
         <div className="col-span-2 md:col-span-1">
           <p className={label}>규격</p>
-          <input
+          <input aria-label="(선택)"
             className="input mt-1"
             value={form.spec}
             onChange={(e) => setForm({ ...form, spec: e.target.value })}

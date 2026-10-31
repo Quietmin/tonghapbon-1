@@ -247,6 +247,16 @@ export default function UploadAnalysis() {
             setDragging(false);
             handleFiles(Array.from(e.dataTransfer.files));
           }}
+          role="button"
+          tabIndex={0}
+          aria-label="파일 올리기 — 눌러서 고르거나 끌어다 놓기"
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
           onClick={() => inputRef.current?.click()}
           className="cursor-pointer py-14 px-6 flex flex-col items-center text-center"
         >

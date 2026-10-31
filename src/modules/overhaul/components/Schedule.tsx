@@ -88,6 +88,25 @@ const END_GUTTER = 44;
 /** 눈금 한 칸이 차지하는 최소 폭(px) — 날짜 글자("10-01")가 서로 겹치지 않을 만큼 */
 const TICK_MIN_PX = 64;
 
+/** 작업 한 줄의 상태 칩 — 완료 / 지연(며칠) / 진행중 / 대기. PC 간트의 현황 칸과 폰 카드가 같이 쓴다 */
+function TaskStatusChip({ r, overdueDays }: { r: Row; overdueDays: number }) {
+  if (r.actual >= 100) return <StatusChip status="완료" />;
+  if (r.behind) {
+    return (
+      <StatusChip
+        status="지연"
+        label={overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
+        title={
+          overdueDays > 0
+            ? `계획 종료일(${r.sch.plannedEndStr})에서 ${overdueDays}일 지났습니다`
+            : "오늘까지 나갔어야 할 계획 진도보다 뒤처졌습니다"
+        }
+      />
+    );
+  }
+  return <StatusChip status={r.actual > 0 ? "진행중" : "대기"} />;
+}
+
 /** 설비 묶음을 늘어놓는 분야 순서 — 기계 → 전기 → 제어. 그 밖의 분야·미분류는 맨 뒤 */
 const FIELD_ORDER = ["기계", "전기", "제어"];
 const fieldRank = (f: string | null) => {
@@ -395,7 +414,7 @@ export default function Schedule() {
           <Card lift={false} className="p-card-padding">
             <div className="flex flex-col lg:flex-row lg:items-center gap-3">
               <div className="flex flex-wrap gap-3 flex-1">
-                <select
+                <select aria-label="분야"
                   value={field}
                   onChange={(e) => setField(e.target.value)}
                   className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary"
@@ -406,7 +425,7 @@ export default function Schedule() {
                     </option>
                   ))}
                 </select>
-                <select
+                <select aria-label="설비"
                   value={equipment}
                   onChange={(e) => setEquipment(e.target.value)}
                   className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary"
@@ -448,8 +467,129 @@ export default function Schedule() {
             </div>
           </Card>
 
-          {/* 간트차트 */}
-          <Card lift={false} className="p-card-padding overflow-hidden">
+          {/*
+            폰(md 미만) — 간트를 760px 로 두고 옆으로 밀어 보면 설비명과 막대가 따로 놀아 읽기 어렵다.
+            설비마다 접히는 카드, 작업마다 이름·상태 줄 + 자기 폭을 다 쓰는 작은 막대(윗줄 계획 / 아랫줄 실적)로 쌓는다.
+          */}
+          <div className="md:hidden flex flex-col gap-3">
+            <div className="flex items-center justify-between text-xs text-on-surface-variant px-1">
+              <span>{startDate?.slice(5)}</span>
+              <span className="font-bold text-status-error-text">오늘 D+{todayOff}</span>
+              <span>{data.project.end_date?.slice(5)}</span>
+            </div>
+            {groups.map((g, gi) => {
+              const isOpen = !collapsed[g.equip];
+              const fieldName = g.field ?? "미분류";
+              const startsField = gi === 0 || (groups[gi - 1].field ?? "미분류") !== fieldName;
+              const allDone = g.list.every((r) => r.actual >= 100);
+              const lateCount = g.list.filter((r) => r.behind && r.actual < 100).length;
+              return (
+                <div key={g.equip}>
+                  {startsField && (
+                    <div className="flex items-center gap-2 pt-1 pb-2">
+                      <FieldChip field={fieldName} />
+                      <span className="text-xs font-bold text-on-surface-variant">{fieldName} 분야</span>
+                    </div>
+                  )}
+                  <Card lift={false} className="p-0 overflow-hidden">
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      onClick={() => setCollapsed((c) => ({ ...c, [g.equip]: isOpen }))}
+                      className="w-full flex items-center gap-2 px-3 min-h-12 text-left hover:bg-surface-container-low"
+                    >
+                      <Icon name={isOpen ? "expand_more" : "chevron_right"} className="text-base text-on-surface-variant" />
+                      <span className="flex-1 min-w-0 truncate font-bold text-sm text-on-surface">
+                        {g.equip} <span className="font-normal text-xs text-on-surface-variant">({g.list.length})</span>
+                      </span>
+                      {allDone ? (
+                        <StatusChip status="완료" />
+                      ) : lateCount > 0 ? (
+                        <StatusChip status="지연" label={`지연 ${lateCount}건`} />
+                      ) : null}
+                      <span className="text-xs font-bold text-on-surface-variant tabular-nums">{g.progress}%</span>
+                    </button>
+                    {isOpen && (
+                      <ul className="divide-y divide-border-subtle border-t border-border-subtle">
+                        {g.list.map((r) => {
+                          const barColor = barColorOf(r);
+                          const overdueDays = data.todayOff - r.sch.endOff;
+                          return (
+                            <li key={r.id} className="px-3 py-2.5 flex flex-col gap-1">
+                              <div className="flex items-start gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setEntryTaskId(r.id)}
+                                  aria-label={`${r.name} 실적 입력 열기`}
+                                  className="flex-1 min-w-0 min-h-10 text-left flex flex-col justify-center"
+                                >
+                                  <span className="text-sm font-bold text-on-surface break-keep">{r.name}</span>
+                                  {/* 날짜는 중간에서 꺾이지 않게 덩어리(nowrap)로 — 칸이 좁으면 덩어리째 다음 줄로 */}
+                                  <span className="text-xs text-on-surface-variant flex flex-wrap gap-x-2">
+                                    <span className="whitespace-nowrap">
+                                      계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}
+                                    </span>
+                                    <span className="whitespace-nowrap">
+                                      {r.actualBar?.real
+                                        ? `실적 ${r.actualBar.startStr!.slice(5)}~${r.actualBar.endStr!.slice(5)}`
+                                        : r.actual > 0
+                                          ? `실적 ${r.actual}% (일자 미입력)`
+                                          : "실적 미입력"}
+                                    </span>
+                                  </span>
+                                </button>
+                                <div className="shrink-0 flex items-center gap-1">
+                                  <TaskStatusChip r={r} overdueDays={overdueDays} />
+                                  <span className={`w-10 text-right text-xs font-bold tabular-nums ${BAR_STYLE[barColor].text}`}>
+                                    {r.actual}%
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  aria-label={`${r.name} 계획일정 조정`}
+                                  onClick={() => openEditor(r)}
+                                  className="shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+                                >
+                                  <Icon name="edit_calendar" className="text-base" />
+                                </button>
+                              </div>
+                              <div className="relative h-7" aria-hidden="true">
+                                <div
+                                  className="absolute top-1 h-2.5 rounded-full bg-surface-container-highest"
+                                  style={{ left: pos(r.sch.startOff), width: pos(Math.max(1, r.sch.endOff - r.sch.startOff)) }}
+                                />
+                                {r.actualBar ? (
+                                  <div
+                                    className={`absolute top-[17px] h-2.5 rounded-full ${BAR_STYLE[barColor].bg} ${r.actualBar.real ? "" : "opacity-60"}`}
+                                    style={{
+                                      left: pos(r.actualBar.startOff),
+                                      width: pos(Math.max(1, r.actualBar.endOff - r.actualBar.startOff)),
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    className="absolute top-[17px] h-2.5 rounded-full border border-dashed border-outline-variant"
+                                    style={{ left: pos(r.sch.startOff), width: pos(Math.max(1, r.sch.endOff - r.sch.startOff)) }}
+                                  />
+                                )}
+                                <div
+                                  className="absolute top-0 bottom-0 w-px bg-status-error/70"
+                                  style={{ left: pos(todayOff) }}
+                                />
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 간트차트 — PC */}
+          <Card lift={false} className="p-card-padding overflow-hidden max-md:hidden">
             <div className="overflow-x-auto">
               {/* PC(md 이상)는 칸 폭에 딱 맞춰 전체 일자가 한 화면에 들어오고, 폰은 최소 폭을 두고 옆으로 민다.
                   이름 칸 폭은 --lbl 한 곳에서 정한다(헤더·설비 행·작업 행·오늘 선이 같이 쓴다). */}
@@ -509,8 +649,19 @@ export default function Schedule() {
                         )}
                         {/* 설비 요약 행 */}
                         <div
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={isOpen}
+                          aria-label={`${g.equip} 설비 ${isOpen ? "접기" : "펼치기"}`}
                           className="flex items-center py-2 cursor-pointer hover:bg-surface-container-low rounded-lg transition-colors"
                           onClick={() => setCollapsed((c) => ({ ...c, [g.equip]: isOpen }))}
+                          onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget) return;
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setCollapsed((c) => ({ ...c, [g.equip]: isOpen }));
+                            }
+                          }}
                         >
                           {/* 펼침 화살표는 칸 왼쪽 가장자리에 고정 — 설비 이름 길이와 상관없이 모든 설비 줄의
                               화살표가 한 세로줄로 늘어선다. 이름·칩은 그 오른쪽에서 가운데로 모은다 */}
@@ -571,6 +722,17 @@ export default function Schedule() {
                                   hideHistory();
                                   setEntryTaskId(r.id);
                                 }}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`${r.name} 실적 입력 열기`}
+                                onKeyDown={(e) => {
+                                  if (e.target !== e.currentTarget) return;
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    hideHistory();
+                                    setEntryTaskId(r.id);
+                                  }
+                                }}
                                 title="눌러서 실적 입력 · 올려 두면 정비 이력"
                                 className={`flex items-center py-1.5 group cursor-pointer border-b border-border-subtle/40 last:border-0 ${
                                   editing?.id === r.id ? "bg-primary/5" : ""
@@ -619,23 +781,7 @@ export default function Schedule() {
                                   </p>
                                 </div>
                                 <div className="w-[var(--st)] shrink-0 flex items-center justify-center">
-                                  {r.actual >= 100 ? (
-                                    <StatusChip status="완료" />
-                                  ) : r.behind ? (
-                                    <StatusChip
-                                      status="지연"
-                                      label={overdueDays > 0 ? `지연 ${overdueDays}일` : "지연"}
-                                      title={
-                                        overdueDays > 0
-                                          ? `계획 종료일(${r.sch.plannedEndStr})에서 ${overdueDays}일 지났습니다`
-                                          : "오늘까지 나갔어야 할 계획 진도보다 뒤처졌습니다"
-                                      }
-                                    />
-                                  ) : r.actual > 0 ? (
-                                    <StatusChip status="진행중" />
-                                  ) : (
-                                    <StatusChip status="대기" />
-                                  )}
+                                  <TaskStatusChip r={r} overdueDays={overdueDays} />
                                 </div>
                                 <div className="relative flex-1 h-11" style={{ marginRight: END_GUTTER }}>
                                   {/* 계획 (윗줄) */}

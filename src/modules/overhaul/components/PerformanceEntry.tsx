@@ -593,7 +593,7 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
             />
           </Field>
           <Field label={`금일 완료 (${task.unit})`}>
-            <input
+            <input aria-label="0"
               type="number"
               min="0"
               value={form.doneToday}
@@ -639,7 +639,7 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
             </select>
           </Field>
           <Field label="익일 계획 / 조치계획">
-            <input
+            <input aria-label="다음 작업 계획을 입력하세요."
               value={form.plan}
               onChange={(e) => setForm({ ...form, plan: e.target.value })}
               placeholder="다음 작업 계획을 입력하세요."

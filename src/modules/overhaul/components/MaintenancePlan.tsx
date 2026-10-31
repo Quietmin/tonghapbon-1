@@ -449,6 +449,16 @@ export default function MaintenancePlan() {
           </div>
 
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="파일 올리기 — 눌러서 고르거나 끌어다 놓기"
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                inputRef.current?.click();
+              }
+            }}
             onClick={() => inputRef.current?.click()}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
@@ -527,7 +537,7 @@ export default function MaintenancePlan() {
                 <label className="text-label-caps uppercase text-on-surface-variant block mb-1.5">
                   대상 연도
                 </label>
-                <select
+                <select aria-label="대상 연도"
                   value={data!.targetYear}
                   onChange={(e) => load(Number(e.target.value))}
                   className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-bold outline-none focus:border-primary"
@@ -610,7 +620,7 @@ export default function MaintenancePlan() {
             </div>
             <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 min-h-11 border border-transparent focus-within:border-primary transition-colors">
               <Icon name="search" className="text-on-surface-variant text-base" />
-              <input
+              <input aria-label="설비명, Tag No., 대분류 검색"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="설비명, Tag No., 대분류 검색"
@@ -726,6 +736,7 @@ export default function MaintenancePlan() {
                           ) : (
                             <input
                               value={units[r.id] ?? "EA"}
+                              aria-label={`${r.name ?? "항목"} 단위`}
                               onChange={(e) => setUnits({ ...units, [r.id]: e.target.value })}
                               className="w-16 h-10 px-2 rounded-lg bg-surface-container-low border border-border-subtle text-sm text-center outline-none focus:border-primary"
                             />
@@ -752,7 +763,7 @@ export default function MaintenancePlan() {
               <div className="flex flex-wrap items-center justify-between gap-3 px-card-padding py-3 border-t border-border-subtle">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
                   <span>페이지당</span>
-                  <select
+                  <select aria-label="페이지당 개수"
                     value={String(pageSize)}
                     onChange={(e) =>
                       setPageSize(e.target.value === "all" ? "all" : Number(e.target.value))
@@ -792,13 +803,14 @@ export default function MaintenancePlan() {
                     <>
                       {(
                         [
-                          { icon: "first_page", to: 1, off: safePage === 1 },
-                          { icon: "chevron_left", to: safePage - 1, off: safePage === 1 },
+                          { icon: "first_page", label: "첫 쪽", to: 1, off: safePage === 1 },
+                          { icon: "chevron_left", label: "이전 쪽", to: safePage - 1, off: safePage === 1 },
                         ] as const
                       ).map((b) => (
                         <button
                           key={b.icon}
                           type="button"
+                          aria-label={b.label}
                           disabled={b.off}
                           onClick={() => setPage(b.to)}
                           className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
@@ -811,13 +823,14 @@ export default function MaintenancePlan() {
                       </span>
                       {(
                         [
-                          { icon: "chevron_right", to: safePage + 1, off: safePage === totalPages },
-                          { icon: "last_page", to: totalPages, off: safePage === totalPages },
+                          { icon: "chevron_right", label: "다음 쪽", to: safePage + 1, off: safePage === totalPages },
+                          { icon: "last_page", label: "마지막 쪽", to: totalPages, off: safePage === totalPages },
                         ] as const
                       ).map((b) => (
                         <button
                           key={b.icon}
                           type="button"
+                          aria-label={b.label}
                           disabled={b.off}
                           onClick={() => setPage(b.to)}
                           className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"

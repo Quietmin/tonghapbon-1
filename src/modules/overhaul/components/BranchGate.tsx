@@ -97,7 +97,7 @@ export default function BranchGate({ children }: { children: React.ReactNode }) 
           <Icon name="apartment" className="text-base" />
           지사
         </span>
-        <select
+        <select aria-label="지사"
           value={branch}
           disabled={switching}
           onChange={(e) => void pick(e.target.value)}

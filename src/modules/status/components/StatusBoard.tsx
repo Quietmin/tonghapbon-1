@@ -416,7 +416,7 @@ export function UpdateDialog({
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-bold text-on-surface-variant">조치자</span>
-            <input
+            <input aria-label="이름을 입력하세요."
               value={by}
               onChange={(e) => setBy(e.target.value)}
               placeholder="이름을 입력하세요."

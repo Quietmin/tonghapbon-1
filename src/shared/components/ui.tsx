@@ -9,8 +9,11 @@ export function Icon({
   fill = false,
   ...rest
 }: { name: string; fill?: boolean } & HTMLAttributes<HTMLSpanElement>) {
+  // 아이콘 글자("close"·"expand_more" 같은 이름)를 스크린리더가 읽지 않게 가린다. 아이콘만 있는 버튼은 aria-label 로
+  // 이름을 준다. 아이콘 자체에 의미를 달아야 하면 aria-label 을 넘기면 가림이 풀린다.
   return (
     <span
+      aria-hidden={rest["aria-label"] ? undefined : true}
       className={`material-symbols-outlined ${className}`}
       style={fill ? { fontVariationSettings: "'FILL' 1, 'wght' 500" } : undefined}
       {...rest}

@@ -42,6 +42,8 @@ export default function ChapterSubNav() {
 
   // 넉넉히 들어갈 때만 6열 그리드 — 적을 때 그리드를 쓰면 칸이 남아 어색하다.
   const dense = items.length > 4;
+  // 딱 4개(설비관리)는 한 줄에 4칸이면 "오버홀 수량산출"이 세 줄로 꺾인다 — 2×2 로 깔아 한 줄 글자가 되게 한다
+  const quad = items.length === 4;
 
   return (
     <nav
@@ -54,7 +56,7 @@ export default function ChapterSubNav() {
       }`}
       aria-label={`${group.label} 하위 화면`}
     >
-      <div className={dense ? "grid grid-cols-6 gap-1" : "flex gap-3"}>
+      <div className={dense ? "grid grid-cols-6 gap-1" : quad ? "grid grid-cols-2 gap-2" : "flex gap-3"}>
         {items.map((item) => {
           const active = isActive(pathname, item);
           const label = MOBILE_LABEL_OVERRIDE[item.href] ?? item.label;
@@ -67,7 +69,9 @@ export default function ChapterSubNav() {
               className={`text-center leading-tight transition-colors ${
                 dense
                   ? "px-1 py-1.5 rounded-md text-xs font-bold"
-                  : "flex-1 px-4 py-3 rounded-xl text-base font-bold"
+                  : quad
+                    ? "flex items-center justify-center min-h-10 px-3 rounded-xl text-sm font-bold whitespace-nowrap"
+                    : "flex-1 px-4 py-3 rounded-xl text-base font-bold"
               } ${active ? ACCENT_ACTIVE[group.accent] : "bg-surface-container-high text-on-surface-variant"}`}
             >
               {label}

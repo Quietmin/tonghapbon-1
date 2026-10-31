@@ -36,7 +36,7 @@ function FieldRow({
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <label className="flex flex-col gap-1">
         <span className="text-label-caps uppercase text-on-surface-variant">회차명</span>
-        <input
+        <input aria-label="2026년 정기 오버홀"
           className="input"
           placeholder="2026년 정기 오버홀"
           value={draft.name ?? ""}

@@ -201,7 +201,7 @@ export default function StatusRegisterForm({
               설비명
               <RequiredMark />
             </span>
-            <input
+            <input aria-label="예: 1호기 순환펌프"
               value={form.equipmentName}
               onChange={(e) => set("equipmentName", e.target.value)}
               placeholder="예: 1호기 순환펌프"
@@ -215,7 +215,7 @@ export default function StatusRegisterForm({
               작성자
               <RequiredMark />
             </span>
-            <input
+            <input aria-label="이름을 입력하세요."
               value={form.reporter}
               onChange={(e) => set("reporter", e.target.value)}
               placeholder="이름을 입력하세요."

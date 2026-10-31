@@ -502,7 +502,7 @@ export default function MaintenanceMatrix() {
         </div>
         <div className="flex-1 lg:min-w-[240px] flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 min-h-11 border border-transparent focus-within:border-primary transition-colors">
           <Icon name="search" className="text-on-surface-variant text-base" />
-          <input
+          <input aria-label="설비명, Tag No., 대분류 검색"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="설비명, Tag No., 대분류 검색"
@@ -527,7 +527,7 @@ export default function MaintenanceMatrix() {
           />
           <span className="text-sm font-semibold text-on-surface">사용중지 포함</span>
         </label>
-        <select
+        <select aria-label="기준 년도"
           value={center}
           disabled={allYears}
           onChange={(e) => {
