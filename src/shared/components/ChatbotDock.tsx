@@ -108,6 +108,8 @@ interface Msg {
   suggestions?: string[];
   /** 매뉴얼·고장보고서 검색 결과 — 있으면 말풍선 아래에 카드 목록으로 그린다 */
   matches?: DocMatch[];
+  /** AI 답변이 조회한 지사 범위 — 있으면 말풍선 위에 "범위: 청주지사" 칩으로 보인다 */
+  scope?: string;
 }
 
 let msgSeq = 0;
@@ -200,7 +202,7 @@ export default function ChatbotDock() {
     setPending(false);
     setMsgs((prev) => [
       ...prev,
-      { id: (msgSeq += 1), role: "bot", text: reply.text, kind: reply.kind, suggestions: reply.suggestions, matches: reply.matches },
+      { id: (msgSeq += 1), role: "bot", text: reply.text, kind: reply.kind, suggestions: reply.suggestions, matches: reply.matches, scope: reply.scope },
     ]);
   }
 
@@ -324,6 +326,13 @@ export default function ChatbotDock() {
                   <img src="/ddasomi-search.png" alt="" className="ddasomi-msg-avatar__img" />
                 </span>
                 <div className="flex flex-col gap-1.5 min-w-0">
+                  {/* 어느 지사 범위로 조회한 답인지 — 내 지사와 질문 속 지사가 다를 수 있어 늘 밝힌다 */}
+                  {m.scope && (
+                    <span className="self-start inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold">
+                      <Icon name="location_on" className="text-[13px]" />
+                      범위: {m.scope}
+                    </span>
+                  )}
                   <div
                     className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line rounded-bl-sm ${
                       m.kind === "refused" ? "bg-error-container text-on-error-container" : "bg-surface-container-high text-on-surface"

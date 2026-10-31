@@ -4,7 +4,7 @@
 import { answerQuestion, isCrossModuleQuestion, isStructuredDataQuestion, type AnswerKind } from "./chatbotRules";
 import { toDdasomiText } from "./ddasomiVoice";
 import type { ChatbotSnapshot } from "./chatbotSnapshot";
-import type { AskFn } from "./chatbotAI";
+import type { AskFn, AskFailReason } from "./chatbotAI";
 import type { DocMatch } from "@/modules/docgen/lib/docgenSearch";
 
 const APOLOGY_TEXT = "잠시 문제가 생겼어요. 공정 데이터를 다시 확인해볼게요.";
@@ -12,6 +12,16 @@ const APOLOGY_TEXT = "잠시 문제가 생겼어요. 공정 데이터를 다시 
 const AI_DISABLED_TEXT =
   "고장이력·매뉴얼·설비 검색은 AI 연결이 필요한데, 아직 서버에 AI 설정이 되어 있지 않아요. 관리자가 배포 환경변수(OPENAI_API_KEY)를 설정하면 바로 쓸 수 있어요.";
 const AI_ERROR_TEXT = "조회 중에 연결이 잠시 불안정했어요. 조금 뒤에 다시 물어봐 주세요.";
+
+/** AI 호출이 실패한 이유별 안내 — 원인을 알면 관리자가 바로 어디를 볼지 알 수 있다 */
+const AI_FAIL_TEXT: Record<AskFailReason, string> = {
+  disabled: AI_DISABLED_TEXT,
+  auth: "AI 연결 키에 문제가 있어요(인증 실패). 관리자가 배포 환경변수 OPENAI_API_KEY가 맞는지, 폐기되지 않았는지 확인해 주세요.",
+  quota: "AI 사용 한도를 다 써서 지금은 답할 수 없어요. 관리자가 OpenAI의 사용량·결제 상태를 확인해 주세요.",
+  rate: "AI 요청이 한꺼번에 몰려 잠시 막혔어요. 잠시 뒤에 다시 물어봐 주세요.",
+  model: "설정된 AI 모델을 찾지 못했어요. 관리자가 OPENAI_MODEL 설정(또는 모델 사용 권한)을 확인해 주세요.",
+  error: AI_ERROR_TEXT,
+};
 
 export type SearchFn = (message: string) => Promise<{ ok: true; matches: DocMatch[] } | null>;
 
@@ -21,6 +31,8 @@ export interface DdasomiReply {
   suggestions?: string[];
   /** kind === "documents" 일 때만 채워진다 — 매뉴얼/고장보고서 검색 결과 */
   matches?: DocMatch[];
+  /** AI 답변이 조회한 지사 범위("청주지사" 또는 "전 지사") — 화면이 칩으로 보여 준다 */
+  scope?: string;
 }
 
 /**
@@ -86,12 +98,17 @@ export async function getDdasomiReply(
     matches,
   });
 
-  let aiFailReason: "disabled" | "error" = "error";
+  let aiFailReason: AskFailReason = "error";
   if (typeof askFn === "function") {
     try {
       const result = await askFn(message, snapshot, docsForAi.length ? { docs: docsForAi } : undefined);
       if (result && result.ok && typeof result.answer === "string" && result.answer.trim()) {
-        return { text: result.answer.trim(), kind: "answer", matches: matches.length ? matches : undefined };
+        return {
+          text: result.answer.trim(),
+          kind: "answer",
+          matches: matches.length ? matches : undefined,
+          scope: result.scope,
+        };
       }
       if (result && result.ok === false) aiFailReason = result.reason;
     } catch {
@@ -108,7 +125,7 @@ export async function getDdasomiReply(
   // no_data 는 원래의 로컬 안내문("업로드 분석에서...")으로 돌아간다 — GPT 없이도 틀린 말은 하지 않는다.
   if (local.kind === "unsupported" || local.kind === "no_data") {
     if (crossModule) {
-      return { text: aiFailReason === "disabled" ? AI_DISABLED_TEXT : AI_ERROR_TEXT, kind: "error" };
+      return { text: AI_FAIL_TEXT[aiFailReason], kind: "error" };
     }
     if (local.kind === "no_data") {
       return { text: toDdasomiText(local), kind: local.kind, suggestions: local.suggestions };

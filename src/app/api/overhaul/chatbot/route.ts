@@ -110,6 +110,21 @@ const SYSTEM_INSTRUCTIONS = `너는 발전소 플랜트 운영·정비 통합 �
 - 인사, 용어 설명, 수치 안내, 문서 안내처럼 한두 문장으로 충분한 답은 짧게 하고 목록을 억지로 만들지 않는다. 숫자와 핵심을 먼저 말한다.
 - 마크다운 기호(**, #, - 등)는 쓰지 않는다. 번호와 줄바꿈만 사용한다.`;
 
+/**
+ * OpenAI 호출 실패를 사용자에게 보여 줄 수 있는 종류로 나눈다 — 전부 upstream_error 하나로 뭉치면
+ * 키 문제인지 한도 초과인지 알 수 없어 관리자가 원인을 찾기 어렵다. 키·헤더 같은 민감한 값은 담지 않는다.
+ */
+function upstreamReason(err: any): string {
+  const status = Number(err?.status);
+  if (status === 401 || status === 403) return "upstream_auth"; // 키가 틀렸거나 폐기됨
+  if (status === 429) {
+    const text = `${err?.code ?? ""} ${err?.message ?? ""}`.toLowerCase();
+    return text.includes("quota") || text.includes("billing") ? "upstream_quota" : "upstream_rate";
+  }
+  if (status === 404) return "upstream_model"; // 모델 이름이 없거나 접근 권한 없음
+  return "upstream_error";
+}
+
 function fail(status: number, reason: string) {
   return NextResponse.json({ ok: false, reason }, { status });
 }
@@ -346,10 +361,11 @@ export async function POST(req: Request) {
   try {
     const answer = await callOpenAI({ message, context, branch, branchRequested, documents, apiKey, model: MODEL_NAME });
     if (!answer) return fail(200, "upstream_error");
-    return NextResponse.json({ ok: true, answer });
+    // scope: 이 답이 어느 지사 범위로 조회됐는지 — 화면이 답변 위에 칩으로 보여 준다
+    return NextResponse.json({ ok: true, answer, scope: branch ?? "전 지사", scopeAsked: branchRequested });
   } catch (err: any) {
     // API 키·요청 헤더 등 민감정보가 섞여 나올 수 있는 전체 에러 객체는 절대 로그하지 않는다.
     console.error("[api/overhaul/chatbot] OpenAI 호출 실패:", { status: err?.status, message: err?.message });
-    return fail(200, "upstream_error");
+    return fail(200, upstreamReason(err));
   }
 }
