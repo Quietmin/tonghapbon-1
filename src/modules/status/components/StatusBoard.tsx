@@ -17,6 +17,7 @@ import { useToast } from "@/shared/components/Toast";
 import { DEPARTMENTS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { StatusBadge, formatDate, formatDateTime } from "./badges";
+import { FaultReportLink, IssuePhotos } from "./StatusPhotos";
 
 const SORTED_BRANCHES = [...BRANCHES].sort((a, b) => a.localeCompare(b, "ko"));
 
@@ -395,6 +396,8 @@ export function UpdateDialog({
           {row.status_updated_at && ` · 상태 변경 ${formatDateTime(row.status_updated_at)}`}
         </p>
 
+        <IssuePhotos issueId={row.id} />
+
         <div className="border-t border-border-subtle pt-4 flex flex-col gap-4">
           <h4 className="text-sm font-bold text-on-surface">조치 현황 갱신</h4>
 
@@ -456,7 +459,8 @@ export function UpdateDialog({
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <FaultReportLink row={row} />
           <Button variant="ghost" onClick={onClose} disabled={saving}>
             취소
           </Button>

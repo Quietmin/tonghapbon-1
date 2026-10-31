@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/shared/components/ui";
 import type { StatusIssueRow } from "../lib/repo";
 import { StatusBadge, formatDate, formatDateTime } from "./badges";
+import { FaultReportLink, IssuePhotos } from "./StatusPhotos";
 
 /**
  * 현황 요약 창 — 보기 전용.
@@ -75,6 +76,8 @@ export default function IssueDetailDialog({
             .join(" · ")}
         </p>
 
+        <IssuePhotos issueId={row.id} />
+
         <div className="border-t border-border-subtle pt-4 flex flex-col gap-3">
           <h4 className="text-sm font-bold text-on-surface">조치 현황</h4>
           {hasAction ? (
@@ -111,7 +114,8 @@ export default function IssueDetailDialog({
           )}
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <FaultReportLink row={row} />
           <Link
             href={moreHref}
             className="px-4 py-2.5 rounded-sm font-bold text-sm text-primary hover:bg-surface-container-high"

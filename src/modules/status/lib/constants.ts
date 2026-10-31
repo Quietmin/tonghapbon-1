@@ -22,6 +22,9 @@ export const STATUS_STYLE: Record<IssueStatus, string> = {
   조치완료: "bg-status-success/10 text-status-success",
 };
 
+/** 한 이슈에 붙일 수 있는 사진 수 — 화면(브라우저)과 서버가 같은 값을 쓴다 */
+export const MAX_ISSUE_PHOTOS = 5;
+
 export function isStatus(v: unknown): v is IssueStatus {
   return typeof v === "string" && (STATUS_OPTIONS as readonly string[]).includes(v);
 }

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button, Card, Icon, RequiredMark } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
 import { DEPARTMENTS } from "../lib/constants";
+import { PhotoPicker, type PickedPhoto } from "./StatusPhotos";
 
 const SORTED_BRANCHES = [...BRANCHES].sort((a, b) => a.localeCompare(b, "ko"));
 
@@ -56,6 +57,11 @@ export default function StatusRegisterForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<FormState | null>(null);
+  /** 첨부 사진(선택) — 브라우저에서 줄인 data URL */
+  const [photos, setPhotos] = useState<PickedPhoto[]>([]);
+  /** 이슈는 저장됐지만 사진만 못 저장했을 때의 안내(예: 배포 DB 에 사진 테이블이 아직 없음) */
+  const [photoWarning, setPhotoWarning] = useState<string | null>(null);
+  const [donePhotoCount, setDonePhotoCount] = useState(0);
   /** 등록을 한 번이라도 시도했는지 / 한 번 거쳐 간 칸 — 비어 있는 필수 칸을 붉게 표시하는 기준 */
   const [attempted, setAttempted] = useState(false);
   const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
@@ -88,10 +94,12 @@ export default function StatusRegisterForm({
       const res = await fetch("/api/status/issues", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, photos: photos.map((p) => p.dataUrl) }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "등록하지 못했습니다.");
+      setPhotoWarning(typeof json.photoWarning === "string" ? json.photoWarning : null);
+      setDonePhotoCount(typeof json.photosSaved === "number" ? json.photosSaved : 0);
       setDone(form);
     } catch (err) {
       setError(err instanceof Error ? err.message : "등록하지 못했습니다.");
@@ -107,7 +115,14 @@ export default function StatusRegisterForm({
         <p className="text-title-sm font-bold text-on-surface">현황이 등록되었습니다</p>
         <p className="text-sm text-on-surface-variant">
           {done.branch} · {done.equipmentName} · {done.department}
+          {donePhotoCount > 0 && ` · 사진 ${donePhotoCount}장`}
         </p>
+        {photoWarning && (
+          <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-status-warning/10 text-status-warning text-sm font-bold">
+            <Icon name="warning" className="text-base" />
+            {photoWarning}
+          </p>
+        )}
         <p className="text-sm text-on-surface-variant">
           현황 조회에 &lsquo;미완료&rsquo;로 올라가며, 유지보수 담당자가 조치 상태를 갱신합니다.
         </p>
@@ -119,6 +134,8 @@ export default function StatusRegisterForm({
               setForm({ ...EMPTY, branch: done.branch, department: done.department, reporter: done.reporter });
               setAttempted(false);
               setTouched({});
+              setPhotos([]);
+              setPhotoWarning(null);
               setDone(null);
             }}
           >
@@ -224,6 +241,8 @@ export default function StatusRegisterForm({
             aria-invalid={invalid("content")}
           />
         </label>
+
+        <PhotoPicker photos={photos} onChange={setPhotos} onError={setError} />
       </Card>
 
       {error && (
