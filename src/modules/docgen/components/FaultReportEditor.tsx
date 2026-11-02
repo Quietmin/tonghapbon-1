@@ -38,14 +38,32 @@ import {
  * (occurred_at / facility / device / fault_content / situation /
  *  recover_at / action_taken / outage_*).
  */
-export default function FaultReportEditor() {
+/** 다른 화면(현황 이슈)에서 넘어올 때 미리 채울 값 — 모두 선택 */
+export interface FaultReportInitial {
+  branch?: string;
+  facility?: string;
+  faultContent?: string;
+  /** 발생일시(ISO). 브라우저 시간대의 입력값으로 바꿔 채운다 */
+  occurredAt?: string;
+}
+
+/** ISO 시각 → datetime-local 입력값(브라우저 시간대, YYYY-MM-DDTHH:mm). 해석할 수 없으면 "" */
+function isoToLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+export default function FaultReportEditor({ initial }: { initial?: FaultReportInitial } = {}) {
   // 지사는 기본값을 두지 않는다 — 고르지 않고 지나쳐도 조용히 찍히는 값이 되면 안 된다.
-  const [branch, setBranch] = useState("");
+  // (현황 이슈에서 넘어온 경우만 그 이슈의 지사로 미리 채운다)
+  const [branch, setBranch] = useState(initial?.branch ?? "");
   const [field, setField] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
-  const [facility, setFacility] = useState("");
+  const [facility, setFacility] = useState(initial?.facility ?? "");
   const [device, setDevice] = useState("");
-  const [faultContent, setFaultContent] = useState("");
+  const [faultContent, setFaultContent] = useState(initial?.faultContent ?? "");
   const [situation, setSituation] = useState("");
   const [recoverAt, setRecoverAt] = useState("");
   const [recoverNote, setRecoverNote] = useState("");
@@ -74,7 +92,10 @@ export default function FaultReportEditor() {
    * prev 가 비어 있을 때만 채운다 — 임시저장 복구가 먼저 값을 넣었다면 덮지 않는다.
    */
   useEffect(() => {
-    setOccurredAt((prev) => prev || nowForDateTimeLocal());
+    // 현황 이슈에서 넘어왔다면 그 이슈가 올라온 시각, 아니면 지금
+    const fromIssue = initial?.occurredAt ? isoToLocalInput(initial.occurredAt) : "";
+    setOccurredAt((prev) => prev || fromIssue || nowForDateTimeLocal());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 때 한 번만 채운다
   }, []);
 
   /** 열공급 기간 = 복구일시 - 중단일시 */

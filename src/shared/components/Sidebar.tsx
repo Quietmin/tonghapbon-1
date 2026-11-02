@@ -129,7 +129,7 @@ export default function Sidebar() {
                     aria-expanded={expanded}
                     aria-label={`${group.label} 하위 메뉴 ${expanded ? "접기" : "펼치기"}`}
                     title={expanded ? "접기" : "펼치기"}
-                    className="w-8 h-8 mr-1 shrink-0 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                    className="w-10 h-10 mr-1 shrink-0 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
                   >
                     <Icon
                       name="expand_more"
@@ -148,7 +148,7 @@ export default function Sidebar() {
                     return (
                       <div key={item.href}>
                         {showSection && (
-                          <p className="px-3 mt-3 mb-1 text-[12px] font-bold uppercase tracking-wider text-on-surface-variant/60">
+                          <p className="px-3 mt-3 mb-1 text-[12px] font-bold uppercase tracking-wider text-on-surface-variant">
                             {item.section}
                           </p>
                         )}

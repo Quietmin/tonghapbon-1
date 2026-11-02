@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Card, Icon, Button, FieldChip, EmptyState } from "@/shared/components/ui";
+import { Card, Icon, Button, FieldChip, EmptyState, ScreenHeader, ErrorState } from "@/shared/components/ui";
 import type { ParsedTask } from "../lib/excelParser";
 
 /**
@@ -183,22 +183,26 @@ export default function UploadAnalysis() {
 
   return (
     <>
-      <div>
-        <h1 className="text-display-lg text-on-surface pt-2">업로드 분석</h1>
-        <p className="text-body-md text-on-surface-variant mt-2">
-          설계내역서 엑셀을 넣으면 바로 분석해서 작업항목을 뽑아냅니다. 엑셀 원본은 저장하지
-          않고, 추출된 항목만 남습니다. 작업항목은 위에 표시된 회차에 쌓입니다 —{" "}
-          <Link href="/overhaul/project" className="text-primary font-semibold hover:underline">
-            회차 관리
-          </Link>
-          에서 바꿀 수 있습니다.
-        </p>
-        <p className="text-sm text-on-surface-variant mt-1.5">
-          보수계획에서 뽑은 수량산출서를 시공사가 채워 되돌려준 파일이면, 맨 끝
-          <b> 항목ID</b> 열이 남아 있는지 확인하세요. 그 열이 있으면 어느 내역서 항목인지
-          정확히 이어져 준공 후 이력 반영이 자동으로 맞춰집니다.
-        </p>
-      </div>
+      <ScreenHeader
+        icon="upload_file"
+        title="엑셀 등록"
+        bullets={[]}
+        tone="soft"
+        desc={
+          <>
+            설계내역서 엑셀을 넣으면 바로 분석해서 작업항목을 뽑아냅니다. 엑셀 원본은 저장하지 않고, 추출된 항목만
+            남습니다. 작업항목은 위에 표시된 회차에 쌓입니다 —{" "}
+            <Link href="/overhaul/project" className="text-primary font-semibold hover:underline">
+              회차 관리
+            </Link>
+            에서 바꿀 수 있습니다.
+            <span className="block text-sm mt-1.5">
+              보수계획에서 뽑은 수량산출서를 시공사가 채워 되돌려준 파일이면, 맨 끝 <b>항목ID</b> 열이 남아 있는지
+              확인하세요. 그 열이 있으면 어느 내역서 항목인지 정확히 이어져 준공 후 이력 반영이 자동으로 맞춰집니다.
+            </span>
+          </>
+        }
+      />
 
       {/* 분야 지정 */}
       <Card className="p-card-padding" lift={false}>
@@ -209,7 +213,7 @@ export default function UploadAnalysis() {
               <button
                 key={f}
                 onClick={() => setFieldHint(f)}
-                className={`px-3 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                className={`px-3.5 min-h-10 rounded-full text-sm font-bold transition-colors ${
                   fieldHint === f
                     ? "bg-primary text-on-primary"
                     : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
@@ -243,6 +247,16 @@ export default function UploadAnalysis() {
             setDragging(false);
             handleFiles(Array.from(e.dataTransfer.files));
           }}
+          role="button"
+          tabIndex={0}
+          aria-label="파일 올리기 — 눌러서 고르거나 끌어다 놓기"
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
           onClick={() => inputRef.current?.click()}
           className="cursor-pointer py-14 px-6 flex flex-col items-center text-center"
         >
@@ -270,17 +284,12 @@ export default function UploadAnalysis() {
       </Card>
 
       {error && (
-        <Card className="p-4 border border-error/30" lift={false}>
-          <p className="text-sm text-error flex items-center gap-2">
-            <Icon name="error" className="text-base" />
-            {error}
-          </p>
-        </Card>
+        <ErrorState message={error} />
       )}
 
       {done && (
         <Card className="p-4 border border-status-success/30" lift={false}>
-          <p className="text-sm text-status-success flex flex-wrap items-center gap-2">
+          <p className="text-sm text-status-success-text flex flex-wrap items-center gap-2">
             <Icon name="check_circle" className="text-base" />
             작업항목 {done.tasks.toLocaleString()}건을 등록했습니다.
             {done.linked > 0 && ` 수량산출서 항목 ${done.linked}건에 일정을 되돌려 적었습니다.`}
@@ -301,7 +310,7 @@ export default function UploadAnalysis() {
             <h2 className="text-headline-md text-on-surface">
               분석 결과 <span className="text-primary">{totalExtracted}건</span>
               {totalVerify > 0 && (
-                <span className="text-status-warning text-base font-bold ml-2">
+                <span className="text-status-warning-text text-base font-bold ml-2">
                   확인 필요 {totalVerify}
                 </span>
               )}
@@ -342,14 +351,14 @@ export default function UploadAnalysis() {
                 <div className="flex flex-wrap gap-1.5">
                   {r.statementLinkedCount > 0 && (
                     <span
-                      className="px-2.5 py-1 rounded-full bg-status-success/10 text-status-success text-xs font-bold"
+                      className="px-2.5 py-1 rounded-full bg-status-success/10 text-status-success-text text-xs font-bold"
                       title="수량산출서의 항목ID가 남아 있어 내역서 항목과 정확히 이어집니다"
                     >
                       내역서 연결 {r.statementLinkedCount}건
                     </span>
                   )}
                   {r.needVerifyCount > 0 && (
-                    <span className="px-2.5 py-1 rounded-full bg-status-warning/10 text-status-warning text-xs font-bold">
+                    <span className="px-2.5 py-1 rounded-full bg-status-warning/10 text-status-warning-text text-xs font-bold">
                       확인 필요 {r.needVerifyCount}건
                     </span>
                   )}
@@ -450,7 +459,7 @@ export default function UploadAnalysis() {
                       href={`/api/overhaul/sources/file?id=${s.id}`}
                       download={s.file_name}
                       title="원본 엑셀 내려받기"
-                      className="text-sm font-bold text-on-surface truncate block hover:text-primary hover:underline"
+                      className="text-sm font-bold text-on-surface truncate block py-2.5 hover:text-primary hover:underline"
                     >
                       {s.file_name}
                     </a>
@@ -464,13 +473,13 @@ export default function UploadAnalysis() {
                     href={`/api/overhaul/sources/file?id=${s.id}`}
                     download={s.file_name}
                     title="원본 엑셀 내려받기"
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary-container/40 text-on-surface-variant hover:text-primary transition-colors"
                   >
                     <Icon name="download" className="text-lg" />
                   </a>
                   <button
                     onClick={() => removeSource(s.id, s.file_name)}
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors"
                     title="이 파일의 작업항목 전체 삭제"
                   >
                     <Icon name="delete" className="text-lg" />

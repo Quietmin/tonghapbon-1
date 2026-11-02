@@ -5,10 +5,14 @@ import {
   Card,
   Icon,
   StatusChip,
+  ScreenHeader,
+  ButtonLink,
+  Button,
   FieldChip,
   Avatar,
   EmptyState,
   ProgressBar,
+  LoadingState,
 } from "@/shared/components/ui";
 import { taskProgress } from "../lib/progress";
 import TaskEditor from "./TaskEditor";
@@ -90,30 +94,26 @@ export default function TaskManagement() {
 
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-display-lg text-on-surface">작업 관리</h1>
-          <p className="text-on-surface-variant text-body-md">
-            {data?.project.name ?? "—"} · 전체 {(s?.taskCount ?? 0).toLocaleString()}개 작업
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <a
-            href="/overhaul/tasks/upload"
-            className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-surface-container-high text-on-surface hover:bg-surface-container-highest border border-border-subtle transition-colors"
-          >
-            <Icon name="upload_file" className="text-base" />
-            엑셀로 일괄 추가
-          </a>
-          <button
-            onClick={() => setEdit("new")}
-            className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-primary text-on-primary hover:opacity-90 transition-opacity"
-          >
-            <Icon name="add" className="text-base" />
-            작업 추가
-          </button>
-        </div>
-      </div>
+      <ScreenHeader
+        icon="format_list_bulleted"
+        title="작업 목록"
+        desc={`${data?.project.name ?? "—"} · 전체 ${(s?.taskCount ?? 0).toLocaleString()}개 작업`}
+        bullets={[]}
+        tone="soft"
+        actionOnMobile
+        action={
+          <>
+            <ButtonLink href="/overhaul/tasks/upload" variant="ghost">
+              <Icon name="upload_file" className="text-base" />
+              엑셀로 일괄 추가
+            </ButtonLink>
+            <Button onClick={() => setEdit("new")}>
+              <Icon name="add" className="text-base" />
+              작업 추가
+            </Button>
+          </>
+        }
+      />
 
       {edit && (
         <TaskEditor
@@ -144,16 +144,16 @@ export default function TaskManagement() {
       <Card lift={false} className="p-card-padding">
         {/* 필터 바 */}
         <div className="flex flex-col lg:flex-row gap-3 mb-5">
-          <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 border border-transparent focus-within:border-primary focus-within:bg-surface-container-lowest transition-colors">
+          <div className="flex-1 flex items-center gap-2 bg-surface-container-low rounded-xl px-4 h-11 min-h-11 border border-transparent focus-within:border-primary focus-within:bg-surface-container-lowest transition-colors">
             <Icon name="search" className="text-on-surface-variant text-base" />
-            <input
+            <input aria-label="작업명, 규격 검색 (여러 낱말로 좁힐 수 있습니다)"
               value={q}
               onChange={(e) => reset(setQ)(e.target.value)}
               placeholder="작업명, 규격 검색 (여러 낱말로 좁힐 수 있습니다)"
-              className="flex-1 bg-transparent outline-none text-sm"
+              className="flex-1 self-stretch min-w-0 bg-transparent outline-none text-sm"
             />
           </div>
-          <select
+          <select aria-label="분야"
             value={field}
             onChange={(e) => reset(setField)(e.target.value)}
             className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary"
@@ -164,7 +164,7 @@ export default function TaskManagement() {
               </option>
             ))}
           </select>
-          <select
+          <select aria-label="설비"
             value={equipment}
             onChange={(e) => reset(setEquipment)(e.target.value)}
             className="h-11 px-4 rounded-xl bg-surface-container-low border border-border-subtle text-sm font-semibold outline-none focus:border-primary"
@@ -180,7 +180,7 @@ export default function TaskManagement() {
             title="수량·단위·분야가 불명확해 사람이 확인해야 하는 항목만 봅니다"
             className={`h-11 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 whitespace-nowrap transition-colors border ${
               onlyReview
-                ? "bg-status-warning/15 text-status-warning border-status-warning/40"
+                ? "bg-status-warning/15 text-status-warning-text border-status-warning/40"
                 : "bg-surface-container-low text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
             }`}
           >
@@ -192,7 +192,7 @@ export default function TaskManagement() {
 
         {/* 테이블 */}
         {loading && !data ? (
-          <p className="py-16 text-center text-sm text-on-surface-variant">불러오는 중…</p>
+          <LoadingState />
         ) : rows.length === 0 ? (
           <EmptyState
             icon={s?.taskCount ? (onlyReview ? "verified" : "search_off") : "table_rows"}
@@ -212,16 +212,93 @@ export default function TaskManagement() {
             }
           />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* 폰(md 미만) — 표는 폭이 860px 이상이라 옆으로 밀어야 해서 카드 목록으로 보인다.
+              카드를 누르면 같은 실적 입력 팝업이 뜨고, 연필 버튼은 작업 수정 창을 연다 */}
+          <ul className="md:hidden flex flex-col divide-y divide-border-subtle -mx-1">
+            {rows.map((t) => {
+              const p = taskProgress(t);
+              const status = p >= 100 ? "완료" : risk.has(t.id) ? "지연" : p > 0 ? "진행중" : "대기";
+              const open = () => setEntryTaskId(t.id);
+              return (
+                <li
+                  key={t.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={open}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      open();
+                    }
+                  }}
+                  className="py-3 px-1 flex flex-col gap-1.5 text-center cursor-pointer active:bg-surface-container-low focus-visible:bg-surface-container-low outline-none"
+                >
+                  <div className="flex items-center justify-center gap-2 min-w-0">
+                    <FieldChip field={t.field ?? "미분류"} />
+                    {t.tag && (
+                      <span className="font-mono-data text-xs text-on-surface-variant truncate">{t.tag}</span>
+                    )}
+                    {t.needs_review && (
+                      <span className="text-status-warning-text text-xs font-bold shrink-0">확인 필요</span>
+                    )}
+                    <span className="shrink-0">
+                      <StatusChip status={status} />
+                    </span>
+                  </div>
+                  <p className="font-semibold text-on-surface text-sm break-keep">{t.name}</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {[
+                      t.equipment_type ?? "기타",
+                      t.sheet_name,
+                      t.spec,
+                      `계획 ${Number(t.plan_qty).toLocaleString()} ${t.unit ?? ""}`.trim(),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <ProgressBar
+                      value={p}
+                      color={status === "지연" ? "error" : "primary"}
+                      height="h-1.5"
+                      className="flex-1"
+                    />
+                    <span className="text-xs font-bold tabular-nums w-10 text-right">{p}%</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    <Avatar name={t.assignee} />
+                    <span className="text-sm">
+                      {t.assignee || <span className="text-on-surface-variant">미지정</span>}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="이 작업 수정·삭제"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEdit(t);
+                      }}
+                      className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                    >
+                      <Icon name="edit" className="text-base" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="max-md:hidden overflow-x-auto">
             <table className="w-full text-left min-w-[860px]">
               <thead>
                 <tr className="text-on-surface-variant text-[12px] md:text-[13px] font-semibold uppercase tracking-widest border-b border-border-subtle">
-                  <th className="pb-3 pr-3">설비 / 작업명</th>
-                  <th className="pb-3 px-3">규격</th>
-                  <th className="pb-3 px-3">계획수량</th>
-                  <th className="pb-3 px-3 w-40">진행률</th>
-                  <th className="pb-3 px-3">상태</th>
-                  <th className="pb-3 px-3">담당자</th>
+                  <th className="pb-3 px-3 text-center text-center">설비 / 작업명</th>
+                  <th className="pb-3 px-3 text-center">규격</th>
+                  <th className="pb-3 px-3 text-center">계획수량</th>
+                  <th className="pb-3 px-3 text-center w-40">진행률</th>
+                  <th className="pb-3 px-3 text-center">상태</th>
+                  <th className="pb-3 px-3 text-center">담당자</th>
                   <th className="pb-3 pl-3 w-10" />
                 </tr>
               </thead>
@@ -249,8 +326,8 @@ export default function TaskManagement() {
                       title="눌러서 실적 입력 · 올려 두면 정비 이력"
                       className="group cursor-pointer hover:bg-surface-container-low transition-colors"
                     >
-                      <td className="py-3 pr-3">
-                        <div className="flex items-center gap-2 mb-0.5">
+                      <td className="py-3 px-3 text-center text-center">
+                        <div className="flex items-center justify-center gap-2 mb-0.5">
                           <FieldChip field={t.field ?? "미분류"} />
                           {t.tag && (
                             <span className="font-mono-data text-xs text-on-surface-variant">
@@ -259,7 +336,7 @@ export default function TaskManagement() {
                           )}
                           {t.needs_review && (
                             <span
-                              className="text-status-warning text-xs font-bold"
+                              className="text-status-warning-text text-xs font-bold"
                               title="수량·단위·분야가 불명확해 확인이 필요한 항목"
                             >
                               확인 필요
@@ -274,14 +351,14 @@ export default function TaskManagement() {
                           {t.sheet_name ? ` · ${t.sheet_name}` : ""}
                         </p>
                       </td>
-                      <td className="py-3 px-3 text-sm text-on-surface-variant max-w-[180px]">
+                      <td className="py-3 px-3 text-center text-sm text-on-surface-variant max-w-[180px]">
                         {t.spec || "—"}
                       </td>
-                      <td className="py-3 px-3 font-mono-data text-sm whitespace-nowrap">
+                      <td className="py-3 px-3 text-center font-mono-data text-sm whitespace-nowrap">
                         {Number(t.plan_qty).toLocaleString()} {t.unit ?? ""}
                       </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
                           <ProgressBar
                             value={p}
                             color={status === "지연" ? "error" : "primary"}
@@ -293,18 +370,18 @@ export default function TaskManagement() {
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 text-center">
                         <StatusChip status={status} />
                       </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
                           <Avatar name={t.assignee} />
                           <span className="text-sm whitespace-nowrap">
                             {t.assignee || <span className="text-on-surface-variant">미지정</span>}
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 pl-3">
+                      <td className="py-3 px-3 text-center">
                         <button
                           title="이 작업 수정·삭제"
                           onClick={(e) => {
@@ -312,7 +389,7 @@ export default function TaskManagement() {
                             e.stopPropagation();
                             setEdit(t);
                           }}
-                          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+                          className="mx-auto w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
                         >
                           <Icon name="edit" className="text-base" />
                         </button>
@@ -323,6 +400,7 @@ export default function TaskManagement() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {/* 페이지네이션 */}
@@ -335,7 +413,8 @@ export default function TaskManagement() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={data.page === 1}
-                className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
+                aria-label="이전 쪽"
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
               >
                 <Icon name="chevron_left" />
               </button>
@@ -345,7 +424,8 @@ export default function TaskManagement() {
               <button
                 onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                 disabled={data.page >= data.totalPages}
-                className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
+                aria-label="다음 쪽"
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-surface-container-high disabled:opacity-30"
               >
                 <Icon name="chevron_right" />
               </button>

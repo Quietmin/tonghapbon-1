@@ -733,6 +733,21 @@ drop trigger if exists status_issue_set_updated_at on status_issue;
 create trigger status_issue_set_updated_at before update on status_issue
   for each row execute function set_updated_at();
 
+-- 현황 이슈에 붙인 현장 사진. 운영 근무자가 폰으로 찍어 올리면 유지보수 담당자가 현장에 가기 전에 본다.
+-- 오버홀 실적 사진(overhaul_entry_photo)과 같은 방식 — 브라우저에서 줄인 JPEG 를 data URL 로 저장한다.
+create table if not exists status_issue_photo (
+  id         bigint generated always as identity primary key,
+  issue_id   uuid not null references status_issue(id) on delete cascade,
+  /** 표시 순서 (1부터) */
+  seq        integer not null default 1,
+  /** data:image/jpeg;base64,... */
+  data       text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists status_issue_photo_issue_idx
+  on status_issue_photo (issue_id, seq);
+
 
 -- ============================================================================
 -- 보안 — 앱 테이블의 행 수준 보안(RLS) 켜기
@@ -760,7 +775,7 @@ begin
     'document', 'document_chunk', 'document_tag', 'chat_message',
     'maintenance_plan_source', 'maintenance_plan', 'maintenance_plan_grade', 'maintenance_record',
     'design_statement', 'design_statement_item',
-    'status_issue'
+    'status_issue', 'status_issue_photo'
   ]
   loop
     if to_regclass('public.' || t) is not null then

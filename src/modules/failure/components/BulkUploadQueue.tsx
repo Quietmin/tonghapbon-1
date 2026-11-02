@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Card, Button, Icon } from "@/shared/components/ui";
+import Dialog, { DialogHeader } from "@/shared/components/Dialog";
+import { Card, Button, Icon, EmptyState } from "@/shared/components/ui";
 import FailureHistoryForm from "./FailureHistoryForm";
 import type { AttachmentInput, FailureHistoryInput } from "@/modules/failure/lib/repo";
 
@@ -27,10 +28,10 @@ const STATUS_LABEL: Record<Status, string> = {
 
 const STATUS_CLASS: Record<Status, string> = {
   pending: "bg-surface-container-high text-on-surface-variant",
-  processing: "bg-status-info/10 text-status-info",
-  extracted: "bg-status-warning/10 text-status-warning",
-  failed: "bg-status-error/10 text-status-error",
-  saved: "bg-status-success/10 text-status-success",
+  processing: "bg-status-info/10 text-status-info-text",
+  extracted: "bg-status-warning/10 text-status-warning-text",
+  failed: "bg-status-error/10 text-status-error-text",
+  saved: "bg-status-success/10 text-status-success-text",
 };
 
 let seq = 0;
@@ -141,6 +142,16 @@ export default function BulkUploadQueue() {
           setDragOver(false);
           if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
         }}
+        role="button"
+        tabIndex={0}
+        aria-label="파일 올리기 — 눌러서 고르거나 끌어다 놓기"
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
         onClick={() => fileInputRef.current?.click()}
         className={`p-6 flex flex-col items-center gap-2 text-center cursor-pointer border-2 border-dashed transition-colors ${
           dragOver ? "border-primary bg-primary/5" : "border-border-subtle"
@@ -165,7 +176,7 @@ export default function BulkUploadQueue() {
       </Card>
 
       {items.length === 0 ? (
-        <p className="text-sm text-on-surface-variant text-center py-8">아직 올린 파일이 없습니다.</p>
+        <EmptyState compact icon="upload_file" title="아직 올린 파일이 없습니다." />
       ) : (
         <div className="flex flex-col gap-3">
           {items.map((item) => (
@@ -179,9 +190,9 @@ export default function BulkUploadQueue() {
                     {item.fields?.occurredAt ? ` · ${item.fields.occurredAt}` : ""}
                   </p>
                 )}
-                {item.status === "failed" && <p className="text-xs text-status-error truncate">{item.error}</p>}
+                {item.status === "failed" && <p className="text-xs text-status-error-text truncate">{item.error}</p>}
                 {item.status === "extracted" && item.warning && (
-                  <p className="text-xs text-status-warning truncate">{item.warning}</p>
+                  <p className="text-xs text-status-warning-text truncate">{item.warning}</p>
                 )}
               </div>
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${STATUS_CLASS[item.status]}`}>
@@ -209,38 +220,20 @@ export default function BulkUploadQueue() {
       )}
 
       {activeItem && (
-        <div
-          className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center p-4"
-          onClick={() => dismissReview(activeItem.id)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-surface-container rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-title-sm font-bold text-on-surface truncate">{activeItem.file.name} 검토</h2>
-              <button
-                type="button"
-                onClick={() => dismissReview(activeItem.id)}
-                aria-label="닫기"
-                className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
-              >
-                <Icon name="close" className="text-base" />
-              </button>
-            </div>
-            <FailureHistoryForm
-              key={activeItem.id}
-              initialForm={activeItem.fields}
-              initialAttachment={activeItem.attachment ?? null}
-              showDropzone={false}
-              onSaved={() => {
-                updateItem(activeItem.id, { status: "saved" });
-                setActiveReviewId(null);
-              }}
-              onCancel={() => dismissReview(activeItem.id)}
-            />
-          </div>
-        </div>
+        <Dialog onClose={() => dismissReview(activeItem.id)} labelledBy="bulkReviewTitle" size="lg" sheet={false}>
+          <DialogHeader id="bulkReviewTitle" title={`${activeItem.file.name} 검토`} onClose={() => dismissReview(activeItem.id)} />
+          <FailureHistoryForm
+            key={activeItem.id}
+            initialForm={activeItem.fields}
+            initialAttachment={activeItem.attachment ?? null}
+            showDropzone={false}
+            onSaved={() => {
+              updateItem(activeItem.id, { status: "saved" });
+              setActiveReviewId(null);
+            }}
+            onCancel={() => dismissReview(activeItem.id)}
+          />
+        </Dialog>
       )}
     </div>
   );

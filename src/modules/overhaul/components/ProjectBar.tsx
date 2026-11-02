@@ -74,7 +74,7 @@ export default function ProjectBar() {
       </span>
 
       {projects.length > 1 ? (
-        <select
+        <select aria-label="회차 선택"
           value={active.id}
           disabled={switching}
           onChange={(e) => void pick(e.target.value)}
@@ -97,7 +97,7 @@ export default function ProjectBar() {
 
       <span
         className={`text-xs font-semibold ${
-          active.start_date && active.end_date ? "text-on-surface-variant" : "text-status-warning"
+          active.start_date && active.end_date ? "text-on-surface-variant" : "text-status-warning-text"
         }`}
       >
         {period}
@@ -105,7 +105,7 @@ export default function ProjectBar() {
 
       <Link
         href="/overhaul/project"
-        className="ml-auto flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+        className="ml-auto flex items-center gap-1 min-h-10 px-1 text-xs font-bold text-primary hover:underline"
       >
         <Icon name="settings" className="text-sm" />
         회차 관리

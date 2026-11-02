@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card, Icon, Button } from "@/shared/components/ui";
+import { Card, Icon, Button, RequiredMark } from "@/shared/components/ui";
 import type { OverhaulTask } from "../lib/repo";
 
 /**
@@ -76,12 +76,25 @@ export function draftToPatch(d: TaskDraft) {
 
 const FIELDS = ["기계", "전기", "제어"];
 
-function Labeled({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Labeled({
+  label,
+  hint,
+  required,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-label-caps uppercase text-on-surface-variant">{label}</span>
+      <span className="text-label-caps uppercase text-on-surface-variant">
+        {label}
+        {required && <RequiredMark />}
+      </span>
       {children}
-      {hint && <span className="text-[11px] md:text-[12px] text-on-surface-variant">{hint}</span>}
+      {hint && <span className="text-xs text-on-surface-variant">{hint}</span>}
     </label>
   );
 }
@@ -172,7 +185,7 @@ export default function TaskEditor({
           {task ? "작업항목 수정" : "작업항목 추가"}
         </h2>
         {task?.needs_review && (
-          <span className="text-xs font-bold text-status-warning flex items-center gap-1">
+          <span className="text-xs font-bold text-status-warning-text flex items-center gap-1">
             <Icon name="warning" className="text-sm" />
             확인이 필요한 항목입니다 — 저장하면 표시가 사라집니다
           </span>
@@ -181,7 +194,7 @@ export default function TaskEditor({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="sm:col-span-2">
-          <Labeled label="작업명">
+          <Labeled label="작업명" required>
             <input className="input" value={draft.name} onChange={(e) => set({ name: e.target.value })} />
           </Labeled>
         </div>

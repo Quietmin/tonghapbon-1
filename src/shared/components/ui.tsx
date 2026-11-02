@@ -9,8 +9,11 @@ export function Icon({
   fill = false,
   ...rest
 }: { name: string; fill?: boolean } & HTMLAttributes<HTMLSpanElement>) {
+  // 아이콘 글자("close"·"expand_more" 같은 이름)를 스크린리더가 읽지 않게 가린다. 아이콘만 있는 버튼은 aria-label 로
+  // 이름을 준다. 아이콘 자체에 의미를 달아야 하면 aria-label 을 넘기면 가림이 풀린다.
   return (
     <span
+      aria-hidden={rest["aria-label"] ? undefined : true}
       className={`material-symbols-outlined ${className}`}
       style={fill ? { fontVariationSettings: "'FILL' 1, 'wght' 500" } : undefined}
       {...rest}
@@ -43,41 +46,60 @@ export function Card({
   );
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  완료: "bg-status-success/10 text-status-success",
-  진행중: "bg-status-warning/10 text-status-warning",
-  대기: "bg-surface-container-highest text-on-surface-variant",
-  지연: "bg-status-error/10 text-status-error",
-  조치중: "bg-status-warning/10 text-status-warning",
-  조치완료: "bg-status-success/10 text-status-success",
+/**
+ * 상태 칩 — 앱 전체에서 상태를 보이는 유일한 부품. 작업 진행 상태(완료·진행중·대기·지연)와 현황 조치
+ * 상태(미완료·조치중·추후 조치 예정·조치완료)를 한 표로 묶어, 같은 뜻이면 어디서나 같은 색·모양이다.
+ * 글자색은 짙은 *-text 색(흰 바탕·옅은 칩 위에서 4.5:1 이상), 점은 밝은 색이다.
+ */
+type StatusTone = "success" | "warning" | "error" | "info" | "neutral";
+
+const TONE_STYLE: Record<StatusTone, { chip: string; dot: string }> = {
+  success: { chip: "bg-status-success/15 text-status-success-text", dot: "bg-status-success" },
+  warning: { chip: "bg-status-warning/15 text-status-warning-text", dot: "bg-status-warning" },
+  error: { chip: "bg-status-error/10 text-status-error-text", dot: "bg-status-error" },
+  info: { chip: "bg-status-info/10 text-status-info-text", dot: "bg-status-info" },
+  neutral: { chip: "bg-surface-container-highest text-on-surface-variant", dot: "bg-outline" },
 };
 
-export function StatusChip({ status }: { status: string }) {
-  const dot =
-    status === "진행중" || status === "조치중"
-      ? "bg-status-warning"
-      : status === "지연"
-        ? "bg-status-error"
-        : status === "완료" || status === "조치완료"
-          ? "bg-status-success"
-          : null;
+const STATUS_TONE: Record<string, StatusTone> = {
+  완료: "success",
+  조치완료: "success",
+  진행중: "warning",
+  조치중: "warning",
+  지연: "error",
+  미완료: "error",
+  "추후 조치 예정": "info",
+  대기: "neutral",
+};
+
+export function StatusChip({
+  status,
+  label,
+  title,
+}: {
+  /** 상태 이름 — 색을 정한다 */
+  status: string;
+  /** 칩에 다른 글자를 보이고 싶을 때(예: status="지연" label="지연 3일"). 색은 status 를 따른다 */
+  label?: string;
+  title?: string;
+}) {
+  const tone = TONE_STYLE[STATUS_TONE[status] ?? "neutral"];
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${
-        STATUS_STYLE[status] || STATUS_STYLE["대기"]
-      }`}
+      title={title}
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${tone.chip}`}
     >
-      {dot && <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />}
-      {status}
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tone.dot}`} />
+      {label ?? status}
     </span>
   );
 }
 
 const FIELD_STYLE: Record<string, string> = {
   기계: "bg-primary/10 text-primary",
-  전기: "bg-status-success/10 text-status-success",
-  제어: "bg-status-info/10 text-status-info",
-  전산: "bg-status-info/10 text-status-info",
+  전기: "bg-status-success/10 text-status-success-text",
+  제어: "bg-status-info/10 text-status-info-text",
+  전산: "bg-status-info/10 text-status-info-text",
   인적실수: "bg-tertiary/10 text-tertiary",
   기타: "bg-surface-container-highest text-on-surface-variant",
   미분류: "bg-surface-container-highest text-on-surface-variant",
@@ -86,7 +108,7 @@ const FIELD_STYLE: Record<string, string> = {
 export function FieldChip({ field }: { field: string }) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold ${
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
         FIELD_STYLE[field] || FIELD_STYLE["미분류"]
       }`}
     >
@@ -183,10 +205,10 @@ export function Avatar({
   const initials = name ? (name.length <= 2 ? name : name.slice(0, 2)) : "--";
   const bg = name
     ? "bg-primary-fixed text-on-primary-fixed-variant"
-    : "bg-outline-variant text-on-surface-variant";
+    : "bg-surface-container-highest text-on-surface-variant";
   return (
     <div
-      className={`${size} rounded-full flex items-center justify-center text-[10px] md:text-[12px] font-bold shrink-0 ${bg} ${className}`}
+      className={`${size} rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${bg} ${className}`}
     >
       {initials}
     </div>
@@ -295,16 +317,20 @@ export function ScreenHeader({
   accent = "primary",
   tone = "solid",
   action,
+  actionOnMobile = false,
 }: {
   icon: string;
   title: string;
-  desc: string;
+  /** 제목 아래 설명. 링크 등을 넣을 수 있다 */
+  desc: ReactNode;
   bullets?: string[];
   accent?: Accent;
   /** solid = 작성, soft = 조회 */
   tone?: "solid" | "soft";
   /** 오른쪽에 서는 버튼. 좁은 폭에서는 아래로 내려가 가로폭을 다 쓴다 */
   action?: ReactNode;
+  /** 폰에서도 action 을 제목 아래에 보일지 — 폰에서 꼭 필요한 버튼(작업 추가 등)이 있는 화면만 true */
+  actionOnMobile?: boolean;
 }) {
   return (
     <section className="pt-2 flex flex-col gap-4">
@@ -316,12 +342,13 @@ export function ScreenHeader({
           <ul className="mt-2 inline-block text-left">
             {bullets.map((b) => (
               <li key={b} className="flex gap-1.5 text-sm text-on-surface-variant py-0.5">
-                <span className="text-on-surface-variant/50">·</span>
+                <span aria-hidden="true" className="text-on-surface-variant/50">·</span>
                 <span>{b}</span>
               </li>
             ))}
           </ul>
         )}
+        {actionOnMobile && action && <div className="mt-3 flex flex-wrap justify-center gap-2">{action}</div>}
       </div>
 
       {/* 데스크톱 */}
@@ -348,24 +375,89 @@ export function EmptyState({
   title,
   desc,
   action,
+  compact = false,
 }: {
   icon?: string;
   title: string;
   desc?: string;
   action?: ReactNode;
+  /** 카드 안의 작은 목록처럼 좁은 자리용 — 여백·아이콘을 줄인다 */
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-      <div className="w-16 h-16 rounded-2xl bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4">
-        <Icon name={icon} className="text-3xl" />
+    <div className={`flex flex-col items-center justify-center text-center px-6 ${compact ? "py-8" : "py-16"}`}>
+      <div
+        className={`rounded-2xl bg-surface-container-high flex items-center justify-center text-on-surface-variant ${
+          compact ? "w-12 h-12 mb-3" : "w-16 h-16 mb-4"
+        }`}
+      >
+        <Icon name={icon} className={compact ? "text-2xl" : "text-3xl"} />
       </div>
-      <h4 className="text-title-sm text-on-surface mb-1">{title}</h4>
+      <h4 className={`text-on-surface mb-1 ${compact ? "text-sm font-bold" : "text-title-sm"}`}>{title}</h4>
       {/* whitespace-pre-line — desc 안의 줄바꿈을 그대로 살린다. 문장을 한 줄씩
           끊어 주지 않으면 브라우저가 아무 데서나 꺾어 너저분해 보인다. */}
       {desc && (
         <p className="text-sm text-on-surface-variant max-w-sm mb-4 whitespace-pre-line">{desc}</p>
       )}
       {action}
+    </div>
+  );
+}
+
+/**
+ * 불러오는 중 — 글자 한 줄 대신 표 모양의 뼈대가 반짝인다. 화면이 비어 있다가 갑자기 차는 느낌을 줄이고, 어느
+ * 화면에서나 같은 모양이다. 스크린리더에는 label 이 읽힌다.
+ */
+export function LoadingState({ label = "불러오는 중…", rows = 4 }: { label?: string; rows?: number }) {
+  return (
+    <div role="status" aria-busy="true" className="py-8 flex flex-col gap-3 animate-pulse">
+      <span className="sr-only">{label}</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <div
+          key={i}
+          aria-hidden="true"
+          className="h-12 rounded-xl bg-surface-container-high"
+          style={{ opacity: 1 - i * 0.18 }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 화면 전체(또는 한 영역)를 못 불러왔을 때. 무슨 일인지 쓰고, onRetry 가 있으면 다시 시도 버튼을 보인다.
+ */
+export function ErrorState({ message, onRetry }: { message: ReactNode; onRetry?: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-3 px-4 py-3.5 rounded-xl border border-status-error/30 bg-status-error/10 text-status-error-text text-sm"
+    >
+      <Icon name="error" className="text-lg shrink-0" />
+      <span className="flex-1 min-w-0 font-medium break-words">{message}</span>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="shrink-0 min-h-10 px-3 rounded-lg font-bold hover:bg-status-error/10 inline-flex items-center gap-1"
+        >
+          <Icon name="refresh" className="text-base" />
+          다시 시도
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 폼·창 안의 오류 띠 — 저장 실패, 입력 확인 안내 등 */
+export function InlineError({ children }: { children: ReactNode }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error-text text-sm"
+    >
+      <Icon name="error" className="text-base shrink-0" />
+      <span className="min-w-0 break-words">{children}</span>
     </div>
   );
 }

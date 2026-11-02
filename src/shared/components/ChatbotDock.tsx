@@ -108,6 +108,8 @@ interface Msg {
   suggestions?: string[];
   /** 매뉴얼·고장보고서 검색 결과 — 있으면 말풍선 아래에 카드 목록으로 그린다 */
   matches?: DocMatch[];
+  /** AI 답변이 조회한 지사 범위 — 있으면 말풍선 위에 "범위: 청주지사" 칩으로 보인다 */
+  scope?: string;
 }
 
 let msgSeq = 0;
@@ -200,7 +202,7 @@ export default function ChatbotDock() {
     setPending(false);
     setMsgs((prev) => [
       ...prev,
-      { id: (msgSeq += 1), role: "bot", text: reply.text, kind: reply.kind, suggestions: reply.suggestions, matches: reply.matches },
+      { id: (msgSeq += 1), role: "bot", text: reply.text, kind: reply.kind, suggestions: reply.suggestions, matches: reply.matches, scope: reply.scope },
     ]);
   }
 
@@ -263,7 +265,7 @@ export default function ChatbotDock() {
           onClick={() => setState("bubble")}
           aria-label="최소화"
           title="최소화"
-          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+          className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
         >
           <Icon name="remove" className="text-base" />
         </button>
@@ -272,7 +274,7 @@ export default function ChatbotDock() {
           onClick={() => setState("bubble")}
           aria-label="닫기"
           title="닫기"
-          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+          className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
         >
           <Icon name="close" className="text-base" />
         </button>
@@ -298,7 +300,7 @@ export default function ChatbotDock() {
                   key={q}
                   type="button"
                   onClick={() => sendText(q)}
-                  className="px-3 py-1.5 rounded-full bg-surface-container-low text-xs font-semibold text-primary border border-border-subtle hover:bg-surface-container-high transition-colors"
+                  className="px-3.5 min-h-10 rounded-full bg-surface-container-low text-xs font-semibold text-primary border border-border-subtle hover:bg-surface-container-high transition-colors"
                 >
                   {q}
                 </button>
@@ -324,6 +326,13 @@ export default function ChatbotDock() {
                   <img src="/ddasomi-search.png" alt="" className="ddasomi-msg-avatar__img" />
                 </span>
                 <div className="flex flex-col gap-1.5 min-w-0">
+                  {/* 어느 지사 범위로 조회한 답인지 — 내 지사와 질문 속 지사가 다를 수 있어 늘 밝힌다 */}
+                  {m.scope && (
+                    <span className="self-start inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                      <Icon name="location_on" className="text-[13px]" />
+                      범위: {m.scope}
+                    </span>
+                  )}
                   <div
                     className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line rounded-bl-sm ${
                       m.kind === "refused" ? "bg-error-container text-on-error-container" : "bg-surface-container-high text-on-surface"
@@ -341,7 +350,7 @@ export default function ChatbotDock() {
                           disabled={openingId === doc.id}
                           className="text-left px-3 py-2 rounded-xl bg-surface-container border border-border-subtle hover:bg-surface-container-high transition-colors disabled:opacity-60"
                         >
-                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-on-surface-variant">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant">
                             <Icon name="description" className="text-sm" />
                             {MODE_LABELS[doc.docType]}
                             {doc.branch && <span>· {doc.branch}</span>}
@@ -349,7 +358,7 @@ export default function ChatbotDock() {
                           </div>
                           <div className="text-sm font-bold text-on-surface mt-0.5 truncate">{doc.title}</div>
                           <div className="text-xs text-on-surface-variant mt-0.5 line-clamp-2">{doc.snippet}</div>
-                          <div className="text-[11px] text-primary font-bold mt-1 flex items-center gap-1">
+                          <div className="text-xs text-primary font-bold mt-1 flex items-center gap-1">
                             <Icon name="visibility" className="text-sm" />
                             {openingId === doc.id ? "여는 중…" : "미리보기"}
                           </div>

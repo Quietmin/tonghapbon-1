@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, Button, Icon } from "@/shared/components/ui";
+import { Card, Button, Icon, InlineError } from "@/shared/components/ui";
 import { BRANCHES, FAULT_FIELDS, sortKorean } from "@/modules/docgen/lib/constants";
 import type { AttachmentInput, FailureHistoryInput } from "@/modules/failure/lib/repo";
 
@@ -260,7 +260,7 @@ export default function FailureHistoryForm({
   if (savedId) {
     return (
       <Card className="p-8 flex flex-col items-center text-center gap-3">
-        <Icon name="check_circle" className="text-4xl text-status-success" />
+        <Icon name="check_circle" className="text-4xl text-status-success-text" />
         <p className="text-title-sm font-bold text-on-surface">고장이력이 등록되었습니다.</p>
         <p className="text-sm text-on-surface-variant">
           {form.equipmentName || form.title} · {form.occurredAt || "발생일시 미입력"}
@@ -302,6 +302,16 @@ export default function FailureHistoryForm({
           const file = e.dataTransfer.files?.[0];
           if (file) void handleFile(file);
         }}
+        role="button"
+        tabIndex={0}
+        aria-label="파일 올리기 — 눌러서 고르거나 끌어다 놓기"
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
         onClick={() => fileInputRef.current?.click()}
         className={`p-6 flex flex-col items-center gap-2 text-center cursor-pointer border-2 border-dashed transition-colors ${
           dragOver ? "border-primary bg-primary/5" : "border-border-subtle"
@@ -333,7 +343,7 @@ export default function FailureHistoryForm({
       )}
 
       {extractWarning && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-warning/10 text-status-warning text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-warning/10 text-status-warning-text text-sm">
           <Icon name="info" className="text-base" />
           {extractWarning}
         </div>
@@ -397,10 +407,7 @@ export default function FailureHistoryForm({
       </Section>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-status-error/10 text-status-error text-sm">
-          <Icon name="error" className="text-base" />
-          {error}
-        </div>
+        <InlineError>{error}</InlineError>
       )}
 
       <div className="flex justify-end gap-2 pb-6">

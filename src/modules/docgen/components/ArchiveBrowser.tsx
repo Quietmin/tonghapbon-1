@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import Dialog from "@/shared/components/Dialog";
 import {
   ACCENT_STYLE,
   Button,
@@ -507,7 +508,7 @@ export default function ArchiveBrowser({
     return (
       <Card className="p-card-padding">
         <div className="flex items-start gap-3">
-          <Icon name="key_off" className="text-status-warning text-2xl" />
+          <Icon name="key_off" className="text-status-warning-text text-2xl" />
           <div>
             <p className="text-title-sm text-on-surface">보관함이 설정되지 않았습니다</p>
             <p className="text-sm text-on-surface-variant mt-1">
@@ -741,13 +742,13 @@ export default function ArchiveBrowser({
             </div>
           )}
           {error && (
-            <p className="mt-2 text-sm font-bold text-status-error flex items-start gap-1.5">
+            <p className="mt-2 text-sm font-bold text-status-error-text flex items-start gap-1.5">
               <Icon name="error" className="text-base shrink-0" />
               {error}
             </p>
           )}
           {notice && (
-            <p className="mt-2 text-sm font-bold text-status-success flex items-start gap-1.5">
+            <p className="mt-2 text-sm font-bold text-status-success-text flex items-start gap-1.5">
               <Icon name="check_circle" className="text-base shrink-0" />
               {notice}
             </p>
@@ -771,7 +772,7 @@ export default function ArchiveBrowser({
           </div>
         )}
         {isPreview && error && (
-          <p className="mb-3 text-sm font-bold text-status-error flex items-start gap-1.5">
+          <p className="mb-3 text-sm font-bold text-status-error-text flex items-start gap-1.5">
             <Icon name="error" className="text-base shrink-0" />
             {error}
           </p>
@@ -846,7 +847,7 @@ export default function ArchiveBrowser({
                         type="button"
                         onClick={() => askPassword(r)}
                         disabled={deletingId === r.id}
-                        className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-status-error active:bg-surface-container-high disabled:opacity-40"
+                        className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-status-error-text active:bg-surface-container-high disabled:opacity-40"
                       >
                         <Icon name="delete" className="text-lg" />
                         <span className="text-xs font-bold">
@@ -939,7 +940,7 @@ export default function ArchiveBrowser({
                             type="button"
                             onClick={() => askPassword(r)}
                             disabled={deletingId === r.id}
-                            className="inline-flex items-center gap-1 text-status-error font-bold hover:underline whitespace-nowrap disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 text-status-error-text font-bold hover:underline whitespace-nowrap disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
                           >
                             <Icon name="delete" className="text-base" />
                             {deletingId === r.id ? "지우는 중…" : "삭제"}
@@ -960,21 +961,10 @@ export default function ArchiveBrowser({
           window.confirm 대신 창을 띄우는 이유: 암호를 가린 채(type="password")
           받아야 하고, 틀렸을 때 창을 닫지 않고 다시 묻기 위해서다. */}
       {pendingRow && (
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delDlgTitle"
-          onClick={closeAsk}
-        >
-          <form
-            onSubmit={submitPassword}
-            // 창 안을 눌렀을 때 바깥 클릭으로 닫히지 않게 한다
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-surface-container-lowest p-6 shadow-xl flex flex-col gap-4"
-          >
+        <Dialog onClose={closeAsk} labelledBy="delDlgTitle" size="sm">
+          <form onSubmit={submitPassword} className="flex flex-col gap-4">
             <div className="flex items-start gap-3">
-              <Icon name="warning" className="text-status-error text-2xl shrink-0" />
+              <Icon name="warning" className="text-status-error-text text-2xl shrink-0" />
               <div className="min-w-0">
                 <h3 id="delDlgTitle" className="text-title-sm text-on-surface">
                   문서를 삭제할까요?
@@ -1005,7 +995,7 @@ export default function ArchiveBrowser({
                 className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
               />
               {pwError && (
-                <p className="text-sm font-bold text-status-error flex items-center gap-1.5">
+                <p className="text-sm font-bold text-status-error-text flex items-center gap-1.5">
                   <Icon name="error" className="text-base" />
                   {pwError}
                 </p>
@@ -1022,7 +1012,7 @@ export default function ArchiveBrowser({
               </Button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {pdfPreview && (

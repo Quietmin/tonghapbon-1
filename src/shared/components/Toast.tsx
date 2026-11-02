@@ -43,7 +43,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       >
         {message && (
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-on-surface text-surface px-5 py-3 text-sm font-bold shadow-lg">
-            <Icon name="check_circle" className="text-lg text-status-success" />
+            <Icon name="check_circle" className="text-lg text-status-success-text" />
             {message}
           </div>
         )}

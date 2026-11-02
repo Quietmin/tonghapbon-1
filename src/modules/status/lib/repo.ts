@@ -1,5 +1,5 @@
 import { execute, query, queryOne } from "@/shared/lib/db";
-import type { IssueStatus } from "./constants";
+import { MAX_ISSUE_PHOTOS, type IssueStatus } from "./constants";
 
 /**
  * 현황관리 DB 계층 — SQL 은 여기에만 둔다 (다른 모듈 repo.ts 와 같은 규칙).
@@ -125,6 +125,43 @@ export async function createIssue(input: IssueInput): Promise<{ id: string }> {
   );
   if (!row) throw new Error("현황을 저장하지 못했습니다.");
   return row;
+}
+
+/**
+ * 이슈에 사진을 붙인다 — 이슈는 이미 저장된 뒤에 부른다. 사진 테이블이 아직 없는 DB(배포 DB 에 마이그레이션 전)에서는
+ * 던지므로, 호출하는 쪽이 잡아 "사진만 저장하지 못했다"고 알린다(이슈 자체는 남는다).
+ * 반환값은 저장한 사진 수.
+ */
+export async function addIssuePhotos(issueId: string, dataUrls: string[]): Promise<number> {
+  let seq = 0;
+  for (const data of dataUrls.slice(0, MAX_ISSUE_PHOTOS)) {
+    seq += 1;
+    await execute(`insert into status_issue_photo (issue_id, seq, data) values ($1, $2, $3)`, [issueId, seq, data]);
+  }
+  return seq;
+}
+
+/** 이슈의 사진 id 목록(표시 순서). 사진 테이블이 없으면 빈 목록 — 팝업이 사진 없이도 열린다 */
+export async function listIssuePhotoIds(issueId: string): Promise<number[]> {
+  try {
+    const rows = await query<{ id: string }>(
+      `select id::text as id from status_issue_photo where issue_id = $1 order by seq, id`,
+      [issueId],
+    );
+    return rows.map((r) => Number(r.id));
+  } catch {
+    return [];
+  }
+}
+
+/** 사진 한 장의 data URL (없으면 null) */
+export async function getIssuePhotoData(id: number): Promise<string | null> {
+  try {
+    const row = await queryOne<{ data: string }>(`select data from status_issue_photo where id = $1`, [id]);
+    return row?.data ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export interface IssuePatch {

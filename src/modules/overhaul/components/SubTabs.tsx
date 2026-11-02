@@ -30,7 +30,7 @@ export default function SubTabs({ tabs, ariaLabel }: { tabs: readonly SubTab[]; 
           <Link
             key={t.href}
             href={t.href}
-            className={`flex items-center gap-1.5 px-3.5 h-9 rounded-lg text-sm font-bold transition-colors ${
+            className={`flex items-center gap-1.5 px-3.5 h-10 rounded-lg text-sm font-bold transition-colors ${
               active
                 ? "bg-primary text-on-primary"
                 : "text-on-surface-variant hover:text-primary hover:bg-primary-container/30"

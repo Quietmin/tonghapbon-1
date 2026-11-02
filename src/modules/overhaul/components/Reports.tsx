@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, Button, Icon, FieldChip, ProgressBar, ProgressRing, EmptyState } from "@/shared/components/ui";
+import { Card, Button, Icon, FieldChip, ProgressBar, ProgressRing, EmptyState, ScreenHeader, LoadingState } from "@/shared/components/ui";
 import { exportTasksToExcel, type ExportTaskRow } from "../lib/exporter";
 import type { ReportData } from "../lib/report";
 import type { OverhaulProject } from "../lib/repo";
@@ -65,11 +65,11 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
               {
                 label: "계획 대비",
                 value: `${d.diff >= 0 ? "+" : ""}${d.diff}%p`,
-                color: d.diff >= 0 ? "text-status-success" : "text-error",
+                color: d.diff >= 0 ? "text-status-success-text" : "text-error",
               },
             ].map((s) => (
               <div key={s.label} className="text-center">
-                <p className="text-[11px] md:text-[12px] text-on-surface-variant uppercase tracking-wider font-semibold">
+                <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
                   {s.label}
                 </p>
                 <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
@@ -171,7 +171,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
             right={<span className="text-xs font-bold text-error">{d.delayed.length}건</span>}
           >
             {d.delayed.length === 0 ? (
-              <p className="text-sm text-status-success py-2 flex items-center gap-1.5">
+              <p className="text-sm text-status-success-text py-2 flex items-center gap-1.5">
                 <Icon name="verified" className="text-base" /> 지연 공정이 없습니다.
               </p>
             ) : (
@@ -203,7 +203,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-1">
             입력 누락
           </p>
-          <p className={`text-2xl font-black ${d.missingCount ? "text-error" : "text-status-success"}`}>
+          <p className={`text-2xl font-black ${d.missingCount ? "text-error" : "text-status-success-text"}`}>
             {d.missingCount}건
           </p>
           <p className="text-xs text-on-surface-variant mt-1">금일 미입력 (미완료 작업)</p>
@@ -221,7 +221,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-1">
             완료 설비
           </p>
-          <p className="text-2xl font-black text-status-success">{d.completedEquipCount}개</p>
+          <p className="text-2xl font-black text-status-success-text">{d.completedEquipCount}개</p>
           <p className="text-xs text-on-surface-variant mt-1">진행률 100% 도달</p>
         </Card>
       </div>
@@ -245,7 +245,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
             </p>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-[11px] md:text-[12px] text-on-surface-variant uppercase tracking-wider font-semibold">
+            <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
               오버홀 기간
             </p>
             <p className="text-sm font-semibold text-on-surface">
@@ -258,7 +258,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
           <div className="flex items-center gap-4">
             <ProgressRing value={d.overall} size={104}>
               <span className="text-2xl font-black text-on-surface">{d.overall}%</span>
-              <span className="text-[10px] md:text-[12px] text-on-surface-variant">전체</span>
+              <span className="text-xs text-on-surface-variant">전체</span>
             </ProgressRing>
           </div>
           <div className="md:col-span-2 grid grid-cols-2 gap-4">
@@ -266,7 +266,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
               <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
                 계획 대비 실적
               </p>
-              <p className={`text-2xl font-black ${d.diff >= 0 ? "text-status-success" : "text-error"}`}>
+              <p className={`text-2xl font-black ${d.diff >= 0 ? "text-status-success-text" : "text-error"}`}>
                 {d.diff >= 0 ? "선행 +" : "지연 "}
                 {d.diff}%p
               </p>
@@ -282,7 +282,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
                 <>
                   <p
                     className={`text-2xl font-black ${
-                      d.finish.deltaDays > 0 ? "text-error" : "text-status-success"
+                      d.finish.deltaDays > 0 ? "text-error" : "text-status-success-text"
                     }`}
                   >
                     {d.finish.deltaDays > 0
@@ -303,7 +303,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h2 className="text-title-sm text-on-surface mb-2 flex items-center gap-2">
-              <Icon name="task_alt" className="text-base text-status-success" /> 주요 완료 공정
+              <Icon name="task_alt" className="text-base text-status-success-text" /> 주요 완료 공정
             </h2>
             {d.completedEquipCount === 0 ? (
               <p className="text-sm text-on-surface-variant">
@@ -317,7 +317,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
                   .map((e) => (
                     <li key={e.equipment} className="flex justify-between">
                       <span>{e.equipment}</span>
-                      <span className="text-status-success font-bold">{e.progress}%</span>
+                      <span className="text-status-success-text font-bold">{e.progress}%</span>
                     </li>
                   ))}
               </ul>
@@ -328,7 +328,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
               <Icon name="warning" className="text-base text-error" /> 주요 지연 공정
             </h2>
             {d.delayed.length === 0 ? (
-              <p className="text-sm text-status-success">지연 공정이 없습니다.</p>
+              <p className="text-sm text-status-success-text">지연 공정이 없습니다.</p>
             ) : (
               <ul className="text-sm space-y-1">
                 {d.delayed.slice(0, 5).map((r) => (
@@ -403,13 +403,13 @@ export default function Reports() {
   }, []);
 
   if (loading) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   if (!data || data.exportRows.length === 0) {
     return (
       <>
-        <h1 className="text-display-lg text-on-surface pt-2">보고서</h1>
+        <ScreenHeader icon="summarize" title="보고서" desc="공정회의·경영진 보고용 자료를 자동 생성합니다." bullets={[]} tone="soft" />
         <Card lift={false} className="p-0">
           <EmptyState
             icon="summarize"
@@ -425,31 +425,34 @@ export default function Reports() {
 
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 no-print">
-        <div>
-          <h1 className="text-display-lg text-on-surface">보고서</h1>
-          <p className="text-on-surface-variant text-body-md">
-            현장 공정회의·경영진 보고용 자료를 자동 생성합니다. (기준일 {report.today})
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            onClick={() =>
-              exportTasksToExcel(data.exportRows, project, {
-                overall: report.overall,
-                byField: report.byField,
-                riskCount: report.delayed.length,
-                missingCount: report.missingCount,
-              })
-            }
-          >
-            <Icon name="table_view" className="text-base" /> 엑셀
-          </Button>
-          <Button onClick={() => window.print()}>
-            <Icon name="print" className="text-base" /> 인쇄 / PDF
-          </Button>
-        </div>
+      <div className="no-print">
+        <ScreenHeader
+          icon="summarize"
+          title="보고서"
+          desc={`현장 공정회의·경영진 보고용 자료를 자동 생성합니다. (기준일 ${report.today})`}
+          bullets={[]}
+          tone="soft"
+          action={
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  exportTasksToExcel(data.exportRows, project, {
+                    overall: report.overall,
+                    byField: report.byField,
+                    riskCount: report.delayed.length,
+                    missingCount: report.missingCount,
+                  })
+                }
+              >
+                <Icon name="table_view" className="text-base" /> 엑셀
+              </Button>
+              <Button onClick={() => window.print()}>
+                <Icon name="print" className="text-base" /> 인쇄 / PDF
+              </Button>
+            </div>
+          }
+        />
       </div>
 
       {/* 탭 */}

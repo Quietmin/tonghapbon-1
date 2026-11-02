@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Icon } from "@/shared/components/ui";
+import { Card, EmptyState, Icon, LoadingState, ErrorState } from "@/shared/components/ui";
 import type { BranchOverviewRow } from "@/modules/equipment/lib/overviewRepo";
 import BranchMap from "./BranchMap";
 
@@ -43,17 +43,12 @@ export default function BranchOverview({
 
   if (error) {
     return (
-      <Card className="p-4 border border-error/30" lift={false}>
-        <p className="text-sm text-error flex items-center gap-2">
-          <Icon name="error" className="text-base" />
-          {error}
-        </p>
-      </Card>
+      <ErrorState message={error} onRetry={() => window.location.reload()} />
     );
   }
 
   if (!items) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   if (items.length === 0) {

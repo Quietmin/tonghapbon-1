@@ -60,7 +60,7 @@ function Kpi({
         </div>
         <div className="flex items-baseline gap-1">
           <span
-            className={`text-display-lg tabular-nums ${tone === "danger" ? "text-status-error" : "text-on-surface"}`}
+            className={`text-display-lg tabular-nums ${tone === "danger" ? "text-status-error-text" : "text-on-surface"}`}
           >
             {value}
           </span>
@@ -117,7 +117,7 @@ function RiskList({ risk, total }: { risk: RiskItem[]; total: number }) {
                   {[r.equipment, r.field].filter(Boolean).join(" · ") || "-"} · 공정률 {fmt(r.progress)}%
                 </span>
               </span>
-              <span className="shrink-0 text-sm font-bold text-status-error tabular-nums">
+              <span className="shrink-0 text-sm font-bold text-status-error-text tabular-nums">
                 {r.overdueDays > 0 ? `지연 ${r.overdueDays}일` : `계획 대비 -${fmt(r.gap)}%p`}
               </span>
             </li>
@@ -246,7 +246,7 @@ function Kpis({
           stats.hasPeriod ? (
             <>
               계획 {fmt(stats.planned)}% ·{" "}
-              <span className={gap >= 0 ? "text-status-success font-bold" : "text-status-error font-bold"}>
+              <span className={gap >= 0 ? "text-status-success-text font-bold" : "text-status-error-text font-bold"}>
                 {gap >= 0 ? `+${fmt(gap)}` : fmt(gap)}%p
               </span>
             </>

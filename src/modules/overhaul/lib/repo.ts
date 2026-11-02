@@ -331,7 +331,8 @@ export async function listTasks(
     `select ${TASK_COLUMNS}
        from overhaul_task
       where ${clause}
-      order by sheet_name nulls last, row_index nulls last
+      order by case field when '기계' then 0 when '전기' then 1 when '제어' then 2 else 3 end,
+               sheet_name nulls last, row_index nulls last
       limit ${limit} offset ${offset}`,
     params,
   );

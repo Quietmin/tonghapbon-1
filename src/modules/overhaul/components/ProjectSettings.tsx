@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Icon, Button, EmptyState } from "@/shared/components/ui";
+import { Card, Icon, Button, EmptyState, ScreenHeader, LoadingState, ErrorState } from "@/shared/components/ui";
 import type { OverhaulProject } from "../lib/repo";
 
 /**
@@ -36,7 +36,7 @@ function FieldRow({
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <label className="flex flex-col gap-1">
         <span className="text-label-caps uppercase text-on-surface-variant">회차명</span>
-        <input
+        <input aria-label="2026년 정기 오버홀"
           className="input"
           placeholder="2026년 정기 오버홀"
           value={draft.name ?? ""}
@@ -211,34 +211,30 @@ export default function ProjectSettings() {
   };
 
   if (!projects) {
-    return <p className="py-20 text-center text-sm text-on-surface-variant">불러오는 중…</p>;
+    return <LoadingState />;
   }
 
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-display-lg text-on-surface pt-2">회차 관리</h1>
-          <p className="text-body-md text-on-surface-variant mt-2">
-            오버홀 회차를 만들고 계약기간을 정합니다. 회차마다 작업항목·실적·사진이 따로
-            쌓이므로, 새 오버홀은 기존 회차를 고치지 말고 새로 만드세요.
-          </p>
-        </div>
-        {!creating && (
-          <Button onClick={() => setCreating({ ...EMPTY_DRAFT })}>
-            <Icon name="add" className="text-base" />
-            새 회차
-          </Button>
-        )}
-      </div>
+      <ScreenHeader
+        icon="settings"
+        title="회차 관리"
+        desc="오버홀 회차를 만들고 계약기간을 정합니다. 회차마다 작업항목·실적·사진이 따로 쌓이므로, 새 오버홀은 기존 회차를 고치지 말고 새로 만드세요."
+        bullets={[]}
+        tone="soft"
+        actionOnMobile
+        action={
+          !creating ? (
+            <Button onClick={() => setCreating({ ...EMPTY_DRAFT })}>
+              <Icon name="add" className="text-base" />
+              새 회차
+            </Button>
+          ) : undefined
+        }
+      />
 
       {error && (
-        <Card className="p-4 border border-error/30" lift={false}>
-          <p className="text-sm text-error flex items-center gap-2">
-            <Icon name="error" className="text-base" />
-            {error}
-          </p>
-        </Card>
+        <ErrorState message={error} />
       )}
 
       {creating && (
@@ -285,14 +281,14 @@ export default function ProjectSettings() {
                   />
                   {p.name}
                   {isActive && (
-                    <span className="text-[11px] md:text-[12px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                       보고 있는 회차
                     </span>
                   )}
                 </h2>
                 <div className="flex items-center gap-2">
                   {missingPeriod && (
-                    <span className="text-xs font-bold text-status-warning">
+                    <span className="text-xs font-bold text-status-warning-text">
                       계약기간을 넣어야 경과일·지연 위험이 계산됩니다
                     </span>
                   )}
@@ -310,7 +306,7 @@ export default function ProjectSettings() {
                         ? "마지막 회차는 지울 수 없습니다"
                         : "이 회차와 딸린 자료 전체 삭제"
                     }
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-error-container text-on-surface-variant hover:text-error transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
                   >
                     <Icon name="delete" className="text-lg" />
                   </button>
@@ -325,7 +321,7 @@ export default function ProjectSettings() {
                   {busy === p.id ? "저장 중…" : "저장"}
                 </Button>
                 {savedId === p.id && (
-                  <span className="text-sm text-status-success font-bold flex items-center gap-1">
+                  <span className="text-sm text-status-success-text font-bold flex items-center gap-1">
                     <Icon name="check_circle" className="text-base" />
                     저장했습니다
                   </span>

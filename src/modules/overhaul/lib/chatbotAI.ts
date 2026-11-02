@@ -19,11 +19,36 @@ export interface AskDoc {
   snippet: string;
 }
 
+/**
+ * 챗봇 AI 호출이 실패한 이유 — disabled(서버에 설정 없음) · auth(키 문제) · quota(사용 한도·결제) ·
+ * rate(요청 과다, 잠시 뒤 재시도) · model(모델 이름 문제) · error(그 밖의 일시 오류)
+ */
+export type AskFailReason = "disabled" | "auth" | "quota" | "rate" | "model" | "error";
+
+const FAIL_REASON_BY_SERVER: Record<string, AskFailReason> = {
+  disabled: "disabled",
+  upstream_auth: "auth",
+  upstream_quota: "quota",
+  upstream_rate: "rate",
+  upstream_model: "model",
+};
+
 export type AskFn = (
   message: string,
   context: ChatbotSnapshot,
   opts?: { timeoutMs?: number; docs?: AskDoc[] },
-) => Promise<{ ok: true; answer: string; usedDocs?: number[] | null } | { ok: false; reason: "disabled" | "error" } | null>;
+) => Promise<
+  | {
+      ok: true;
+      answer: string;
+      /** 이 답이 조회한 지사 범위("청주지사" 또는 "전 지사") */
+      scope?: string;
+      /** 모델이 실제로 근거로 쓴 문서의 인덱스(검색 결과 순). null 이면 형식을 못 지킨 것 — 검색 결과를 그대로 쓴다 */
+      usedDocs?: number[] | null;
+    }
+  | { ok: false; reason: AskFailReason }
+  | null
+>;
 
 export async function classifyQuestionWithAI(
   question: string,
@@ -67,7 +92,7 @@ export const askDdasomi: AskFn = async (message, context, { timeoutMs = 45000, d
     if (!res.ok) return { ok: false, reason: "error" };
     const data = await res.json();
     if (data?.ok === true && typeof data.answer === "string") return data;
-    return { ok: false, reason: data?.reason === "disabled" ? "disabled" : "error" };
+    return { ok: false, reason: FAIL_REASON_BY_SERVER[data?.reason as string] ?? "error" };
   } catch {
     return null;
   } finally {

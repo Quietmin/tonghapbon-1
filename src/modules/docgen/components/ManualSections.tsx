@@ -199,7 +199,7 @@ export function ManualSectionsFields({
                 "마지막 행/열"만 건드리던 예전과 달리 원하는 자리를 직접 고를 수 있다.
                 맨 아래 행·맨 오른쪽 열에서 [+]를 누르면 결과적으로 끝에 추가하는
                 것과 같아서, 끝에 추가하는 용도도 따로 안 둬도 된다. */}
-            <p className="text-[11px] text-on-surface-variant mb-1.5">
+            <p className="text-xs text-on-surface-variant mb-1.5">
               칸 오른쪽 [+ / −]는 그 행을, 머리글 칸 아래 [+ / −]는 그 열을 겨눕니다.
             </p>
             <div className="overflow-x-auto">

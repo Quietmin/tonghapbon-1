@@ -584,7 +584,7 @@ export default function PhotoEditorModal({
         {/* 사진 위를 누르면 나타나는 입력줄. 타이핑이 즉시 캔버스에 반영된다 */}
         {drafting && (
           <div className="flex gap-1.5 items-center">
-            <input
+            <input aria-label="표시할 텍스트 입력"
               ref={textInputRef}
               type="text"
               value={textValue}
@@ -662,7 +662,7 @@ export default function PhotoEditorModal({
           </button>
         </div>
 
-        <p className="text-white/60 text-[11px] md:text-[12px] text-center">
+        <p className="text-white/80 text-xs text-center">
           {message ??
             (isCrop
               ? HINT_CROP
