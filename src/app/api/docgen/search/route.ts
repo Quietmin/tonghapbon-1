@@ -20,7 +20,10 @@ const MAX_DOCUMENTS = 5;
 // 코사인 유사도 하한 — 이보다 낮으면 "관련 없음"으로 보고 버린다. text-embedding-3-small로
 // 실제 매뉴얼/고장보고서 텍스트를 써 본 경험적 값이 아직 없어 보수적으로 잡았다.
 // 엉뚱한 결과가 자주 섞이면 이 값을 올리고, 반대로 못 찾는 게 많으면 내린다.
-const SIMILARITY_FLOOR = 0.25;
+// 실측(2026-11-03, 양산지사 매뉴얼 보관함): 관련 질문 0.45~0.56, 무관한 질문 0.31~0.35 → 그 사이인 0.42.
+const SIMILARITY_FLOOR = 0.42;
+// 1등 조각보다 이만큼 이상 낮은 조각은 "덤으로 딸려온 것"으로 보고 버린다
+const RELATIVE_DROP = 0.12;
 
 export interface DocMatch {
   id: string;
@@ -76,7 +79,9 @@ export async function POST(req: Request) {
   }
 
   type ChunkRow = { document_id: string; label: string; chunk_text: string; similarity: number };
-  const rows = ((chunkRows ?? []) as ChunkRow[]).filter((r) => r.similarity >= SIMILARITY_FLOOR);
+  const all = (chunkRows ?? []) as ChunkRow[];
+  const best = all.length ? Math.max(...all.map((r) => r.similarity)) : 0;
+  const rows = all.filter((r) => r.similarity >= SIMILARITY_FLOOR && r.similarity >= best - RELATIVE_DROP);
 
   // 문서 단위로 묶는다 — 조각은 similarity 내림차순으로 오므로, 문서마다 처음 만나는
   // (= 그 문서에서 가장 비슷한) 조각을 대표 스니펫으로 쓴다.

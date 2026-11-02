@@ -23,7 +23,7 @@ export type AskFn = (
   message: string,
   context: ChatbotSnapshot,
   opts?: { timeoutMs?: number; docs?: AskDoc[] },
-) => Promise<{ ok: true; answer: string } | { ok: false; reason: "disabled" | "error" } | null>;
+) => Promise<{ ok: true; answer: string; usedDocs?: number[] | null } | { ok: false; reason: "disabled" | "error" } | null>;
 
 export async function classifyQuestionWithAI(
   question: string,

@@ -201,6 +201,24 @@ export function sanitizeDocuments(raw: unknown) {
     .filter((d) => d.title);
 }
 
+/**
+ * 답변 끝의 "근거문서: 1, 3" / "근거문서: 없음" 줄을 떼어 낸다.
+ * usedDocs: 실제로 근거로 쓴 문서의 0-기반 인덱스. 줄이 없으면(모델이 형식을 안 지킴) null — 호출부가 검색 결과를 그대로 쓴다.
+ */
+export function splitUsedDocs(raw: string, docCount: number): { answer: string; usedDocs: number[] | null } {
+  const lines = raw.trimEnd().split(/\r?\n/);
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 3); i--) {
+    const m = lines[i].match(/^\s*\**\s*근거\s*문서\s*\**\s*[:：]\s*(.*?)\s*\**\s*$/);
+    if (!m) continue;
+    const body = m[1];
+    const nums = Array.from(body.matchAll(/\d+/g)).map((x) => parseInt(x[0], 10) - 1).filter((n) => n >= 0 && n < docCount);
+    const usedDocs = /없음|none/i.test(body) && nums.length === 0 ? [] : Array.from(new Set(nums));
+    lines.splice(i, 1);
+    return { answer: lines.join("\n").trimEnd(), usedDocs };
+  }
+  return { answer: raw.trim(), usedDocs: null };
+}
+
 function validateMessage(body: any): string | null {
   if (!body || typeof body !== "object") return null;
   const message = typeof body.message === "string" ? body.message.trim() : "";
@@ -258,7 +276,8 @@ ${dataBlock}${
 
 보관함에서 이 질문으로 미리 검색된 관련 문서 ${documents.length}건(제목 · 종류 · 지사/분야 · 발췌). 이 문서들은 답변 아래에 카드로 함께 표시된다:
 ${documents.map((d, i) => `${i + 1}. [${d.docType ?? "문서"}] ${d.title} (${[d.branch, d.field].filter(Boolean).join(" · ") || "-"}) — ${d.snippet ?? ""}`).join("\n")}
-문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제면 "검색된 문서는 ○○ 관련이라 직접 근거는 아니다"라고 한 줄로 밝힌다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.`
+문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제면 "검색된 문서는 ○○ 관련이라 직접 근거는 아니다"라고 한 줄로 밝힌다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.
+답변 맨 마지막 줄에는 반드시 실제로 근거로 쓴 문서의 번호만 "근거문서: 1, 3" 형식으로 적는다. 하나도 근거로 쓰지 않았으면 "근거문서: 없음"이라고 적는다(이 줄은 화면에 보이지 않고 문서 카드 표시에만 쓰인다).`
       : ""
   }`;
 
@@ -344,9 +363,10 @@ export async function POST(req: Request) {
   const branchRequested = asked !== null;
 
   try {
-    const answer = await callOpenAI({ message, context, branch, branchRequested, documents, apiKey, model: MODEL_NAME });
-    if (!answer) return fail(200, "upstream_error");
-    return NextResponse.json({ ok: true, answer });
+    const raw = await callOpenAI({ message, context, branch, branchRequested, documents, apiKey, model: MODEL_NAME });
+    if (!raw) return fail(200, "upstream_error");
+    const { answer, usedDocs } = splitUsedDocs(raw, documents.length);
+    return NextResponse.json({ ok: true, answer, usedDocs });
   } catch (err: any) {
     // API 키·요청 헤더 등 민감정보가 섞여 나올 수 있는 전체 에러 객체는 절대 로그하지 않는다.
     console.error("[api/overhaul/chatbot] OpenAI 호출 실패:", { status: err?.status, message: err?.message });
