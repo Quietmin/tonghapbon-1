@@ -1,5 +1,14 @@
 /* 따소미 플로팅 챗봇 전용 애니메이션 — 다른 화면에는 영향 없음. prefers-reduced-motion에서는 최소화. */
 
+/* 챗봇 패널을 PC(md 이상)에서 헤더로 끌어 옮길 때 쓴다(ChatbotDock.tsx 의 panelStyle).
+   폰 폭에서는 이 규칙이 적용되지 않아 --dock-x/--dock-y 값이 있어도 시트가 그대로
+   바닥에 붙어 있는다(바닥 시트를 PC 드래그 좌표로 밀어 버리지 않기 위함). */
+@media (min-width: 768px) {
+  .dock-draggable {
+    transform: translate(var(--dock-x, 0px), var(--dock-y, 0px));
+  }
+}
+
 /* 로딩 중 — 돋보기 든 따소미가 여기저기 살펴보는 느낌 (1.8초 주기) */
 @keyframes ddasomi-search-wiggle {
   0% {

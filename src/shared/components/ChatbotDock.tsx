@@ -9,6 +9,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Icon } from "./ui";
 import { getDdasomiReply, type DdasomiReply } from "@/modules/overhaul/lib/ddasomiChat";
@@ -126,6 +128,151 @@ async function fetchSnapshot(): Promise<ChatbotSnapshot | null> {
   }
 }
 
+const DOCK_POS_KEY = "chatbot-dock-pos";
+/** 드래그로 안 치고 그냥 누른 걸로 볼 최대 이동 거리(px) — 이보다 덜 움직였으면 클릭이다 */
+const DRAG_CLICK_THRESHOLD = 6;
+
+/**
+ * 챗봇(접힌 버튼 · 데스크톱 패널)을 손가락/마우스로 끌어 옮길 수 있게 한다.
+ * 버튼이 다른 화면의 버튼과 겹쳐 눌리지 않는 문제가 있어 추가했다(사용자 요청).
+ *
+ * Pointer Events 하나로 마우스·터치를 같이 받는다 — 모바일(손가락)·데스크톱(마우스)을
+ * 따로 구현할 필요가 없다. 옮긴 자리는 translate 로만 얹는다(원래 fixed 위치는 그대로
+ * 두고 그 위에 더하는 식이라, 화면 폭이 바뀌어도 기준점 계산을 다시 할 필요가 없다).
+ * 위치는 localStorage 에 저장해 새로고침·다른 화면 이동에도 남는다.
+ *
+ * "눌러서 열기"와 "끌어서 옮기기"를 구분해야 한다 — 전혀 안 움직였으면 클릭으로 보고
+ * 평소처럼 열리게 둔다(justDragged 를 안 세운다). 조금이라도 문턱을 넘겨 움직였으면
+ * 그 클릭은 버린다(옮기고 나서 바로 열리면 사용자가 당황한다).
+ */
+function useDraggablePosition() {
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const posRef = useRef(pos);
+  posRef.current = pos;
+  const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number; moved: boolean } | null>(
+    null,
+  );
+  const justDraggedRef = useRef(false);
+  // posRef 는 리액트가 다시 그린 뒤에야(state → ref 복사가 렌더 중에 일어나므로) 최신
+  // 값이 된다. pointermove 를 여러 번 받고 바로 pointerup 이 오는 경우(리액트 18 은
+  // 같은 틱 안의 setPos 를 모아 한 번에 처리한다 — 그 사이엔 아직 다시 그려지지
+  // 않는다) posRef 가 "드래그를 시작하기 전" 값에 멈춰 있을 수 있다. 끝난 자리를
+  // 저장할 때는 이 ref 를 쓴다 — onPointerMove 안에서 렌더와 상관없이 바로 갱신한다.
+  const lastPosRef = useRef(pos);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DOCK_POS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown };
+      if (typeof parsed.x === "number" && typeof parsed.y === "number") setPos({ x: parsed.x, y: parsed.y });
+    } catch {
+      /* 저장된 위치를 못 읽어도 기본 자리(0,0)로 그냥 동작한다 */
+    }
+  }, []);
+
+  /** candidate(x,y) 만큼 옮겼을 때 요소가 화면 밖으로 나가지 않게 깎는다 */
+  const clamp = useCallback((x: number, y: number) => {
+    const el = elRef.current;
+    if (!el) return { x, y };
+    const rect = el.getBoundingClientRect();
+    // rect 는 이미 지금 pos 만큼 옮겨진 상태다 — 옮기기 전(기준) 좌표로 되돌린다
+    const baseLeft = rect.left - posRef.current.x;
+    const baseTop = rect.top - posRef.current.y;
+    const minX = -baseLeft;
+    const maxX = window.innerWidth - rect.width - baseLeft;
+    const minY = -baseTop;
+    const maxY = window.innerHeight - rect.height - baseTop;
+    return {
+      x: Math.min(Math.max(x, Math.min(minX, maxX)), Math.max(minX, maxX)),
+      y: Math.min(Math.max(y, Math.min(minY, maxY)), Math.max(minY, maxY)),
+    };
+  }, []);
+
+  // 화면을 돌리거나 창 크기를 바꾸면(폰 가로/세로 전환 등) 저장해 둔 자리가 화면
+  // 밖으로 나갈 수 있다 — 다시 안으로 당긴다.
+  useEffect(() => {
+    function onResize() {
+      setPos((p) => clamp(p.x, p.y));
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [clamp]);
+
+  const onPointerDown = useCallback((e: ReactPointerEvent<HTMLElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return; // 마우스는 왼쪽 버튼만
+    dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: posRef.current.x, baseY: posRef.current.y, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }, []);
+
+  const onPointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLElement>) => {
+      const st = dragRef.current;
+      if (!st) return;
+      const dx = e.clientX - st.startX;
+      const dy = e.clientY - st.startY;
+      if (!st.moved && Math.hypot(dx, dy) < DRAG_CLICK_THRESHOLD) return;
+      st.moved = true;
+      const next = clamp(st.baseX + dx, st.baseY + dy);
+      lastPosRef.current = next;
+      setPos(next);
+    },
+    [clamp],
+  );
+
+  const endDrag = useCallback(() => {
+    const st = dragRef.current;
+    dragRef.current = null;
+    if (!st?.moved) return;
+    justDraggedRef.current = true;
+    // justDraggedRef 는 도크 전체(열기 버튼·최소화·닫기)가 같이 쓴다. 막아야 하는 건
+    // 딱 하나 — 드래그를 끝낸 바로 그 pointerup 이 만드는 "유령 클릭"뿐이다(마우스를
+    // 떼면 브라우저가 같은 동작 안에서 바로 click 을 하나 더 쏜다). 그 유령 클릭은
+    // pointerup 과 같은 동기 작업 안에서 일어나므로, microtask 로 미뤄 끄면 그 클릭이
+    // 지나간 *바로 다음*에 풀린다 — 시간을 정해 두면(예: 300ms) 그 안에 사용자가
+    // 다른 버튼(예: 헤더를 끌고 바로 닫기)을 눌러도 같이 막혀 버리는데, microtask 는
+    // 그 문제가 없다.
+    queueMicrotask(() => {
+      justDraggedRef.current = false;
+    });
+    try {
+      localStorage.setItem(DOCK_POS_KEY, JSON.stringify(lastPosRef.current));
+    } catch {
+      /* 못 저장해도 이번 화면에서는 그대로 보이니 무시한다 */
+    }
+  }, []);
+
+  /** 버튼 onClick 맨 앞에서 부른다 — true 면 방금 드래그였다는 뜻이니 열기 동작을 건너뛴다 */
+  const consumeDraggedFlag = useCallback(() => {
+    const was = justDraggedRef.current;
+    justDraggedRef.current = false;
+    return was;
+  }, []);
+
+  return {
+    elRef,
+    pos,
+    /** 접힌 버튼용 — 폰·PC 모두 옮기므로 바로 transform 으로 적용한다 */
+    style: { transform: pos.x || pos.y ? `translate(${pos.x}px, ${pos.y}px)` : undefined },
+    /**
+     * 데스크톱 패널용 — 패널은 PC(md 이상)에서만 끌어 옮기고 폰 시트는 바닥에 그대로
+     * 붙어 있어야 한다. transform 을 바로 주면 PC 에서 끌어 옮긴 좌표가 localStorage 에
+     * 남아 있다가 폰 화면에서도 시트를 밀어 버린다 — CSS 변수로만 값을 건네고, 실제
+     * transform 적용은 ddasomi.css 의 `@media (min-width:768px)` 규칙에 맡긴다(그 미디어
+     * 밖에서는 변수가 있어도 적용되지 않는다).
+     */
+    panelStyle: { "--dock-x": `${pos.x}px`, "--dock-y": `${pos.y}px` } as CSSProperties,
+    dragHandlers: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: endDrag,
+      onPointerCancel: endDrag,
+    },
+    consumeDraggedFlag,
+  };
+}
+
 function emptySnapshot(): ChatbotSnapshot {
   return {
     queriedAt: new Date().toISOString(),
@@ -156,6 +303,7 @@ export default function ChatbotDock() {
   const listRef = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<{ title: string; previewUrl: string; downloadUrl: string } | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const drag = useDraggablePosition();
 
   /** 검색 결과 카드를 탭했을 때 — 보관함 조회 화면(ArchiveBrowser)과 같은 방식으로 서명 URL 둘을 받아 모달로 연다 */
   async function openMatch(m: DocMatch) {
@@ -212,13 +360,23 @@ export default function ChatbotDock() {
 
   if (state === "bubble") {
     return (
-      // 모바일은 하단탭(h-16) 위로 올린다
-      <div className="print:hidden fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[200] flex flex-col items-end gap-3">
+      // 모바일은 하단탭(h-16) 위로 올린다. 다른 화면의 버튼과 겹쳐 그 버튼을 못 누르는
+      // 일이 있어, 손가락(폰)·마우스(PC) 로 끌어 옮길 수 있게 했다(drag.dragHandlers) —
+      // touch-none 이 없으면 폰에서 끌 때 브라우저가 화면 스크롤로 먼저 가로채 간다.
+      <div
+        ref={drag.elRef}
+        style={drag.style}
+        className="print:hidden fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[200] flex flex-col items-end gap-3 touch-none"
+        {...drag.dragHandlers}
+      >
         {/* 말풍선 — 버튼과 같이 눌리도록 클릭 영역을 공유한다. 폰에서는 버튼을 작게(56px) 하고 말풍선은
             감춘다 — 큰 버튼과 말풍선이 현황 목록 같은 본문을 가리는 데 대한 조정(PC 는 그대로 2배 크기) */}
         <button
           type="button"
-          onClick={() => setState("open")}
+          onClick={() => {
+            if (drag.consumeDraggedFlag()) return;
+            setState("open");
+          }}
           aria-hidden="true"
           tabIndex={-1}
           className="ddasomi-speech-bubble mr-6 md:mr-7 max-md:hidden"
@@ -229,9 +387,12 @@ export default function ChatbotDock() {
         </button>
         <button
           type="button"
-          onClick={() => setState("open")}
-          aria-label="정비 챗봇 열기 (따소미)"
-          className="w-14 h-14 md:w-28 md:h-28 rounded-full bg-primary shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center overflow-hidden"
+          onClick={() => {
+            if (drag.consumeDraggedFlag()) return;
+            setState("open");
+          }}
+          aria-label="정비 챗봇 열기 (따소미) — 길게 끌면 자리를 옮길 수 있어요"
+          className="w-14 h-14 md:w-28 md:h-28 rounded-full bg-primary shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
         >
           <span className="ddasomi-face-crop w-full h-full">
             <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img ddasomi-idle-anim" />
@@ -243,18 +404,35 @@ export default function ChatbotDock() {
 
   return (
     <div
+      ref={drag.elRef}
+      style={drag.panelStyle}
       role="dialog"
       aria-label="정비 챗봇"
       className={[
         // 떠 있는 판이라 카드와 같은 흰색이어야 바탕 위에 올라앉은 것으로 읽힌다
-      "print:hidden fixed z-[200] flex flex-col bg-surface-container-lowest border border-border-subtle shadow-2xl",
-        // 모바일: 하단 시트 (하단탭 위에 붙는다)
+        // dock-draggable: 끌어 옮긴 좌표(--dock-x/--dock-y)는 md 이상에서만 실제
+        // transform 으로 적용한다(ddasomi.css) — 폰 시트가 PC 드래그 좌표에 밀리지 않게.
+      "print:hidden fixed z-[200] flex flex-col bg-surface-container-lowest border border-border-subtle shadow-2xl dock-draggable",
+        // 모바일: 하단 시트 (하단탭 위에 붙는다) — 시트는 끌어 옮기지 않는다(폰 화면
+        // 관례상 바닥에 붙어 있는 게 자연스럽고, 열려 있는 동안은 다른 버튼을 일부러
+        // 가리는 모달에 가깝다 — 안 보이는 버튼은 아래 "여유 스크롤"로 접근한다).
         "inset-x-0 bottom-16 h-[70vh] rounded-t-2xl",
-        // 데스크톱: 우하단 패널
+        // 데스크톱: 우하단 패널 — 떠 있는 카드라 헤더를 끌어 옮길 수 있다
         "md:inset-x-auto md:right-6 md:bottom-6 md:w-[380px] md:h-[560px] md:max-h-[calc(100vh-6rem)] md:rounded-2xl",
       ].join(" ")}
     >
-      <header className="flex items-center gap-2 px-4 h-12 border-b border-border-subtle shrink-0">
+      <header
+        className="flex items-center gap-2 px-4 h-12 border-b border-border-subtle shrink-0 md:cursor-grab md:active:cursor-grabbing"
+        onPointerDown={(e) => {
+          // 폰 폭에서는 시트 자체를 끌지 않는다 — pointerType 이 아니라 화면 폭으로
+          // 가른다(마우스를 쓰는 좁은 창도 있을 수 있어서).
+          if (window.innerWidth < 768) return;
+          drag.dragHandlers.onPointerDown(e);
+        }}
+        onPointerMove={drag.dragHandlers.onPointerMove}
+        onPointerUp={drag.dragHandlers.onPointerUp}
+        onPointerCancel={drag.dragHandlers.onPointerCancel}
+      >
         <span className="ddasomi-face-crop w-7 h-7 shrink-0">
           <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img" />
         </span>
@@ -262,7 +440,10 @@ export default function ChatbotDock() {
 
         <button
           type="button"
-          onClick={() => setState("bubble")}
+          onClick={() => {
+            if (drag.consumeDraggedFlag()) return;
+            setState("bubble");
+          }}
           aria-label="최소화"
           title="최소화"
           className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
@@ -271,7 +452,10 @@ export default function ChatbotDock() {
         </button>
         <button
           type="button"
-          onClick={() => setState("bubble")}
+          onClick={() => {
+            if (drag.consumeDraggedFlag()) return;
+            setState("bubble");
+          }}
           aria-label="닫기"
           title="닫기"
           className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
