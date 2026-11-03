@@ -15,10 +15,10 @@ export default function StatusCountCards({ counts }: { counts: Record<string, nu
     <section className="grid gap-gutter grid-cols-2 xl:grid-cols-4">
       {STATUS_OPTIONS.map((s) => (
         <Link key={s} href="/status" className="block h-full">
-          <Card className="p-5 h-full flex flex-col gap-1">
+          <Card lift className="p-5 h-full flex flex-col gap-1">
             <span className="text-sm font-bold text-on-surface-variant">{s}</span>
             <span className="flex items-baseline gap-1">
-              <span className={`text-display-lg tabular-nums ${TONE[s]}`}>{counts[s] ?? 0}</span>
+              <span className={`text-kpi-lg ${TONE[s]}`}>{counts[s] ?? 0}</span>
               <span className="text-title-sm text-on-surface-variant">건</span>
             </span>
           </Card>

@@ -575,7 +575,7 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
           </div>
           <div className="text-right shrink-0">
             <StatusChip status={taskStatus(task)} />
-            <p className="text-2xl font-black text-primary mt-2">{p}%</p>
+            <p className="text-kpi text-primary mt-2">{p}%</p>
           </div>
         </div>
         <ProgressBar value={p} height="h-2" />

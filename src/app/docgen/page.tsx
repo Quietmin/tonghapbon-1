@@ -42,7 +42,7 @@ export default function DocgenHomePage() {
       <section className="grid gap-gutter md:grid-cols-3">
         {CHOICES.map((c) => (
           <Link key={c.href} href={c.href} className="block">
-            <Card className="p-card-padding flex flex-col h-full">
+            <Card lift className="p-card-padding flex flex-col h-full">
               <div className="w-12 h-12 rounded-2xl bg-primary-fixed text-on-primary-fixed-variant flex items-center justify-center mb-4">
                 <Icon name={c.icon} className="text-2xl" />
               </div>
@@ -59,7 +59,7 @@ export default function DocgenHomePage() {
 
       <section>
         <Link href="/docgen/archive" className="block">
-          <Card className="p-card-padding flex items-center gap-4">
+          <Card lift className="p-card-padding flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shrink-0">
               <Icon name="inventory_2" className="text-2xl" />
             </div>

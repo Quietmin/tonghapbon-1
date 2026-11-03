@@ -72,7 +72,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
                 <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
                   {s.label}
                 </p>
-                <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                <p className={`text-kpi ${s.color}`}>{s.value}</p>
               </div>
             ))}
           </div>
@@ -203,7 +203,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-1">
             입력 누락
           </p>
-          <p className={`text-2xl font-black ${d.missingCount ? "text-error" : "text-status-success-text"}`}>
+          <p className={`text-kpi ${d.missingCount ? "text-error" : "text-status-success-text"}`}>
             {d.missingCount}건
           </p>
           <p className="text-xs text-on-surface-variant mt-1">금일 미입력 (미완료 작업)</p>
@@ -212,7 +212,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-1">
             사진 등록
           </p>
-          <p className="text-2xl font-black text-on-surface">
+          <p className="text-kpi text-on-surface">
             전 {d.withBefore} / 후 {d.withAfter}
           </p>
           <p className="text-xs text-on-surface-variant mt-1">분해 전 / 후 등록 작업 수</p>
@@ -221,7 +221,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-1">
             완료 설비
           </p>
-          <p className="text-2xl font-black text-status-success-text">{d.completedEquipCount}개</p>
+          <p className="text-kpi text-status-success-text">{d.completedEquipCount}개</p>
           <p className="text-xs text-on-surface-variant mt-1">진행률 100% 도달</p>
         </Card>
       </div>
@@ -257,7 +257,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
           <div className="flex items-center gap-4">
             <ProgressRing value={d.overall} size={104}>
-              <span className="text-2xl font-black text-on-surface">{d.overall}%</span>
+              <span className="text-kpi text-on-surface">{d.overall}%</span>
               <span className="text-xs text-on-surface-variant">전체</span>
             </ProgressRing>
           </div>
@@ -266,7 +266,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
               <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
                 계획 대비 실적
               </p>
-              <p className={`text-2xl font-black ${d.diff >= 0 ? "text-status-success-text" : "text-error"}`}>
+              <p className={`text-kpi ${d.diff >= 0 ? "text-status-success-text" : "text-error"}`}>
                 {d.diff >= 0 ? "선행 +" : "지연 "}
                 {d.diff}%p
               </p>
@@ -281,7 +281,7 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
               {d.finish.date && d.finish.deltaDays != null ? (
                 <>
                   <p
-                    className={`text-2xl font-black ${
+                    className={`text-kpi ${
                       d.finish.deltaDays > 0 ? "text-error" : "text-status-success-text"
                     }`}
                   >

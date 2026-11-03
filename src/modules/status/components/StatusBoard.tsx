@@ -235,7 +235,8 @@ export default function StatusBoard({
 
           {/* PC — 표 */}
           <div className="hidden md:block overflow-x-auto">
-            <table className={`${TABLE} table-fixed`}>
+            {/* 고정 칸 합(712px)에 이슈 내용 칸이 쓸 폭을 더해 둔다 — 안 그러면 좁은 화면에서 이슈 내용 칸이 0px 로 사라진다 */}
+            <table className={`${TABLE} table-fixed min-w-[880px]`}>
               <colgroup>
                 <col style={{ width: "130px" }} />
                 <col style={{ width: "170px" }} />

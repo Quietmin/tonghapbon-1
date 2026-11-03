@@ -247,7 +247,11 @@ export default function IssueListPanel({
         </ul>
 
         <div className="max-md:hidden overflow-x-auto -mx-1">
-          <table className={`${TABLE} table-fixed`}>
+          <table
+            className={`${TABLE} table-fixed`}
+            // 폭이 정해진 칸의 합에 폭 없는 칸(이슈 내용)이 쓸 160px 을 더한다 — 좁으면 가로로 밀어 보게 하고 칸이 0px 로 사라지지 않게
+            style={{ minWidth: columns.reduce((sum, c) => sum + (parseInt(widthOf(c) ?? "0", 10) || 0), 160) }}
+          >
             <colgroup>
               {columns.map((c) => (
                 <col key={c} style={widthOf(c) ? { width: widthOf(c) } : undefined} />

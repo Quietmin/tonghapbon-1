@@ -305,7 +305,7 @@ export default function Schedule() {
           data.hasPeriod ? (
             <div className="text-right">
               <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">오늘 계획공정률</p>
-              <p className="text-2xl font-black text-primary leading-tight">{data.plannedPct}%</p>
+              <p className="text-kpi text-primary leading-tight">{data.plannedPct}%</p>
             </div>
           ) : undefined
         }
@@ -839,28 +839,28 @@ export default function Schedule() {
               <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-2">
                 계획 공정률
               </p>
-              <p className="text-2xl font-black text-on-surface">{data.plannedPct}%</p>
+              <p className="text-kpi text-on-surface">{data.plannedPct}%</p>
               <p className="text-xs text-on-surface-variant mt-1">오늘 기준</p>
             </Card>
             <Card className="p-card-padding">
               <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-2">
                 지연 위험 공정
               </p>
-              <p className="text-2xl font-black text-error">{rows.filter((r) => r.behind).length}건</p>
+              <p className="text-kpi text-error">{rows.filter((r) => r.behind).length}건</p>
               <p className="text-xs text-error mt-1">계획 대비 15%p+ 미달</p>
             </Card>
             <Card className="p-card-padding">
               <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-2">
                 표시 설비
               </p>
-              <p className="text-2xl font-black text-on-surface">{groups.length}개</p>
+              <p className="text-kpi text-on-surface">{groups.length}개</p>
               <p className="text-xs text-on-surface-variant mt-1">작업 {rows.length}건</p>
             </Card>
             <Card className="p-card-padding">
               <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-2">
                 경과 / 전체
               </p>
-              <p className="text-2xl font-black text-on-surface">
+              <p className="text-kpi text-on-surface">
                 {todayOff} / {total}일
               </p>
               <p className="text-xs text-on-surface-variant mt-1">~ {data.project.end_date}</p>

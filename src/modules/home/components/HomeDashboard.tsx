@@ -53,14 +53,14 @@ function Kpi({
 }) {
   return (
     <Link href={href} className="block h-full">
-      <Card className="p-5 h-full flex flex-col gap-1">
+      <Card lift className="p-5 h-full flex flex-col gap-1">
         <div className="flex items-center gap-1.5 text-sm font-bold text-on-surface-variant">
           <Icon name={icon} className="text-base" />
           {label}
         </div>
         <div className="flex items-baseline gap-1">
           <span
-            className={`text-display-lg tabular-nums ${tone === "danger" ? "text-status-error-text" : "text-on-surface"}`}
+            className={`text-kpi-lg ${tone === "danger" ? "text-status-error-text" : "text-on-surface"}`}
           >
             {value}
           </span>

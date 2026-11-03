@@ -36,7 +36,7 @@ function ProfileCard() {
         <Icon name="badge" className="text-xl" />
       </span>
       <span className="min-w-0">
-        <span className="block text-title-sm font-black text-on-surface leading-tight truncate">
+        <span className="block text-title-sm font-bold text-on-surface leading-tight truncate">
           {profile ? profile.branch : "지사·부서 선택"}
         </span>
         <span className="block text-xs text-on-surface-variant truncate">
