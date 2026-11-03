@@ -351,21 +351,32 @@ async function fixCheongju() {
     rows = await getRows(project.id);
   }
 
-  // 일정이 없는 작업에 분야 순서(기계→전기→제어)대로 기간을 나눠 깐다
+  // 일정을 DB에 굳힌다.
+  //
+  // 공정표(schedule API)는 plan_start가 비어 있으면 회차 기간에 자동 배치한 날짜를
+  // 돌려준다 — 그래서 화면에는 그려지지만 DB는 비어 있고, 작업 편집·내려받기에서는
+  // 일정 칸이 빈 채로 보인다. 이 지사만 그런 상태라 화면 구성이 달라 보였다.
+  // 이미 보이고 있는 그 배치를 그대로 써넣어 다른 지사와 같게 만든다.
   const ORDER = { 기계: 0, 전기: 1, 제어: 2 };
-  const pending = rows.filter((t) => !toDate(t.sch?.plannedStartStr));
-  pending.sort((a, b) => (ORDER[a.field] ?? 3) - (ORDER[b.field] ?? 3) || a.name.localeCompare(b.name, "ko"));
+  const ordered = rows
+    .slice()
+    .sort((a, b) => (ORDER[a.field] ?? 3) - (ORDER[b.field] ?? 3) || a.name.localeCompare(b.name, "ko"));
   let placed = 0;
-  pending.forEach((t, i) => { t._slot = i; });
-  for (const t of pending) {
-    // 분야 구간 안에서 고르게 퍼뜨리고, 작업마다 5~12일을 준다
-    const ratio = pending.length > 1 ? t._slot / (pending.length - 1) : 0;
-    const s = addDays(start, Math.round(total * ratio * 0.82));
-    const dur = 5 + (t._slot % 8);
+  for (let i = 0; i < ordered.length; i++) {
+    const t = ordered[i];
+    let s = toDate(t.sch?.plannedStartStr);
+    let e = toDate(t.sch?.plannedEndStr);
+    if (!s || !e) {
+      // 자동 배치조차 못 한 작업 — 분야 순서대로 기간에 고르게 퍼뜨린다
+      const ratio = ordered.length > 1 ? i / (ordered.length - 1) : 0;
+      s = addDays(start, Math.round(total * ratio * 0.82));
+      e = minDate(addDays(s, 5 + (i % 8)), end);
+    }
     await api("PATCH", "/api/overhaul/tasks", {
-      id: t.id, patch: { plan_start: s, plan_end: minDate(addDays(s, dur), end) },
+      id: t.id, patch: { plan_start: s, plan_end: minDate(e, end) },
     });
     placed++;
+    if (placed % 80 === 0) console.log(`    일정 ${placed}/${ordered.length}`);
   }
 
   // 일정이 바뀌었으니 실적도 그 일정 위에 다시 깐다 (전 작업 완료)
