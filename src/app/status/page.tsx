@@ -16,9 +16,16 @@ export const metadata = { title: "현황 조회 — 유지보수 마스터" };
  * 보인다. 운영부는 담당부서로 거르지 않는다 — 담당부서는 "누가 조치하느냐"라서 운영부가 올린 이슈는
  * 거의 유지보수 부서 담당이고, 운영부로 걸러 두면 자기 지사의 이슈 대부분이 안 보인다. 운영부 계정은
  * 내 지사의 모든 이슈가 뜬다.
+ *
+ * ?issue=<id> 로 들어오면 그 현황의 조치 창이 바로 열린다 — 푸시 알림·새 현황 팝업을
+ * 눌렀을 때 쓰는 경로다 (StatusBoard 가 필터와 무관하게 그 건을 따로 불러 연다).
  */
-export default async function StatusPage() {
-  const user = await getCurrentUser();
+export default async function StatusPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ issue?: string }>;
+}) {
+  const [user, sp] = await Promise.all([getCurrentUser(), searchParams]);
   return (
     <>
       <ScreenHeader
@@ -40,6 +47,7 @@ export default async function StatusPage() {
       <StatusBoard
         initialBranch={user.branch ?? ""}
         initialDepartment={isMaintenanceDepartment(user.department) ? (user.department ?? "") : ""}
+        initialIssueId={typeof sp.issue === "string" ? sp.issue : undefined}
       />
     </>
   );

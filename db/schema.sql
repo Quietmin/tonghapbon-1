@@ -748,6 +748,30 @@ create table if not exists status_issue_photo (
 create index if not exists status_issue_photo_issue_idx
   on status_issue_photo (issue_id, seq);
 
+-- 웹 푸시 구독 — "이 기기(브라우저)로 알림을 보내 달라"는 등록 한 건.
+-- 로그인이 없으므로 구독 시점의 내 지사·부서(쿠키)를 함께 저장하고, 발송은
+-- (지사, 부서)로 고른다: 현황 등록 → 그 지사의 담당부서, 조치완료 → 그 지사의 운영부.
+-- endpoint 는 브라우저 푸시 서비스가 주는 기기 고유 주소라 유일키로 쓴다.
+-- 지사·부서를 바꾸면 같은 endpoint 로 다시 등록돼 행이 갱신된다(upsert).
+-- 만료된 구독(발송 시 404/410)은 발송 코드가 지운다.
+create table if not exists push_subscription (
+  id          bigint generated always as identity primary key,
+  endpoint    text not null unique,
+  p256dh      text not null,
+  auth        text not null,
+  branch      text,
+  department  text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists push_subscription_target_idx
+  on push_subscription (branch, department);
+
+drop trigger if exists push_subscription_set_updated_at on push_subscription;
+create trigger push_subscription_set_updated_at before update on push_subscription
+  for each row execute function set_updated_at();
+
 
 -- ============================================================================
 -- 보안 — 앱 테이블의 행 수준 보안(RLS) 켜기
@@ -775,7 +799,7 @@ begin
     'document', 'document_chunk', 'document_tag', 'chat_message',
     'maintenance_plan_source', 'maintenance_plan', 'maintenance_plan_grade', 'maintenance_record',
     'design_statement', 'design_statement_item',
-    'status_issue', 'status_issue_photo'
+    'status_issue', 'status_issue_photo', 'push_subscription'
   ]
   loop
     if to_regclass('public.' || t) is not null then
