@@ -59,7 +59,10 @@
    (원본 주석) 고장 보고서의 .fr-photo-cap 도 같은 기준을 쓴다. */
 .desc-text {
   width: 100%; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere;
-  font-size: 14px; font-weight: 700; line-height: 1.5; text-align: justify;
+  /* 굵기 400 — 원본(뚝DOC) 캡션과 같은 보통 굵기다. 700 으로 찍으면 ①②③·※ 같은
+     원문자·기호가 대체 글꼴로 그려지면서 숫자가 뭉개져 ◉·✳ 처럼 보이고, 글자가
+     빽빽해져 설명란이 잘 읽히지 않는다. (SFC-09 매뉴얼 사례, 2026-11-03) */
+  font-size: 14px; font-weight: 400; line-height: 1.5; text-align: justify;
 }
 /* 텍스트 항목은 사진 칸/설명 칸으로 나누지 않고 칸 하나를 통째로 쓴다.
    위쪽 여백은 좌상단 순번 배지(2mm+6mm)를 피하려고 넉넉히 잡았다. (원본 주석) */
