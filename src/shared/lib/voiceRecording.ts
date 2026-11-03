@@ -90,7 +90,8 @@ export function useAudioRecorder(): AudioRecorder {
 
 export interface TranscribeFieldContext {
   label: string;
-  kind: "short" | "long";
+  /** short=한 줄 값, long=개조식 서술, question=챗봇에게 묻는 질문(묻는 말투 그대로 다듬는다) */
+  kind: "short" | "long" | "question";
   options?: readonly string[];
   /** 자리가 좁은 칸(예: 사진 설명)이면 대략 이 글자 수를 넘지 않게 짧게 정리해 달라고 알려 준다 */
   maxChars?: number;

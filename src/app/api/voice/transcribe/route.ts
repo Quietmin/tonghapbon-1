@@ -126,6 +126,42 @@ ${kindLine}${lengthLine}
 }
 
 /**
+ * 따소미 대화창(fieldKind: "question") 전용 정리 프롬프트 — 양식 칸이 아니라 챗봇에게 묻는 말이다.
+ * 개조식으로 줄이면 "SFC 고장사례 찾아줘"가 "SFC 고장사례"처럼 요청이 사라져 챗봇이 의도를 잃으므로,
+ * 묻는 말투·요청("찾아줘", "있어?", "어떻게 해?")은 그대로 살리고 군더더기만 지운다.
+ * 가장 중요한 일은 잘못 들린 설비 용어를 앞뒤 맥락으로 바로잡는 것이다(에스에프씨→SFC, 비에프피→BFP 등) —
+ * 챗봇 검색이 그 낱말로 보관함을 찾기 때문에 용어 하나가 틀리면 0건이 된다.
+ */
+function buildQuestionCleanupPrompt(raw: string): string {
+  return `너는 발전소·지역난방 설비 정비 챗봇 "따소미"에게 사용자가 음성으로 한 질문을 받아쓴 결과를, 채팅 입력창에 바로 넣을 수 있는 질문 한두 문장으로 정리하는 도우미다. 결과는 JSON의 text 필드에 넣는다.
+
+예시:
+원문: "어 에스에프씨 그 고장 사례 좀 찾아줄래" → text: "SFC 고장사례 찾아줘"
+원문: "비에프피 음 급수 펌프에서 누유 난 적 있어" → text: "BFP(급수펌프)에서 누유 난 적 있어?"
+원문: "가스 터빈 발전기 메가 측정 어떻게 해" → text: "가스터빈 발전기 메거 측정 어떻게 해?"
+원문: "청주 지사 현황 미완료 거 뭐 있어" → text: "청주지사 현황 미완료 건 뭐 있어?"
+원문: "그 아까 그 보고서에서 조치 사항 다시 알려 줘" → text: "아까 그 보고서에서 조치사항 다시 알려줘"
+
+사용자가 말한 원문(받아쓰기 결과 — 인식 오류·더듬거림이 섞여 있을 수 있다):
+"${raw}"
+
+규칙:
+1. 묻는 말투와 요청 표현("찾아줘", "알려줘", "있어?", "어떻게 해?")은 그대로 살린다. 개조식으로 줄이지 않는다. 묻는 문장이면 끝에 물음표를 붙인다.
+2. "음", "어", "그", "좀", "그러니까" 같은 군더더기와 같은 말 반복은 지운다. 단, "아까 그 보고서"처럼 앞 대화를 가리키는 말은 남긴다.
+3. 설비·정비 맥락에서 뜻이 안 통하는 낱말은 발음이 비슷해 잘못 받아적혔을 가능성을 추론해 현장 용어로 바로잡는다.
+   영문 약어는 대문자 약어로 쓴다(에스에프씨→SFC, 지티→GT, 에스티→ST, 비에프피→BFP, 디씨에스→DCS, 피엘씨→PLC, 엠씨씨→MCC, 지아이에스→GIS, 에이브이알→AVR, 오엘티씨→OLTC, 에이치알에스지→HRSG).
+   지사명은 "○○지사"로 붙여 쓴다. 숫자는 아라비아 숫자로 쓴다(일호기→1호기).
+4. 원문에 없는 새 사실·설비·수치·조건을 보태거나 뜻(부정·긍정)을 뒤집지 않는다.
+5. 쓸 만한 내용이 전혀 없으면 text를 빈 문자열로 한다.`;
+}
+
+/** 대화창 받아쓰기의 STT 힌트 낱말 — 자주 잘못 들리는 영문 약어·전문 용어를 미리 알려 준다 */
+const QUESTION_KEYWORDS = [
+  "따소미", "SFC", "GT", "ST", "STG", "HRSG", "BFP", "DCS", "PLC", "MCC", "LCP", "GIS", "OLTC", "AVR",
+  "메거", "절연저항", "인터락", "고장보고서", "매뉴얼", "보관함",
+];
+
+/**
  * 받아쓰기(STT) 모델에 "이런 맥락의 말이 나올 것이다"를 prompt 로 살짝 건네준다
  * (OpenAI 전사 API 가 지원하는 입력 — 받아쓴 글자를 대신 채워 주는 게 아니라,
  * 발음이 비슷한 후보들 중 이 맥락에 맞는 쪽을 더 잘 고르도록 돕는 "힌트"다).
@@ -133,7 +169,10 @@ ${kindLine}${lengthLine}
  * 여기서 미리 맥락을 주면 애초에 엉뚱하게 받아적힐 확률 자체가 줄어든다 — 설비명
  * 같은 전문 용어가 "순한수 펌프"처럼 비슷한 음으로 잘못 받아적히는 문제가 실제로 있었다.
  */
-function buildTranscribeHint(fieldLabel: string, options: string[] | null): string {
+function buildTranscribeHint(fieldLabel: string, options: string[] | null, question = false): string {
+  if (question) {
+    return "발전소·지역난방 설비 정비 담당자가 챗봇에게 묻는 질문을 받아쓰는 중이다. 고장 사례·매뉴얼·현황을 찾는 말이 많고, SFC·GT·BFP·DCS 같은 영문 약어와 설비명·지사명이 섞인 구어체 한국어다.";
+  }
   const base = `설비 점검·정비 현장에서 "${fieldLabel}" 칸에 들어갈 말을 받아쓰는 중이다. 설비명·지사명·전문 용어가 섞인 구어체 한국어 문장일 수 있다.`;
   if (options && options.length) {
     return `${base} 다음 중 하나를 고르는 말일 때가 많다: ${options.slice(0, 20).join(", ")}.`;
@@ -155,6 +194,7 @@ async function transcribeWithOpenAI(
   apiKey: string,
   fieldLabel: string,
   options: string[] | null,
+  question = false,
 ): Promise<string | null> {
   const form = new FormData();
   form.append("file", audio, `recording.${extensionForMime(audio.type)}`);
@@ -162,8 +202,8 @@ async function transcribeWithOpenAI(
   // gpt-transcribe 는 복수형 languages 를 쓴다(language 단수 필드와는 별개 — 같이
   // 보내지 않는다. 공식 가이드: "these models use languages instead of language").
   form.append("languages[]", "ko");
-  if (fieldLabel) form.append("prompt", buildTranscribeHint(fieldLabel, options));
-  for (const kw of buildKeywords(options)) form.append("keywords[]", kw);
+  if (fieldLabel || question) form.append("prompt", buildTranscribeHint(fieldLabel, options, question));
+  for (const kw of question ? QUESTION_KEYWORDS : buildKeywords(options)) form.append("keywords[]", kw);
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -299,7 +339,8 @@ export async function POST(req: Request) {
 
   const fieldLabelRaw = form.get("fieldLabel");
   const fieldLabel = typeof fieldLabelRaw === "string" ? fieldLabelRaw.trim().slice(0, MAX_FIELD_LABEL_LEN) : "";
-  const fieldKind = form.get("fieldKind") === "long" ? "long" : "short";
+  const kindRaw = form.get("fieldKind");
+  const fieldKind = kindRaw === "long" ? "long" : kindRaw === "question" ? "question" : "short";
 
   let options: string[] | null = null;
   const optionsRaw = form.get("options");
@@ -319,8 +360,15 @@ export async function POST(req: Request) {
   const maxChars = Number.isFinite(maxCharsNum) && maxCharsNum > 0 ? Math.min(maxCharsNum, MAX_CHARS_CAP) : undefined;
 
   try {
-    const raw = await transcribeWithOpenAI(audio, apiKey, fieldLabel, options);
+    const raw = await transcribeWithOpenAI(audio, apiKey, fieldLabel, options, fieldKind === "question");
     if (!raw) return NextResponse.json({ ok: true, raw: "", text: "" });
+
+    if (fieldKind === "question") {
+      // 따소미 대화창 — 묻는 말투를 살리고 잘못 들린 용어를 맥락으로 바로잡는다. 정리가 실패하면 원문을 쓴다
+      let cleaned = await cleanWithOpenAI(buildQuestionCleanupPrompt(raw), apiKey).catch(() => null);
+      if (cleaned?.includes("�")) cleaned = null;
+      return NextResponse.json({ ok: true, raw, text: (cleaned ?? raw).slice(0, 500) });
+    }
     if (!fieldLabel) return NextResponse.json({ ok: true, raw, text: raw });
 
     if (options && options.length) {
