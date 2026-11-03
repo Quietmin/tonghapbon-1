@@ -178,6 +178,79 @@ export async function updateProject(
  * 파서가 분류한 설비 유형은 설비 마스터에도 함께 등록해서, 고장이력·챗봇이 같은
  * 설비를 참조할 수 있게 한다.
  */
+const normTag = (s: string | null | undefined) => (s ?? "").toUpperCase().replace(/[-_\s]/g, "");
+
+/** 설비가 아닌 작업 분류 — '기타'는 분류 실패, '비계'는 가설 작업이다 */
+const NON_EQUIPMENT = new Set(["기타", "비계"]);
+
+/** 지사 보수계획의 태그번호 → 그 항목이 속한 설비(대분류) id */
+async function planEquipmentByTag(branch: string): Promise<Map<string, string>> {
+  const rows = await query<{ tag_no: string; equipment_id: string }>(
+    `select tag_no, equipment_id from maintenance_plan
+      where branch = $1 and equipment_id is not null and tag_no is not null and is_active`,
+    [branch],
+  );
+  const map = new Map<string, string>();
+  for (const r of rows) {
+    const k = normTag(r.tag_no);
+    if (k && !map.has(k)) map.set(k, r.equipment_id);
+  }
+  return map;
+}
+
+/**
+ * 업로드한 작업마다 이어 붙일 설비를 정한다.
+ *
+ * 수량산출서는 보수계획에서 뽑은 것이라 같은 태그번호를 쓴다. 그래서
+ *   1) 태그가 보수계획에 있으면 그 항목의 설비(대분류)로 잇는다
+ *   2) 태그 없는 공통 작업(비계·종합시험 등)은 같은 공종 시트의 작업들이 가장 많이
+ *      이어진 설비를 따른다 — 수량산출서 시트가 공종 단위로 나뉘어 있다
+ *   3) 보수계획이 없는 지사만 예전처럼 분류명(GT·발전기…)으로 설비를 만든다.
+ *      보수계획이 있는 지사에서 그렇게 하면 "가스터빈설비" 옆에 "GT",
+ *      "발전기설비" 옆에 "발전기"가 점검 항목 없는 빈 줄로 따로 생긴다.
+ */
+async function resolveTaskEquipment(
+  branch: string,
+  tasks: ParsedTask[],
+): Promise<Map<ParsedTask, string>> {
+  const out = new Map<ParsedTask, string>();
+  const byTag = await planEquipmentByTag(branch);
+  for (const t of tasks) {
+    const id = byTag.get(normTag(t.tag));
+    if (id) out.set(t, id);
+  }
+
+  const votes = new Map<string, Map<string, number>>();
+  for (const [t, id] of out) {
+    const sheet = votes.get(t.sheetName ?? "") ?? new Map<string, number>();
+    sheet.set(id, (sheet.get(id) ?? 0) + 1);
+    votes.set(t.sheetName ?? "", sheet);
+  }
+  for (const t of tasks) {
+    if (out.has(t)) continue;
+    const best = [...(votes.get(t.sheetName ?? "") ?? new Map<string, number>()).entries()]
+      .sort((a, b) => b[1] - a[1])[0];
+    if (best) out.set(t, best[0]);
+  }
+
+  if (byTag.size === 0) {
+    const rest = tasks.filter((t) => !out.has(t) && t.equipment && !NON_EQUIPMENT.has(t.equipment));
+    const equipMap = await ensureEquipments(
+      rest.map((t) => ({
+        name: t.equipment,
+        branch,
+        type: t.equipment,
+        field: t.field === "미분류" ? null : t.field,
+      })),
+    );
+    for (const t of rest) {
+      const id = equipMap.get(t.equipment.trim().toLowerCase());
+      if (id) out.set(t, id);
+    }
+  }
+  return out;
+}
+
 export async function saveAnalysis(params: {
   projectId: string;
   fileName: string;
@@ -195,29 +268,17 @@ export async function saveAnalysis(params: {
   );
   if (!source) throw new Error("업로드 이력을 저장하지 못했습니다.");
 
-  // 설비 마스터를 먼저 채운다. '기타'는 분류 실패를 뜻하므로 마스터에 만들지 않는다.
-  // 설비 마스터는 지사에 속하므로 회차의 지사를 따른다 — 지사 없는 옛 회차면
-  // 마스터 등록만 건너뛴다 (작업 저장은 그대로 된다).
+  // 작업을 설비 마스터의 설비에 잇는다. 설비 마스터는 지사에 속하므로 회차의 지사를
+  // 따른다 — 지사 없는 옛 회차면 연결만 건너뛴다 (작업 저장은 그대로 된다).
   const project = await queryOne<{ branch: string | null }>(
     `select branch from overhaul_project where id = $1`,
     [projectId],
   );
   const branch = project?.branch ?? null;
-  const equipMap = branch
-    ? await ensureEquipments(
-        tasks
-          .filter((t) => t.equipment && t.equipment !== "기타")
-          .map((t) => ({
-            name: t.equipment,
-            branch,
-            type: t.equipment,
-            field: t.field === "미분류" ? null : t.field,
-          })),
-      )
-    : new Map<string, string>();
+  const equipmentIds = branch ? await resolveTaskEquipment(branch, tasks) : new Map<ParsedTask, string>();
 
   for (const t of tasks) {
-    const equipmentId = equipMap.get(t.equipment.trim().toLowerCase()) ?? null;
+    const equipmentId = equipmentIds.get(t) ?? null;
     await execute(
       `insert into overhaul_task
          (project_id, source_id, equipment_id, name, spec, unit, plan_qty,
@@ -443,8 +504,13 @@ export async function createTask(
     `select branch from overhaul_project where id = $1`,
     [projectId],
   );
+  // 태그가 보수계획에 있으면 그 설비로 잇는다 — 업로드(resolveTaskEquipment)와 같은 규칙
+  const tagged =
+    project?.branch && input.tag
+      ? (await planEquipmentByTag(project.branch)).get(normTag(input.tag)) ?? null
+      : null;
   const equipMap =
-    equipmentType && equipmentType !== "기타" && project?.branch
+    !tagged && equipmentType && !NON_EQUIPMENT.has(equipmentType) && project?.branch
       ? await ensureEquipments([
           {
             name: equipmentType,
@@ -463,7 +529,7 @@ export async function createTask(
      returning id`,
     [
       projectId,
-      equipMap?.get(equipmentType!.toLowerCase()) ?? null,
+      tagged ?? equipMap?.get(equipmentType!.toLowerCase()) ?? null,
       name,
       input.spec || null,
       input.unit || "EA",
