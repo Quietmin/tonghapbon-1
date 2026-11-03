@@ -189,6 +189,17 @@ export async function deleteEquipment(id: string): Promise<number> {
   return execute(`delete from equipment where id = $1`, [id]);
 }
 
+/**
+ * 지사 설비 전체 삭제(초기화) — 엑셀을 다시 올려 처음부터 구성하고 싶을 때 쓴다.
+ * 개별 삭제와 같은 규칙이 지사 전체에 적용된다: 기기·태그는 함께 지워지고(cascade),
+ * 보수계획·고장이력·작업의 데이터 자체는 남되 설비 연결만 끊긴다(set null).
+ * 지사 밖 데이터는 절대 건드리지 않는다.
+ */
+export async function deleteAllEquipment(branch: string): Promise<number> {
+  if (!branch) throw new Error("지사를 먼저 선택하세요.");
+  return execute(`delete from equipment where branch = $1`, [branch]);
+}
+
 // ---------------------------------------------------------------------------
 // 기기·태그 CRUD — 설비에 딸린 2단
 // ---------------------------------------------------------------------------
