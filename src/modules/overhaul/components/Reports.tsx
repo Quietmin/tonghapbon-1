@@ -55,7 +55,7 @@ function DailyReport({ project, report: d }: { project: OverhaulProject; report:
             <p className="text-xs uppercase tracking-widest text-primary font-bold">일일 공정 보고서</p>
             <h2 className="text-headline-md text-on-surface">{project.name}</h2>
             <p className="text-sm text-on-surface-variant mt-0.5">
-              {project.plant} · {project.unit} · 기준일 {d.today}
+              {project.branch ? `${project.branch} · ` : ""}기준일 {d.today}
             </p>
           </div>
           <div className="flex gap-6">
@@ -239,9 +239,9 @@ function ExecutiveReport({ project, report: d }: { project: OverhaulProject; rep
         <div className="flex items-start justify-between gap-4 border-b border-border-subtle pb-5">
           <div>
             <p className="text-xs uppercase tracking-widest text-primary font-bold">경영진 요약 보고</p>
-            <h2 className="text-headline-md text-on-surface">{project.name} 정기 오버홀</h2>
+            <h2 className="text-headline-md text-on-surface">{project.name}</h2>
             <p className="text-sm text-on-surface-variant mt-0.5">
-              {project.plant} · {project.unit} · 기준일 {d.today}
+              {project.branch ? `${project.branch} · ` : ""}기준일 {d.today}
             </p>
           </div>
           <div className="text-right shrink-0">

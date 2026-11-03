@@ -71,7 +71,7 @@ export interface ChatbotSnapshot {
   dataSource: "uploaded" | "empty";
   planBaselineDate: string;
   lastEntryDate: string | null;
-  project: { name: string; plant: string | null; unit: string | null; startDate: string | null; endDate: string | null } | null;
+  project: { name: string; startDate: string | null; endDate: string | null } | null;
   counts: { total: number; done: number; inProgress: number; waiting: number };
   canCompute: boolean;
   overall: number | null;
@@ -152,8 +152,6 @@ export async function getChatbotSnapshot(branch?: string | null): Promise<Chatbo
     lastEntryDate,
     project: {
       name: project.name,
-      plant: project.plant,
-      unit: project.unit,
       startDate: project.start_date,
       endDate: project.end_date,
     },

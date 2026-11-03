@@ -25,8 +25,7 @@ export interface ExportTaskRow {
 
 export interface ExportProject {
   name: string;
-  plant: string | null;
-  unit: string | null;
+  branch?: string | null;
   start_date: string | null;
   end_date: string | null;
 }
@@ -73,7 +72,7 @@ export function exportTasksToExcel(
   const today = new Date().toISOString().slice(0, 10);
   const summary = [
     ["프로젝트", project.name],
-    ["호기", project.unit ?? ""],
+    ["지사", project.branch ?? ""],
     ["기간", `${project.start_date ?? "미설정"} ~ ${project.end_date ?? "미설정"}`],
     ["기준일", today],
     [],
@@ -90,5 +89,5 @@ export function exportTasksToExcel(
   XLSX.utils.book_append_sheet(wb, ws2, "요약");
 
   const stamp = today.replace(/-/g, "");
-  XLSX.writeFile(wb, `공정현황_${project.unit || "오버홀"}_${stamp}.xlsx`);
+  XLSX.writeFile(wb, `공정현황_${project.branch || "오버홀"}_${stamp}.xlsx`);
 }
