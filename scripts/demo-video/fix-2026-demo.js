@@ -72,8 +72,14 @@ function detailFor(name, phase) {
   return phase === "end" ? "점검 완료, 특이사항 없음" : "점검 진행 중, 특이사항 없음";
 }
 
-const midQty = (plan, frac) =>
-  Math.max(1, Math.min(plan - (plan > 1 ? 1 : 0), Math.round(plan * frac)));
+// 중간 실적 수량 — 항상 계획보다 작아야 "진행 중"으로 보인다.
+// 수량 1(식)짜리를 정수로 반올림하면 1/1 = 100%가 돼 진행 중·지연 작업이 완료로
+// 찍힌다. 그래서 수량이 작으면 소수(0.1 단위)로 넣는다 — done_qty는 소수를 받는다.
+const midQty = (plan, frac) => {
+  if (plan >= 3) return Math.max(1, Math.min(plan - 1, Math.round(plan * frac)));
+  const v = Math.round(plan * frac * 10) / 10;
+  return Math.min(plan - 0.1, Math.max(0.1, v));
+};
 
 const setBranch = (branch) => api("POST", "/api/overhaul/branch", { branch });
 
@@ -199,6 +205,63 @@ async function emptyGwanggyo() {
 }
 
 // ── ④ 판교 — 지금 돌아가는 현장(≈50%) ──────────────────────────────────────
+// 지연 6건 — 기한이 지났는데 아직 안 끝난 작업. 설비가 겹치지 않게 이름으로 고른다.
+// 공정률 예측(simulate)과 실제 쓰기가 같은 작업을 고르도록 함수 하나로 둔다.
+const DELAY_FRAC = [0.5, 0.4, 0.6, 0.45, 0.55, 0.35];
+
+// 분해 전/후 사진 — 작업 이름에 맞는 실사를 붙인다 (photos/real, 출처는 그 폴더 CREDITS.md).
+// 예전 일러스트 사진은 "6.9kV 차단기" 같은 글자가 박혀 있어 가스터빈 작업에 붙으면 어색했다.
+const PHOTO_RULES = [
+  [/베어링/, "bearing"],
+  [/터닝기어|기어/, "gear"],
+  [/로터|회전자/, "rotor"],
+  [/압축기|블레이드/, "compressor"],
+];
+function pickPhotoTasks(overdue, delayPick) {
+  const photoTargets = [], photoPairs = [];
+  for (const [re, key] of PHOTO_RULES) {
+    const hit = overdue.find((t) => re.test(t.name) && !delayPick.includes(t.id) && !photoTargets.includes(t.id));
+    if (hit) { photoTargets.push(hit.id); photoPairs.push(key); }
+  }
+  return { photoTargets, photoPairs };
+}
+const photoPayload = (key) => ({
+  keepIds: [],
+  add: [
+    { slot: "before", dataUrl: dataUrl(PHOTO(`real/${key}-before.jpg`)) },
+    { slot: "after", dataUrl: dataUrl(PHOTO(`real/${key}-after.jpg`)) },
+  ],
+});
+
+// 사진만 바꾼다 — 실적·공정률은 그대로 두고, 사진이 붙어 있던 실적의 사진을 교체한다
+async function replacePangyoPhotos() {
+  const branch = "판교지사";
+  await setBranch(branch);
+  const { project } = await mainProject(branch);
+  const rows = await getRows(project.id);
+  let replaced = 0;
+  for (const [re, key] of PHOTO_RULES) {
+    for (const t of rows.filter((r) => re.test(r.name))) {
+      const { entries = [] } = await api("GET", `/api/overhaul/entries?taskId=${t.id}`);
+      const withPhoto = entries.find((e) => (e.photos || []).length);
+      if (!withPhoto) continue;
+      await postEntry(t.id, toDate(withPhoto.entry_date), Number(withPhoto.done_qty),
+        withPhoto.work_detail || "", withPhoto.delay_reason || "", withPhoto.next_plan || "", photoPayload(key));
+      console.log(`  판교: "${t.name}" 사진 → ${key}`);
+      replaced++;
+    }
+  }
+  console.log(`  판교: 사진 ${replaced}건 교체`);
+}
+function pickDelays(overdue) {
+  const picked = [];
+  for (const re of [/HRSG/, /전동기|차단기|변압기/, /DCS|제어|밸브/, /펌프/, /열교환|세관/, /배관|밸브실/]) {
+    const hit = overdue.find((t) => re.test(t.name) && !picked.includes(t.id));
+    if (hit) picked.push(hit.id);
+  }
+  return picked;
+}
+
 // 기간 가운데에 오늘이 오도록 통째로 옮기고, 완료·진행·지연·대기를 섞는다.
 async function pangyoInProgress() {
   const branch = "판교지사";
@@ -207,10 +270,44 @@ async function pangyoInProgress() {
   const start = toDate(project.start_date);
   const end = toDate(project.end_date);
   const total = daysBetween(start, end);
-  // 공정률이 ≈50%가 되는 지점에 오늘을 둔다. 날짜 경과율과 물량 공정률이
-  // 비례하지 않아(물량이 큰 작업이 특정 구간에 몰려 있다) 실측으로 맞춘 값이다:
-  // 0.50→32% · 0.53→50% · 0.56→67% · 0.66→93%. 데이터가 바뀌면 다시 재어야 한다.
-  const ELAPSED = Number(process.env.PANGYO_ELAPSED || 0.53);
+
+  // 오늘이 기간의 어디쯤 와야 공정률이 목표(기본 50%)가 되는지 미리 계산한다.
+  // 날짜 경과율과 물량 공정률은 비례하지 않아서(물량이 큰 작업이 특정 구간에 몰려
+  // 있다) 고정 비율로는 32%·93%처럼 크게 빗나갔다. 아래 실적 규칙을 그대로 흉내 내
+  // 후보 비율마다 공정률을 계산하고, 목표에 가장 가까운 비율을 고른다.
+  const TARGET = Number(process.env.PANGYO_TARGET || 50);
+  const rows0 = await getRows(project.id);
+  const simulate = (E) => {
+    const sh = daysBetween(start, addDays(TODAY, -Math.round(total * E)));
+    const ts = rows0.map((t) => {
+      const s0 = toDate(t.sch?.plannedStartStr), e0 = toDate(t.sch?.plannedEndStr);
+      return { id: t.id, name: t.name, q: Number(t.planQty) || 1,
+        s: s0 && addDays(s0, sh), e: e0 && addDays(e0, sh) };
+    });
+    const picks = pickDelays(ts.filter((t) => t.e && t.e < TODAY));
+    let num = 0, den = 0;
+    for (const t of ts) {
+      den += t.q;
+      if (!t.s || !t.e) continue;
+      const di = picks.indexOf(t.id);
+      if (di >= 0) num += midQty(t.q, DELAY_FRAC[di] ?? 0.5);
+      else if (t.e < TODAY) num += t.q;
+      else if (t.s <= TODAY) {
+        num += midQty(t.q, Math.min(0.9, Math.max(0.25, daysBetween(t.s, TODAY) / Math.max(1, daysBetween(t.s, t.e)))));
+      }
+    }
+    return (100 * num) / Math.max(1, den);
+  };
+  let ELAPSED = Number(process.env.PANGYO_ELAPSED || 0);
+  if (!ELAPSED) {
+    let best = { e: 0.5, gap: Infinity };
+    for (let e = 0.35; e <= 0.85; e += 0.005) {
+      const gap = Math.abs(simulate(e) - TARGET);
+      if (gap < best.gap) best = { e, gap };
+    }
+    ELAPSED = best.e;
+    console.log(`  판교: 목표 ${TARGET}% → 경과 비율 ${ELAPSED.toFixed(3)} (예상 ${simulate(ELAPSED).toFixed(1)}%)`);
+  }
   const newStart = addDays(TODAY, -Math.round(total * ELAPSED));
   const shift = daysBetween(start, newStart);
   const newEnd = addDays(end, shift);
@@ -226,13 +323,8 @@ async function pangyoInProgress() {
   }
 
   const rows = await getRows(project.id);
-  // 지연 6건 — 기한이 지났는데 아직 안 끝난 작업. 설비가 겹치지 않게 이름으로 고른다
   const overdue = rows.filter((t) => toDate(t.sch?.plannedEndStr) && toDate(t.sch?.plannedEndStr) < TODAY);
-  const delayPick = [];
-  for (const re of [/HRSG/, /전동기|차단기|변압기/, /DCS|제어|밸브/, /펌프/, /열교환|세관/, /배관|밸브실/]) {
-    const hit = overdue.find((t) => re.test(t.name) && !delayPick.includes(t.id));
-    if (hit) delayPick.push(hit.id);
-  }
+  const delayPick = pickDelays(overdue);
   const delayReasons = [
     "교체 부품 입고 지연 — 납기 재확인 중",
     "선행 작업(비계) 지연으로 착수가 밀림",
@@ -242,20 +334,8 @@ async function pangyoInProgress() {
     "협력사 인력 수급 지연",
   ];
 
-  // 사진 — 분해점검 계열 완료 작업 4건에 전/후를 붙인다
-  const photoPairs = [
-    ["photo-before.jpg", "photo-after.jpg"],
-    ["photo-step1.jpg", "photo-step2.jpg"],
-    ["photo-before.jpg", "photo-step2.jpg"],
-    ["photo-step1.jpg", "photo-after.jpg"],
-  ];
-  const photoTargets = [];
-  for (const re of [/베어링/, /분해점검/, /로터|회전자/, /세관|세정/]) {
-    const hit = overdue.find(
-      (t) => re.test(t.name) && !delayPick.includes(t.id) && !photoTargets.includes(t.id),
-    );
-    if (hit) photoTargets.push(hit.id);
-  }
+  // 사진 — 완료 작업 4건에 그 설비의 분해 전/후 실사를 붙인다
+  const { photoTargets, photoPairs } = pickPhotoTasks(overdue, delayPick);
 
   let done = 0, prog = 0, wait = 0, delayed = 0, photos = 0;
   for (const t of rows) {
@@ -267,13 +347,15 @@ async function pangyoInProgress() {
 
     const di = delayPick.indexOf(t.id);
     if (di >= 0) {
-      const frac = [0.5, 0.4, 0.6, 0.45, 0.55, 0.35][di] ?? 0.5;
+      const frac = DELAY_FRAC[di] ?? 0.5;
       const cum = midQty(planQty, frac);
       const mid = addDays(s, Math.max(1, Math.round(daysBetween(s, e) * 0.5)));
       if (daysBetween(s, mid) >= 1) {
-        await postEntry(t.id, mid, Math.max(1, Math.round(cum * 0.6)), detailFor(t.name, "mid"));
+        const first = cum >= 2 ? Math.max(1, Math.round(cum * 0.6)) : Math.max(0.1, Math.round(cum * 6) / 10);
+        await postEntry(t.id, mid, first, detailFor(t.name, "mid"));
       }
-      await postEntry(t.id, addDays(TODAY, -1), cum, detailFor(t.name, "mid"),
+      // 최근 실적은 오늘 날짜로 — 일일보고서의 "금일 주요 실적"이 비지 않게
+      await postEntry(t.id, TODAY, cum, detailFor(t.name, "mid"),
         delayReasons[di], "만회 계획 수립 — 주말 연장작업 투입");
       delayed++;
       continue;
@@ -285,21 +367,13 @@ async function pangyoInProgress() {
         await postEntry(t.id, addDays(s, Math.round(span * 0.55)), midQty(planQty, 0.6), detailFor(t.name, "mid"));
       }
       const pi = photoTargets.indexOf(t.id);
-      const photoArg = pi >= 0
-        ? {
-            keepIds: [],
-            add: [
-              { slot: "before", dataUrl: dataUrl(PHOTO(photoPairs[pi][0])) },
-              { slot: "after", dataUrl: dataUrl(PHOTO(photoPairs[pi][1])) },
-            ],
-          }
-        : undefined;
+      const photoArg = pi >= 0 ? photoPayload(photoPairs[pi]) : undefined;
       await postEntry(t.id, e, planQty, detailFor(t.name, "end"), "", "", photoArg);
       if (photoArg) photos++;
       done++;
     } else if (s <= TODAY) {
       const frac = Math.min(0.9, Math.max(0.25, daysBetween(s, TODAY) / Math.max(1, daysBetween(s, e))));
-      await postEntry(t.id, addDays(TODAY, -1), midQty(planQty, frac), detailFor(t.name, "mid"),
+      await postEntry(t.id, TODAY, midQty(planQty, frac), detailFor(t.name, "mid"),
         "", "계획대로 진행 — 익일 후속 공정 착수");
       prog++;
     } else {
@@ -397,6 +471,48 @@ async function fixCheongju() {
   console.log(`  청주: 일정 ${placed}건 배치 · 실적 ${done}건 재작성 (${start}~${end})`);
 }
 
+// ── ⑥ 자동 추출이 남긴 "확인 필요" 정리 ────────────────────────────────────
+// 엑셀 자동 추출이 수량을 못 읽은 작업은 계획수량 0 + "확인 필요"로 남는다.
+// 완료된 회차인데 수량 0이 지연 위험으로 잡혀 경고가 뜨고, 작업 목록에 "확인 필요"
+// 필터가 생겨 다른 완료 지사와 화면이 달라진다. 사람이 검토를 마친 것처럼
+// 수량 미기재는 1식으로 두고 표시를 내린다(작업 편집 폼이 보내는 것과 같은 patch).
+async function settleReview(branch) {
+  await setBranch(branch);
+  const { project } = await mainProject(branch);
+  await api("POST", "/api/overhaul/project/active", { id: project.id });
+  let cleared = 0, qtyFixed = 0;
+  for (let guard = 0; guard < 200; guard++) {
+    const r = await api("GET", `/api/overhaul/tasks?needsReview=1&page=1&projectId=${project.id}`);
+    const list = r.rows ?? [];
+    if (!list.length) break;
+    for (const t of list) {
+      const patch = { needs_review: false };
+      if (!(Number(t.plan_qty) > 0)) { patch.plan_qty = 1; qtyFixed++; }
+      await api("PATCH", "/api/overhaul/tasks", { id: t.id, patch });
+      cleared++;
+    }
+  }
+  // 표시는 없지만 수량이 0인 작업도 같은 기준으로
+  for (const t of await getRows(project.id)) {
+    if (Number(t.planQty) > 0) continue;
+    await api("PATCH", "/api/overhaul/tasks", { id: t.id, patch: { plan_qty: 1 } });
+    qtyFixed++;
+  }
+  // 수량을 1로 올린 작업은 완료 실적(1)이 이미 있으면 그대로 100%가 된다 — 없으면 채운다.
+  // 끝난 회차에서만 한다: 진행 중 회차(판교)의 미완료는 지연·진행 중이라는 의도된 상태다.
+  let topped = 0;
+  const projEnd = toDate(project.end_date);
+  if (projEnd && projEnd < TODAY) {
+    for (const t of await getRows(project.id)) {
+      if ((t.actual ?? 0) >= 100) continue;
+      const e = minDate(toDate(t.sch?.plannedEndStr) ?? projEnd, projEnd);
+      await postEntry(t.id, e, Number(t.planQty) || 1, detailFor(t.name, "end"));
+      topped++;
+    }
+  }
+  console.log(`  ${branch}: 확인 필요 ${cleared}건 해제 · 수량 미기재 ${qtyFixed}건 → 1식 · 완료 실적 보충 ${topped}건`);
+}
+
 // ---------------------------------------------------------------------------
 const BRANCHES = [
   "중앙지사", "강남지사", "파주지사", "삼송지사", "고양사업소", "화성지사", "동탄지사",
@@ -429,6 +545,17 @@ const BRANCHES = [
   if (mode === "cheongju" || mode === "all") {
     console.log("\n■ 청주 일정·분야 맞추기");
     await fixCheongju();
+  }
+  if (mode === "photos") {
+    console.log("\n■ 판교 사진 교체");
+    await replacePangyoPhotos();
+  }
+  if (mode === "review" || mode === "all") {
+    console.log("\n■ 확인 필요·수량 미기재 정리");
+    for (const b of BRANCHES) {
+      if (b === "광교지사") continue; // 현장 시연용으로 비워 둔 지사
+      await settleReview(b);
+    }
   }
   console.log("\n끝.");
 })().catch((e) => { console.error("실패:", e.message); process.exit(1); });
