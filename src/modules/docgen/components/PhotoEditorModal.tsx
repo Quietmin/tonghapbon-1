@@ -504,10 +504,10 @@ export default function PhotoEditorModal({
         </button>
       </div>
 
-      <div className="flex-1 flex items-center justify-center overflow-hidden p-2">
+      <div className="flex-1 flex items-center justify-center overflow-hidden p-2 md:p-6">
         <canvas
           ref={canvasRef}
-          className="max-w-full max-h-full touch-none bg-white shadow-[0_2px_12px_rgba(0,0,0,.5)]"
+          className="max-w-full max-h-full w-full h-full object-contain touch-none bg-white shadow-[0_2px_12px_rgba(0,0,0,.5)]"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -515,163 +515,168 @@ export default function PhotoEditorModal({
         />
       </div>
 
-      <div className="bg-black px-3 pb-4 pt-2.5 flex flex-col gap-2">
-        <div className="flex gap-1.5 flex-wrap">
-          {TOOLS.map((t) => (
-            <button
-              key={t.tool}
-              type="button"
-              onClick={() => selectTool(t.tool)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-                tool === t.tool ? "bg-primary text-on-primary" : "bg-white/10 text-white"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {isCrop && (
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={handleApplyCrop}
-              disabled={busy}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white disabled:opacity-40"
-            >
-              자르기 적용
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                cropRectRef.current = null;
-                cropStartRef.current = null;
-                redraw();
-              }}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white"
-            >
-              영역 지우기
-            </button>
-          </div>
-        )}
-
-        {/* 글자 크기 — 텍스트 도구일 때만. 사진 해상도마다 알맞은 크기가 달라
-            값 하나로 고정하지 않고 여기서 직접 고르게 한다 (원본과 동일) */}
-        {isText && (
-          <div className="flex gap-1.5 items-center">
-            <button
-              type="button"
-              onClick={() => changeTextSize(-1)}
-              disabled={textSizeIndex === 0}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white disabled:opacity-40"
-            >
-              A− 작게
-            </button>
-            <span className="text-white/80 text-xs min-w-16 text-center">
-              {TEXT_SIZE_LABELS[textSizeIndex]}
-            </span>
-            <button
-              type="button"
-              onClick={() => changeTextSize(1)}
-              disabled={textSizeIndex === TEXT_SIZE_STEPS.length - 1}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white disabled:opacity-40"
-            >
-              A+ 크게
-            </button>
-          </div>
-        )}
-
-        {/* 사진 위를 누르면 나타나는 입력줄. 타이핑이 즉시 캔버스에 반영된다 */}
-        {drafting && (
-          <div className="flex gap-1.5 items-center">
-            <input aria-label="표시할 텍스트 입력"
-              ref={textInputRef}
-              type="text"
-              value={textValue}
-              autoComplete="off"
-              placeholder="표시할 텍스트 입력"
-              onChange={(e) => {
-                setTextValue(e.target.value);
-                const active = activeStrokeRef.current;
-                if (active && active.tool === "text") {
-                  active.text = e.target.value;
-                  redraw();
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  applyTextDraft();
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  cancelTextDraft();
-                }
-              }}
-              className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm bg-white/10 text-white placeholder:text-white/40 outline-none focus:bg-white/15"
-            />
-            <button
-              type="button"
-              onClick={cancelTextDraft}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white shrink-0"
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={applyTextDraft}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-on-primary shrink-0"
-            >
-              적용
-            </button>
-          </div>
-        )}
-
-        {!isCrop && (
-          <div className="flex gap-1.5">
-            {COLORS.map((c) => (
+      {/* 넓은 화면에서 버튼들이 왼쪽에 쏠려 보이지 않도록, 가운데로 모아 한
+          덩어리로 두고 폭을 제한한다 — 양옆 빈 공간이 남더라도 도구 묶음
+          자체는 항상 화면 가운데에 정렬된다. */}
+      <div className="bg-black px-3 pb-4 pt-2.5 md:pb-6 flex flex-col items-center gap-2">
+        <div className="w-full max-w-2xl flex flex-col gap-2 md:gap-3">
+          <div className="flex gap-1.5 md:gap-2 flex-wrap justify-center">
+            {TOOLS.map((t) => (
               <button
-                key={c.color}
+                key={t.tool}
                 type="button"
-                aria-label={c.label}
-                onClick={() => setColor(c.color)}
-                style={{ background: c.color }}
-                className={`w-8 h-8 rounded-full border-2 ${
-                  color === c.color ? "border-white" : "border-transparent"
+                onClick={() => selectTool(t.tool)}
+                className={`px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium ${
+                  tool === t.tool ? "bg-primary text-on-primary" : "bg-white/10 text-white"
                 }`}
-              />
+              >
+                {t.label}
+              </button>
             ))}
           </div>
-        )}
 
-        <div className="flex gap-1.5">
-          <button
-            type="button"
-            onClick={() => void handleUndo()}
-            disabled={!canUndo}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white disabled:opacity-40"
-          >
-            되돌리기
-          </button>
-          <button
-            type="button"
-            onClick={handleClear}
-            disabled={!hasStrokes}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white disabled:opacity-40"
-          >
-            전체 지우기
-          </button>
+          {isCrop && (
+            <div className="flex gap-1.5 justify-center">
+              <button
+                type="button"
+                onClick={handleApplyCrop}
+                disabled={busy}
+                className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-white/10 text-white disabled:opacity-40"
+              >
+                자르기 적용
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  cropRectRef.current = null;
+                  cropStartRef.current = null;
+                  redraw();
+                }}
+                className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-white/10 text-white"
+              >
+                영역 지우기
+              </button>
+            </div>
+          )}
+
+          {/* 글자 크기 — 텍스트 도구일 때만. 사진 해상도마다 알맞은 크기가 달라
+              값 하나로 고정하지 않고 여기서 직접 고르게 한다 (원본과 동일) */}
+          {isText && (
+            <div className="flex gap-1.5 items-center justify-center">
+              <button
+                type="button"
+                onClick={() => changeTextSize(-1)}
+                disabled={textSizeIndex === 0}
+                className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-white/10 text-white disabled:opacity-40"
+              >
+                A− 작게
+              </button>
+              <span className="text-white/80 text-xs md:text-sm min-w-16 text-center">
+                {TEXT_SIZE_LABELS[textSizeIndex]}
+              </span>
+              <button
+                type="button"
+                onClick={() => changeTextSize(1)}
+                disabled={textSizeIndex === TEXT_SIZE_STEPS.length - 1}
+                className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-white/10 text-white disabled:opacity-40"
+              >
+                A+ 크게
+              </button>
+            </div>
+          )}
+
+          {/* 사진 위를 누르면 나타나는 입력줄. 타이핑이 즉시 캔버스에 반영된다 */}
+          {drafting && (
+            <div className="flex gap-1.5 items-center">
+              <input aria-label="표시할 텍스트 입력"
+                ref={textInputRef}
+                type="text"
+                value={textValue}
+                autoComplete="off"
+                placeholder="표시할 텍스트 입력"
+                onChange={(e) => {
+                  setTextValue(e.target.value);
+                  const active = activeStrokeRef.current;
+                  if (active && active.tool === "text") {
+                    active.text = e.target.value;
+                    redraw();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyTextDraft();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    cancelTextDraft();
+                  }
+                }}
+                className="flex-1 min-w-0 px-3 py-1.5 md:py-2 rounded-lg text-sm bg-white/10 text-white placeholder:text-white/40 outline-none focus:bg-white/15"
+              />
+              <button
+                type="button"
+                onClick={cancelTextDraft}
+                className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-white/10 text-white shrink-0"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={applyTextDraft}
+                className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-primary text-on-primary shrink-0"
+              >
+                적용
+              </button>
+            </div>
+          )}
+
+          {!isCrop && (
+            <div className="flex gap-1.5 md:gap-2 justify-center">
+              {COLORS.map((c) => (
+                <button
+                  key={c.color}
+                  type="button"
+                  aria-label={c.label}
+                  onClick={() => setColor(c.color)}
+                  style={{ background: c.color }}
+                  className={`w-8 h-8 md:w-9 md:h-9 rounded-full border-2 ${
+                    color === c.color ? "border-white" : "border-transparent"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-1.5 justify-center">
+            <button
+              type="button"
+              onClick={() => void handleUndo()}
+              disabled={!canUndo}
+              className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-white/10 text-white disabled:opacity-40"
+            >
+              되돌리기
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={!hasStrokes}
+              className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium bg-white/10 text-white disabled:opacity-40"
+            >
+              전체 지우기
+            </button>
+          </div>
+
+          <p className="text-white/80 text-xs md:text-sm text-center">
+            {message ??
+              (isCrop
+                ? HINT_CROP
+                : isText
+                  ? drafting
+                    ? HINT_TEXT_EDITING
+                    : HINT_TEXT
+                  : HINT_DRAW)}
+          </p>
         </div>
-
-        <p className="text-white/80 text-xs text-center">
-          {message ??
-            (isCrop
-              ? HINT_CROP
-              : isText
-                ? drafting
-                  ? HINT_TEXT_EDITING
-                  : HINT_TEXT
-                : HINT_DRAW)}
-        </p>
       </div>
     </div>
   );
