@@ -34,6 +34,8 @@ interface ActualBar {
 interface Row {
   id: string;
   name: string;
+  /** 같은 설비 묶음에 이름이 같은 작업이 있을 때 구분 꼬리표 (출처 시트·규격) — 없으면 null */
+  detail: string | null;
   unit: string | null;
   field: string | null;
   equipment: string;
@@ -524,6 +526,9 @@ export default function Schedule() {
                                   className="flex-1 min-w-0 min-h-10 text-left flex flex-col justify-center"
                                 >
                                   <span className="text-sm font-bold text-on-surface break-keep">{r.name}</span>
+                                  {r.detail && (
+                                    <span className="text-xs font-medium text-primary break-keep">{r.detail}</span>
+                                  )}
                                   {/* 날짜는 중간에서 꺾이지 않게 덩어리(nowrap)로 — 칸이 좁으면 덩어리째 다음 줄로 */}
                                   <span className="text-xs text-on-surface-variant flex flex-wrap gap-x-2">
                                     <span className="whitespace-nowrap">
@@ -757,6 +762,11 @@ export default function Schedule() {
                                       <Icon name="edit_calendar" className="text-sm" />
                                     </button>
                                   </div>
+                                  {r.detail && (
+                                    <p className="text-xs font-medium text-primary truncate" title={r.detail}>
+                                      {r.detail}
+                                    </p>
+                                  )}
                                   <p className="text-xs text-on-surface-variant font-mono-data flex items-center justify-center gap-1 whitespace-nowrap">
                                     계획 {r.sch.plannedStartStr.slice(5)}~{r.sch.plannedEndStr.slice(5)}
                                     {r.sch.source === "excel" && (
