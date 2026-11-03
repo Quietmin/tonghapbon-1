@@ -19,7 +19,7 @@ import { Icon, RequiredMark, InlineError } from "./ui";
  * 업무망에서 실제 로그인이 붙으면 이 창은 필요 없어진다 — 서버의 getCurrentUser() 만 세션으로
  * 바꾸면 되고, 이 컴포넌트는 Shell 에서 떼어 내면 그만이다.
  *
- * ⚠️ 비밀번호가 없고 쿠키라서 누구나 바꿀 수 있다 — 보안이 아니라 "내 기준으로 먼저 보여 주기" 위한 편의다.
+ * ⚠️ 비밀번호가 없고(화면에도 따로 적지 않는다) 쿠키라서 누구나 바꿀 수 있다 — 보안이 아니라 "내 기준으로 먼저 보여 주기" 위한 편의다.
  */
 
 interface Profile {
@@ -207,34 +207,35 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           aria-modal="true"
           aria-labelledby="profileDlgTitle"
         >
-          <div className="min-h-full grid md:grid-cols-2">
+          {/* 남색 2 : 흰색 1 — 폭이 좁은 태블릿(md)에서는 폼이 찌그러지지 않게 3 : 2 */}
+          <div className="min-h-full grid md:grid-cols-[3fr_2fr] lg:grid-cols-[2fr_1fr]">
             {/* 왼쪽 브랜드 영역 — 폰에서는 접고 아래 폼 위에 로고·제목만 둔다 */}
-            <aside className="hidden md:flex flex-col justify-between gap-10 bg-primary text-on-primary p-10 lg:p-14">
-              <div>
-                <div className="inline-flex rounded-2xl bg-white p-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
-                  <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-20 w-auto" />
+            <aside className="hidden md:flex flex-col gap-10 bg-primary text-on-primary p-10 lg:p-14">
+              {/* 로고·제목 줄을 남색 영역의 위아래·좌우 가운데에 둔다. 슬로건 마크만 맨 아래(가운데) */}
+              <div className="flex-1 flex flex-col items-center justify-center gap-12">
+                {/* 로고와 제목은 한 줄(1열) — 로고 왼쪽, 제목·영문명 오른쪽, 서로 위아래 가운데 맞춤 */}
+                <div className="flex items-center justify-center gap-5 lg:gap-7">
+                  <div className="shrink-0 rounded-3xl bg-white p-2.5 lg:p-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+                    <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-24 lg:h-36 w-auto" />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-[26px] lg:text-4xl leading-tight font-bold tracking-tight break-keep">
+                      플랜트 지능형 관리시스템
+                    </h1>
+                    <p className="mt-2 text-base lg:text-lg text-primary-fixed tracking-wide">Plant Intelligence Management System</p>
+                  </div>
                 </div>
-                <h1 className="mt-6 text-4xl lg:text-[40px] leading-tight font-bold tracking-tight">
-                  플랜트 지능형
-                  <br />
-                  관리시스템
-                </h1>
-                <p className="mt-2 text-sm text-primary-fixed tracking-wide">Plant Intelligence Management System</p>
               </div>
-              <ul className="flex flex-col gap-4">
-                {[
-                  ["build", "설비·보수계획 통합 관리"],
-                  ["timeline", "오버홀 공정표와 실적"],
-                  ["report", "현황·고장 이슈 조회"],
-                ].map(([icon, text]) => (
-                  <li key={text} className="flex items-center gap-3 text-base">
-                    <Icon name={icon} className="text-primary-fixed-dim" />
-                    {text}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-sm text-primary-fixed-dim">깨끗한 에너지로 세상을 따뜻하게 · 한국지역난방공사</p>
+              {/* 슬로건은 글자가 아니라 마크 — 헤더의 banner.png 와 같은 그림인데, 남색 바탕에서 읽히도록 짙은 글자는 흰색, 초록·빨강은 밝게 바꾼 banner-light.png */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+              <img
+                src="/banner-light.png"
+                alt="깨끗한 에너지로 세상을 따뜻하게"
+                width={568}
+                height={80}
+                className="self-center h-11 lg:h-14 w-auto"
+              />
             </aside>
 
             <div className="flex flex-col items-center justify-center gap-6 px-6 py-10 md:py-14">
@@ -268,7 +269,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
                 >
                   {saving ? "로그인 중…" : "로그인"}
                 </button>
-                <p className="text-xs text-on-surface-variant text-center">임시 로그인 — 비밀번호 없음</p>
               </form>
             </div>
           </div>
