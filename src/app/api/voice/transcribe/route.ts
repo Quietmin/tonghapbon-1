@@ -46,41 +46,36 @@ function upstreamReason(err: unknown): string {
 }
 
 /**
- * 받아쓴 원문을 그 칸에 바로 넣을 수 있게 정리하는 프롬프트.
- *
- * 핵심 규칙 셋:
- *   1) 칸 이름을 같이 말했으면("작성자는 홍길동이에요") 이름 부분은 떼고 내용만 남긴다.
- *   2) 선택형(options가 있는) 칸이면 보기 중 하나만 그대로 고르게 한다 — 전에는
- *      클라이언트에서 문자열 포함 비교로 거칠게 맞췄는데, 그 방식이 "기계"처럼 전혀
- *      다른 칸의 값을 다른 칸에 잘못 채우는 등 엉뚱하게 작동했다. 이제는 모델이 뜻으로
- *      판단해 더 정확하다.
- *   3) 원문에 없는 내용은 지어내지 않는다 — 추측으로 채우면 사용자가 믿고 쓸 수 없다.
+ * 받아쓴 원문을 그 칸에 바로 넣을 수 있게 정리하는 프롬프트 — 보기가 없는(자유
+ * 서술·짧은 값) 칸에만 쓴다. 보기가 있는(select) 칸은 matchOptionWithOpenAI 를
+ * 쓴다(아래 설명 참고 — 같은 프롬프트에 두 가지를 다 넣었더니 작은 모델이
+ * 헷갈려 했다). 추상적인 규칙 설명만으로는("군더더기 말을 지워라") 모델이
+ * "바꾸는 것 자체가 위험하다"고 판단해 입력을 그대로 돌려주는 경우가 많아서,
+ * 구체적인 예시(few-shot)를 넣었다 — 작은 모델일수록 설명보다 예시를 더 잘 따른다.
  */
-function buildCleanupPrompt(
-  fieldLabel: string,
-  kind: "short" | "long",
-  options: string[] | null,
-  raw: string,
-): string {
-  const optionLine =
-    options && options.length
-      ? `이 칸은 보기 중 하나를 고르는 칸이다 — 아래 보기 중 뜻이 가장 가까운 것 딱 하나만 그대로(토씨 하나 안 틀리고) 출력해라. 뜻이 통하는 보기가 없으면 빈 문자열만 출력해라.\n보기: ${options.join(", ")}`
-      : kind === "long"
-        ? "이 칸은 여러 문장이 들어갈 수 있는 자유 서술 칸이다. 문장을 자연스럽게 다듬어서 출력해라."
-        : "이 칸은 한 줄짜리 짧은 값이 들어가는 칸이다. 핵심 값만 출력해라.";
+function buildCleanupPrompt(fieldLabel: string, kind: "short" | "long", raw: string): string {
+  const kindLine =
+    kind === "long"
+      ? "이 칸은 여러 문장이 들어갈 수 있는 자유 서술 칸이다. 문장을 자연스럽게 다듬어서 출력해라."
+      : "이 칸은 한 줄짜리 짧은 값이 들어가는 칸이다. 핵심 값만 출력해라.";
 
-  return `너는 한국어 음성 받아쓰기 결과를 양식 입력칸에 바로 넣을 수 있게 정리하는 도우미다.
+  return `너는 한국어 음성 받아쓰기 결과를 양식 입력칸에 바로 넣을 수 있게 정리하는 도우미다. 입력을 그대로 돌려주는 것은 "정리"가 아니다 — 아래 규칙대로 반드시 다듬어서 출력해라.
 
 지금 채우려는 칸: "${fieldLabel}"
-${optionLine}
+${kindLine}
+
+예시(다른 칸 기준 — 방식만 참고):
+칸: "작성자" / 원문: "어 작성자는 음 홍길동입니다" → 출력: 홍길동
+칸: "내용" / 원문: "그러니까 방음벽 음 철거 범위를 사진으로 확인합니다" → 출력: 방음벽 철거 범위를 사진으로 확인합니다.
+칸: "설비명" / 원문: "설비명은 1호기 순환수 펌프 순환수 펌프요" → 출력: 1호기 순환수 펌프
 
 사용자가 음성으로 말한 원문(받아쓰기 결과 — 인식 오류나 더듬거림이 섞여 있을 수 있다):
 "${raw}"
 
 규칙:
-1. 사용자가 "${fieldLabel}는/은/이/가 ~~"처럼 칸 이름을 같이 말했으면, 그 이름을 말한 부분은 빼고 실제 내용만 남긴다.
-2. "음", "어", "그러니까" 같은 군더더기 말과 더듬거나 반복한 말은 지운다.
-3. 원문에 없는 내용을 새로 지어내거나 추측해서 채우지 않는다.
+1. 사용자가 "${fieldLabel}는/은/이/가 ~~"처럼 칸 이름을 같이 말했으면, 그 이름을 말한 부분은 반드시 빼고 실제 내용만 남긴다.
+2. "음", "어", "그러니까" 같은 군더더기 말과 더듬거나 같은 말 반복은 반드시 지운다.
+3. 원문에 없는 내용을 새로 지어내거나 추측해서 채우지 않는다 — 단, 위 1·2번처럼 군더더기를 "빼는" 것은 지어내는 것이 아니다.
 4. 출력은 그 칸에 바로 들어갈 내용만 적는다 — 설명, 따옴표, 접두사 없이 결과 텍스트만. 원문에 쓸 만한 내용이 전혀 없으면 빈 문자열만 출력한다.`;
 }
 
@@ -113,10 +108,66 @@ async function cleanWithOpenAI(prompt: string, apiKey: string): Promise<string |
       max_tokens: 300,
     }),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[api/voice/transcribe] 정리 단계 실패:", res.status, body.slice(0, 300));
+    return null;
+  }
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content;
   return typeof text === "string" ? text.trim() : null;
+}
+
+/**
+ * 선택형(보기가 있는) 칸 전용.
+ *
+ * 처음엔 모델이 보기 문구를 그대로 출력하게(자유 텍스트 프롬프트로) 시켰더니,
+ * 같은 요청인데도 어떨 때는 정확히 골라내고 어떨 때는 원문 문장을 그대로
+ * 돌려주는 등 들쭉날쭉했다 — 작은 모델이 "이 중 하나만 그대로 베껴 써라"를
+ * 안정적으로 못 지켰다.
+ *
+ * 대신 모델에게는 "보기 번호(숫자)"만 답하게 한다 — 보기 문구 자체는 모델이
+ * 한 글자도 직접 생성하지 않고, 이 함수가 번호로 내가 이미 들고 있는 options
+ * 배열에서 그대로 꺼내 쓴다. 숫자 하나만 고르는 쪽이 모델에게도 더 쉬운 작업이라
+ * 훨씬 안정적으로 맞혔고, 한국어 문구를 직접 베끼게 하는 경로 자체를 없앴다.
+ */
+async function matchOptionWithOpenAI(
+  fieldLabel: string,
+  options: string[],
+  raw: string,
+  apiKey: string,
+): Promise<string | null> {
+  const prompt = `사용자가 "${fieldLabel}" 칸을 채우려고 음성으로 말했다. 받아쓴 원문을 듣고, 사용자가 고른 보기의 번호를 찾아라.
+
+보기 목록:
+${options.map((o, i) => `${i + 1}. ${o}`).join("\n")}
+
+받아쓴 원문: "${raw}"
+
+정답 번호 하나만 숫자로 출력해라(예: 3). 뜻이 통하는 보기가 전혀 없으면 0을 출력해라. 번호 말고 다른 글자는 절대 출력하지 마라.`;
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: CLEAN_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0,
+      max_tokens: 10,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[api/voice/transcribe] 선택형 매칭 실패:", res.status, body.slice(0, 300));
+    return null;
+  }
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content !== "string") return null;
+  const match = content.match(/\d+/);
+  if (!match) return null;
+  const idx = parseInt(match[0], 10);
+  return idx >= 1 && idx <= options.length ? options[idx - 1] : null;
 }
 
 export async function POST(req: Request) {
@@ -158,11 +209,23 @@ export async function POST(req: Request) {
     if (!raw) return NextResponse.json({ ok: true, raw: "", text: "" });
     if (!fieldLabel) return NextResponse.json({ ok: true, raw, text: raw });
 
-    const prompt = buildCleanupPrompt(fieldLabel, fieldKind, options, raw);
-    // 정리 단계가 실패해도(네트워크 오류 등) 받아쓴 원문은 살려서 돌려준다 — 빈 손으로
-    // 돌아가는 것보다 원문이라도 칸에 들어가는 편이 사용자에게 낫다. 이 단계는
-    // 전사 자체와 달리 throw 하지 않는다(cleanWithOpenAI 가 실패하면 null).
-    const cleaned = await cleanWithOpenAI(prompt, apiKey).catch(() => null);
+    if (options && options.length) {
+      // 선택형 칸 — 모델은 번호만 고르고, 실제 문구는 내가 options 배열에서 그대로
+      // 꺼내 쓴다(한국어 글자를 모델이 직접 생성하지 않아 깨질 일이 없다). 매칭 안
+      // 되면 원문으로 때우지 않고 빈 문자열을 돌려준다 — 클라이언트가 "못 알아들었다"는
+      // 안내를 그 자리에서 보여주게 한다.
+      const matched = await matchOptionWithOpenAI(fieldLabel, options, raw, apiKey).catch(() => null);
+      return NextResponse.json({ ok: true, raw, text: matched ?? "" });
+    }
+
+    // 자유 서술·짧은 값 칸 — 정리 단계가 실패해도(네트워크 오류 등) 받아쓴 원문은
+    // 살려서 돌려준다. 빈 손으로 돌아가는 것보다 원문이라도 칸에 들어가는 편이 낫다.
+    const prompt = buildCleanupPrompt(fieldLabel, fieldKind, raw);
+    let cleaned = await cleanWithOpenAI(prompt, apiKey).catch(() => null);
+    // 드물게 망가진 응답(멀티바이트 글자가 중간에 끊겨 U+FFFD로 치환된 경우)이
+    // 들어올 때가 있다(실제로 관찰됨 — 네트워크/레이트리밋 경계에서 발생하는 듯).
+    // 이런 깨진 글자를 그대로 칸에 채우면 사용자가 못 알아보니, 원문으로 대체한다.
+    if (cleaned?.includes("�")) cleaned = null;
     return NextResponse.json({ ok: true, raw, text: cleaned ?? raw });
   } catch (err) {
     const status = err instanceof UpstreamError ? err.status : undefined;
