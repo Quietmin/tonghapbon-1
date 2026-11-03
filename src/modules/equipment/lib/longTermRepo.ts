@@ -34,6 +34,26 @@ export interface LongTermCell {
   projected: number;
 }
 
+/** 펼쳤을 때 보여줄 개별 항목(태그)의 연도 한 칸 */
+export interface LongTermItemCell {
+  year: number;
+  status: "done" | "skipped" | "planned" | "projected" | null;
+  /** 실적·계획·추정 등급 (있을 때만) */
+  grade: string | null;
+}
+
+/** 행을 펼치면 나오는 보수계획 항목 — 태그번호·제작사·규격까지 그대로 보여준다 */
+export interface LongTermItem {
+  planId: string;
+  name: string;
+  tagNo: string | null;
+  maker: string | null;
+  spec: string | null;
+  cycleLabel: string | null;
+  lastDoneYear: number | null;
+  cells: LongTermItemCell[];
+}
+
 export interface LongTermRow {
   /** null이면 설비 마스터에 없는 계획 그룹 (마스터 미등록) */
   equipmentId: string | null;
@@ -44,6 +64,8 @@ export interface LongTermRow {
   itemCount: number;
   lastDoneYear: number | null;
   cells: LongTermCell[];
+  /** 개별 항목 상세 — 행을 펼쳤을 때 쓴다 */
+  items: LongTermItem[];
 }
 
 export interface LongTermPayload {
@@ -114,7 +136,31 @@ export async function listLongTermPlan(
         lastDoneYear = m.lastDoneYear;
       }
     }
-    return { equipmentId, name, type, field, itemCount: members.length, lastDoneYear, cells };
+
+    // 펼침용 항목 상세 — 연도 판정은 위 집계와 같은 우선순위(실적 > 계획 > 예정)를 쓴다
+    const items: LongTermItem[] = members.map((m) => ({
+      planId: m.id,
+      name: m.name,
+      tagNo: m.tag_no,
+      maker: m.maker,
+      spec: m.spec,
+      cycleLabel: m.cycle_raw || (m.cycle_years ? `${m.cycle_years}년` : null),
+      lastDoneYear: m.lastDoneYear,
+      cells: years.map((year): LongTermItemCell => {
+        const c = m.cells.find((x) => x.year === year);
+        if (!c) return { year, status: null, grade: null };
+        if (c.hasRecord && c.skipped) return { year, status: "skipped", grade: null };
+        if (c.hasRecord) return { year, status: "done", grade: c.done };
+        if (c.planned) return { year, status: "planned", grade: c.planned };
+        if (c.projected) return { year, status: "projected", grade: c.estimatedGrade };
+        if (year === thisYear && m.judge.classification === "필수") {
+          return { year, status: "projected", grade: null };
+        }
+        return { year, status: null, grade: null };
+      }),
+    }));
+
+    return { equipmentId, name, type, field, itemCount: members.length, lastDoneYear, cells, items };
   };
 
   const rows: LongTermRow[] = [];

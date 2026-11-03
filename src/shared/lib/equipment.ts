@@ -254,3 +254,32 @@ export async function updateDevice(id: string, patch: DevicePatch): Promise<void
 export async function deleteDevice(id: string): Promise<number> {
   return execute(`delete from device where id = $1`, [id]);
 }
+
+/**
+ * 보수계획의 태그번호를 기기·태그로 자동 등록한다.
+ *
+ * 중장기계획 엑셀의 행은 태그 단위(tag_no·기기명·제작사·규격)인데, 설비 마스터의
+ * 2단(device)은 손으로만 채워져 늘 비어 있었다. 둘은 같은 기기를 가리키므로
+ * 계획 쪽에 태그가 있으면 기기로도 등록해 챗봇 태그 검색과 QR 스티커(향후:
+ * 현장에서 QR을 찍으면 P&ID·vendor print가 나오는 확대방안)의 기준정보로 쓴다.
+ *
+ * 이미 있는 태그(지사 내 tag_norm 유일키)는 건드리지 않는다 — 사람이 고친
+ * 기기명·규격을 자동 동기화가 덮어쓰면 안 되기 때문. 새 태그만 추가한다.
+ */
+export async function syncDevicesFromPlans(branch: string): Promise<number> {
+  if (!branch) throw new Error("지사를 먼저 선택하세요.");
+  return execute(
+    `insert into device (equipment_id, branch, tag, name, spec)
+     select distinct on (upper(regexp_replace(btrim(p.tag_no), '[-_[:space:]]', '', 'g')))
+            p.equipment_id, p.branch, btrim(p.tag_no), p.name,
+            nullif(concat_ws(' / ',
+              nullif(btrim(coalesce(p.maker, '')), ''),
+              nullif(btrim(coalesce(p.spec,  '')), '')), '')
+       from maintenance_plan p
+      where p.branch = $1
+        and p.equipment_id is not null
+        and nullif(btrim(coalesce(p.tag_no, '')), '') is not null
+      on conflict (branch, tag_norm) do nothing`,
+    [branch],
+  );
+}
