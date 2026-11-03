@@ -62,6 +62,9 @@ const HINT_TEXT = "텍스트를 표시할 위치를 눌러 주세요.";
 const HINT_TEXT_EDITING =
   "입력하면서 [A− 작게]/[A+ 크게]로 크기를 바로 조절할 수 있습니다. [적용]으로 확정합니다.";
 const UNDO_LIMIT = 40;
+/** 두 손가락 핀치로 확대할 수 있는 배율 범위 — 1이 원본(화면 맞춤) 크기다 */
+const CANVAS_ZOOM_MIN = 1;
+const CANVAS_ZOOM_MAX = 4;
 
 interface CropRect {
   x: number;
@@ -128,6 +131,52 @@ export default function PhotoEditorModal({
   const [textValue, setTextValue] = useState("");
   const textInputRef = useRef<HTMLInputElement>(null);
 
+  /*
+   * 두 손가락 확대/이동 — 한 손가락은 항상 그리기(펜 등)로 쓰이고 있어서, 손가락
+   * 하나로 화면을 옮기면 그리기와 뭘 하려는 건지 구분이 안 된다. 그래서 핀치(두
+   * 손가락 오므리기·펴기)는 확대/축소, 두 손가락으로 같이 끌기는 이동으로 쓴다
+   * (사용자가 고른 방식) — 한 손가락은 그대로 비워 둬서 언제든 그릴 수 있다.
+   * 캔버스 자체(그 안의 그림 좌표)는 안 건드리고, CSS transform 으로 "보이는
+   * 자리"만 옮긴다 — getBoundingClientRect() 가 transform 을 반영해 주므로
+   * pointFromEvent() 의 좌표 계산(화면 좌표 → 0~1 정규화)은 고칠 필요가 없다.
+   */
+  const [canvasZoom, setCanvasZoom] = useState(1);
+  const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
+  // 터치 핸들러는 useEffect 가 한 번만 등록되므로(아래, deps: []), 그 안에서
+  // 최신 줌/이동 값을 읽으려면 ref 가 필요하다 — state 를 deps 에 넣으면 제스처
+  // 중간에 리스너가 다시 붙어 끊길 수 있다.
+  const canvasZoomRef = useRef(canvasZoom);
+  canvasZoomRef.current = canvasZoom;
+  const canvasPanRef = useRef(canvasPan);
+  canvasPanRef.current = canvasPan;
+  const pinchRef = useRef<{
+    startDist: number;
+    startZoom: number;
+    startMidX: number;
+    startMidY: number;
+    startPanX: number;
+    startPanY: number;
+  } | null>(null);
+
+  /** 확대 배율에서 캔버스가 컨테이너보다 얼마나 더 커지는지를 기준으로, 화면
+   *  밖으로 완전히 나가 못 찾게 되지 않도록 이동 범위를 깎는다 */
+  function clampPan(x: number, y: number, zoom: number): { x: number; y: number } {
+    const canvas = canvasRef.current;
+    const container = canvas?.parentElement;
+    if (!canvas || !container) return { x: 0, y: 0 };
+    const overflowX = Math.max(0, (canvas.clientWidth * zoom - container.clientWidth) / 2);
+    const overflowY = Math.max(0, (canvas.clientHeight * zoom - container.clientHeight) / 2);
+    return {
+      x: Math.min(overflowX, Math.max(-overflowX, x)),
+      y: Math.min(overflowY, Math.max(-overflowY, y)),
+    };
+  }
+
+  function resetCanvasView() {
+    setCanvasZoom(1);
+    setCanvasPan({ x: 0, y: 0 });
+  }
+
   function trackUrl(u: string): string {
     createdUrlsRef.current.add(u);
     return u;
@@ -140,6 +189,9 @@ export default function PhotoEditorModal({
     const scale = Math.min(1, SKETCH_MAX_EDGE / Math.max(w, h));
     canvas.width = Math.max(1, Math.round(w * scale));
     canvas.height = Math.max(1, Math.round(h * scale));
+    // 그림(자르기·되돌리기 등)이 바뀌면 전에 보던 확대/이동은 더 이상 맞지
+    // 않을 수 있어 화면 맞춤으로 되돌린다
+    resetCanvasView();
   }
 
   function redraw() {
@@ -212,6 +264,55 @@ export default function PhotoEditorModal({
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
+
+  // 두 손가락 핀치=확대, 두 손가락 끌기=이동. 두 손가락일 때만 손댄다 — 한
+  // 손가락(그리기)·마우스는 기존 pointer 핸들러에 그대로 맡긴다.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const distance = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const midpoint = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      const mid = midpoint(e.touches);
+      pinchRef.current = {
+        startDist: distance(e.touches),
+        startZoom: canvasZoomRef.current,
+        startMidX: mid.x,
+        startMidY: mid.y,
+        startPanX: canvasPanRef.current.x,
+        startPanY: canvasPanRef.current.y,
+      };
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const st = pinchRef.current;
+      if (e.touches.length !== 2 || !st) return;
+      e.preventDefault();
+      const nextZoom = Math.min(
+        CANVAS_ZOOM_MAX,
+        Math.max(CANVAS_ZOOM_MIN, st.startZoom * (distance(e.touches) / st.startDist)),
+      );
+      const mid = midpoint(e.touches);
+      const next = clampPan(st.startPanX + (mid.x - st.startMidX), st.startPanY + (mid.y - st.startMidY), nextZoom);
+      setCanvasZoom(nextZoom);
+      setCanvasPan(next);
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinchRef.current = null;
+    };
+
+    canvas.addEventListener("touchstart", onTouchStart, { passive: true });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd);
+    canvas.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
+      canvas.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
 
   function pushUndoSnapshot() {
     undoStackRef.current.push({
@@ -508,6 +609,12 @@ export default function PhotoEditorModal({
         <canvas
           ref={canvasRef}
           className="max-w-full max-h-full w-full h-full object-contain touch-none bg-white shadow-[0_2px_12px_rgba(0,0,0,.5)]"
+          style={{
+            transform:
+              canvasZoom === 1 && canvasPan.x === 0 && canvasPan.y === 0
+                ? undefined
+                : `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${canvasZoom})`,
+          }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
