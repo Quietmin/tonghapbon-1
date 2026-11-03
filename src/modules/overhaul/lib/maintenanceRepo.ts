@@ -1,5 +1,5 @@
 import { query, queryOne, execute, transaction } from "@/shared/lib/db";
-import { ensureEquipments } from "@/shared/lib/equipment";
+import { ensureEquipments, syncDevicesFromPlans } from "@/shared/lib/equipment";
 import { normalizeEquipmentName } from "@/shared/lib/equipmentMeta";
 import { parseCycle, type ParsedPlanItem, type ParsedCycle } from "./maintenancePlanParser";
 import { detectGradePattern } from "./gradePattern";
@@ -151,6 +151,16 @@ export async function saveParsedPlan(params: {
          on conflict (plan_id, year) do update set grade = excluded.grade`,
         gVals,
       );
+    }
+  }
+
+  // 태그번호가 있는 행은 기기·태그(device)로도 등록 — 챗봇 태그 검색·QR 확대방안의
+  // 기준정보. 실패해도 업로드 자체는 성공으로 둔다 (기기 등록은 부가 효과라서).
+  if (branch) {
+    try {
+      await syncDevicesFromPlans(branch);
+    } catch (e) {
+      console.error("기기·태그 자동 등록 실패:", e);
     }
   }
 
