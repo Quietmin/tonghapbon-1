@@ -52,6 +52,13 @@ function upstreamReason(err: unknown): string {
  * 헷갈려 했다). 추상적인 규칙 설명만으로는("군더더기 말을 지워라") 모델이
  * "바꾸는 것 자체가 위험하다"고 판단해 입력을 그대로 돌려주는 경우가 많아서,
  * 구체적인 예시(few-shot)를 넣었다 — 작은 모델일수록 설명보다 예시를 더 잘 따른다.
+ *
+ * 처음엔 "원문에 없는 내용은 지어내지 마라"만 강하게 시켰더니, STT가 발음이 비슷한
+ * 단어를 엉뚱하게 잘못 받아적여도(예: "순환수"를 "순한수"로) 모델이 "틀렸을 수도
+ * 있지만 고치는 건 지어내는 거니까"라며 그 오타를 그대로 베껴 왔다 — 실제로 겪은
+ * 문제. 그래서 "지어내지 마라"와 "말이 안 되면 맥락으로 바로잡아라"를 규칙에서
+ * 분명히 나눴다: 아예 없던 내용을 보태는 건 금지하지만, 있던 말을 더 말이 되는
+ * 쪽으로 고치는 교정은 허용·권장한다.
  */
 function buildCleanupPrompt(fieldLabel: string, kind: "short" | "long", raw: string): string {
   const kindLine =
@@ -68,6 +75,8 @@ ${kindLine}
 칸: "작성자" / 원문: "어 작성자는 음 홍길동입니다" → 출력: 홍길동
 칸: "내용" / 원문: "그러니까 방음벽 음 철거 범위를 사진으로 확인합니다" → 출력: 방음벽 철거 범위를 사진으로 확인합니다.
 칸: "설비명" / 원문: "설비명은 1호기 순환수 펌프 순환수 펌프요" → 출력: 1호기 순환수 펌프
+칸: "설비명" / 원문: "일호기 순한수 펌프" → 출력: 1호기 순환수 펌프 (발음이 비슷해 잘못 받아적힌 "순한수"를 현장 설비 용어로 말이 되는 "순환수"로 바로잡음)
+칸: "내용" / 원문: "배관에서 어 누수 같은 소음이 들려서 정기 점검 대상입니다" → 출력: 배관에서 누수로 추정되는 소음이 들려 정기 점검 대상입니다. (음성 인식 상 어색한 "누수 같은 소음"을 맥락상 더 말이 되는 표현으로 다듬음 — 새 사실을 보탠 건 아님)
 
 사용자가 음성으로 말한 원문(받아쓰기 결과 — 인식 오류나 더듬거림이 섞여 있을 수 있다):
 "${raw}"
@@ -75,15 +84,38 @@ ${kindLine}
 규칙:
 1. 사용자가 "${fieldLabel}는/은/이/가 ~~"처럼 칸 이름을 같이 말했으면, 그 이름을 말한 부분은 반드시 빼고 실제 내용만 남긴다.
 2. "음", "어", "그러니까" 같은 군더더기 말과 더듬거나 같은 말 반복은 반드시 지운다.
-3. 원문에 없는 내용을 새로 지어내거나 추측해서 채우지 않는다 — 단, 위 1·2번처럼 군더더기를 "빼는" 것은 지어내는 것이 아니다.
-4. 출력은 그 칸에 바로 들어갈 내용만 적는다 — 설명, 따옴표, 접두사 없이 결과 텍스트만. 원문에 쓸 만한 내용이 전혀 없으면 빈 문자열만 출력한다.`;
+3. 단어나 구절이 뜻이 안 통하거나 이 칸(${fieldLabel})의 맥락과 안 맞으면, 발음이 비슷해 잘못 받아적혔을 가능성을 추론해서 가장 말이 되는 표현으로 바로잡는다 — 이건 지어내는 게 아니라 교정이다.
+4. 다만 원문에 아예 등장하지 않은 새로운 사실·수치·이름을 보태지는 않는다(교정은 "있던 말을 더 말이 되게" 고치는 것까지만, 없던 정보를 만들어 내는 게 아니다).
+5. 출력은 그 칸에 바로 들어갈 내용만 적는다 — 설명, 따옴표, 접두사 없이 결과 텍스트만. 원문에 쓸 만한 내용이 전혀 없으면 빈 문자열만 출력한다.`;
 }
 
-async function transcribeWithOpenAI(audio: Blob, apiKey: string): Promise<string | null> {
+/**
+ * 받아쓰기(STT) 모델에 "이런 맥락의 말이 나올 것이다"를 prompt 로 살짝 건네준다
+ * (OpenAI 전사 API 가 지원하는 입력 — 받아쓴 글자를 대신 채워 주는 게 아니라,
+ * 발음이 비슷한 후보들 중 이 맥락에 맞는 쪽을 더 잘 고르도록 돕는 "힌트"다).
+ * 정리 단계(cleanWithOpenAI)는 오디오 없이 글자만 보고 고치므로 한계가 있는데,
+ * 여기서 미리 맥락을 주면 애초에 엉뚱하게 받아적힐 확률 자체가 줄어든다 — 설비명
+ * 같은 전문 용어가 "순한수 펌프"처럼 비슷한 음으로 잘못 받아적히는 문제가 실제로 있었다.
+ */
+function buildTranscribeHint(fieldLabel: string, options: string[] | null): string {
+  const base = `설비 점검·정비 현장에서 "${fieldLabel}" 칸에 들어갈 말을 받아쓰는 중이다. 설비명·지사명·전문 용어가 섞인 구어체 한국어 문장일 수 있다.`;
+  if (options && options.length) {
+    return `${base} 다음 중 하나를 고르는 말일 때가 많다: ${options.slice(0, 20).join(", ")}.`;
+  }
+  return base;
+}
+
+async function transcribeWithOpenAI(
+  audio: Blob,
+  apiKey: string,
+  fieldLabel: string,
+  options: string[] | null,
+): Promise<string | null> {
   const form = new FormData();
   form.append("file", audio, "recording.webm");
   form.append("model", TRANSCRIBE_MODEL);
   form.append("language", "ko");
+  if (fieldLabel) form.append("prompt", buildTranscribeHint(fieldLabel, options));
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -205,7 +237,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const raw = await transcribeWithOpenAI(audio, apiKey);
+    const raw = await transcribeWithOpenAI(audio, apiKey, fieldLabel, options);
     if (!raw) return NextResponse.json({ ok: true, raw: "", text: "" });
     if (!fieldLabel) return NextResponse.json({ ok: true, raw, text: raw });
 
