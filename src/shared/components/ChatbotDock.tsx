@@ -203,7 +203,10 @@ function useDraggablePosition() {
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return; // 마우스는 왼쪽 버튼만
     dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: posRef.current.x, baseY: posRef.current.y, moved: false };
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    // 여기서 바로 포인터를 잡지 않는다 — setPointerCapture 를 걸면 그 뒤의 click
+    // 이벤트까지 이 캡처한 요소(바깥 div) 쪽으로 다시 겨냥돼, 안쪽 버튼을 눌러도
+    // 버튼의 onClick 이 전혀 안 불린다(그냥 누르기=클릭까지 드래그로 먹혀버리던
+    // 원인). 문턱을 넘겨 실제로 끄는 게 확정된 순간(onPointerMove)에만 잡는다.
   }, []);
 
   const onPointerMove = useCallback(
@@ -213,6 +216,7 @@ function useDraggablePosition() {
       const dx = e.clientX - st.startX;
       const dy = e.clientY - st.startY;
       if (!st.moved && Math.hypot(dx, dy) < DRAG_CLICK_THRESHOLD) return;
+      if (!st.moved) e.currentTarget.setPointerCapture?.(e.pointerId);
       st.moved = true;
       const next = clamp(st.baseX + dx, st.baseY + dy);
       lastPosRef.current = next;
