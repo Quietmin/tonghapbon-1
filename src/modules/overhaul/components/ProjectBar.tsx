@@ -83,7 +83,6 @@ export default function ProjectBar() {
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
-              {p.unit ? ` · ${p.unit}` : ""}
               {p.start_date ? ` (${p.start_date.slice(0, 4)})` : ""}
             </option>
           ))}
@@ -91,7 +90,6 @@ export default function ProjectBar() {
       ) : (
         <span className="text-sm font-bold text-on-surface">
           {active.name}
-          {active.unit ? ` · ${active.unit}` : ""}
         </span>
       )}
 

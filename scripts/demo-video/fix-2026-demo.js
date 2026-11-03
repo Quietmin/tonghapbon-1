@@ -513,6 +513,120 @@ async function settleReview(branch) {
   console.log(`  ${branch}: 확인 필요 ${cleared}건 해제 · 수량 미기재 ${qtyFixed}건 → 1식 · 완료 실적 보충 ${topped}건`);
 }
 
+// ── ⑦ 판교 재구성 — 실제 업무 흐름대로 처음부터 다시 쌓는다 ─────────────────
+// 보수계획 업로드 → 2026년 판정 "필수"로 확정 내역서 → 시공사가 일정을 채운 수량산출서
+// 업로드 → 공정 진행. 이렇게 쌓아야 설비 마스터·수량산출·공정관리가 같은 설비를 본다.
+// (예전 판교는 보수계획 설비와 작업 분류 설비가 따로 놀아 "발전기"가 빈 줄로 떴고,
+//  진행 중인 공사인데 2026년 보수가 이미 끝난 것으로 이력에 반영돼 있었다.)
+const PANGYO_SEED = path.join(__dirname, "seed", "판교재구성");
+const PANGYO_PERIOD = { start: "2026-09-28", end: "2026-12-04" };
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+async function apiForm(url, files, extra = {}) {
+  const fd = new FormData();
+  for (const f of files) fd.append("file", new Blob([fs.readFileSync(f)], { type: XLSX_MIME }), path.basename(f));
+  for (const [k, v] of Object.entries(extra)) fd.append(k, v);
+  const res = await fetch(BASE + url, { method: "POST", headers: { Cookie: cookieHeader() }, body: fd });
+  storeCookies(res);
+  const text = await res.text();
+  const json = JSON.parse(text);
+  if (!res.ok || json.ok === false) throw new Error(`POST ${url} → ${res.status}: ${text.slice(0, 200)}`);
+  return json;
+}
+
+// 설비 마스터 "유형" — 보수계획 대분류 이름은 유형을 모르므로 채워 준다
+const TYPE_BY_NAME = [
+  [/가스터빈/, "GT"], [/배열회수/, "HRSG"], [/증기터빈/, "ST"], [/발전기/, "발전기"],
+  [/지역난방/, "DH"], [/복수·급수/, "펌프/밸브"], [/배관·밸브/, "배관"],
+  [/수전|고압|저압|직류|보호계전|케이블/, "전기설비"],
+  [/분산제어|터빈·보일러|계측|제어밸브|분석|안전계장|계장공기/, "제어설비"],
+  [/첨두부하|냉각|수처리/, "기타"],
+];
+
+async function rebuildPangyo() {
+  const XLSX = require("xlsx");
+  if (!fs.existsSync(path.join(PANGYO_SEED, "기계_01_중장기보수계획.xlsx"))) {
+    fs.mkdirSync(PANGYO_SEED, { recursive: true });
+    require("node:child_process").execFileSync(process.execPath, [
+      path.join(__dirname, "make-pangyo-sample.js"), PANGYO_SEED, PANGYO_PERIOD.start, PANGYO_PERIOD.end,
+    ], { stdio: "inherit" });
+  }
+  const branch = "판교지사";
+  await setBranch(branch);
+  const { project } = await mainProject(branch);
+  await api("POST", "/api/overhaul/project/active", { id: project.id });
+  await api("PATCH", "/api/overhaul/project", { id: project.id, start_date: PANGYO_PERIOD.start, end_date: PANGYO_PERIOD.end });
+
+  // 1) 지우기 — 작업(업로드 파일째) · 확정 내역서 · 보수계획(등급·이력 포함) · 설비
+  const { sources = [] } = await api("GET", `/api/overhaul/sources?projectId=${project.id}`);
+  for (const s of sources) await api("DELETE", `/api/overhaul/sources?id=${s.id}`);
+  for (const t of await getRows(project.id)) await api("DELETE", `/api/overhaul/tasks?id=${t.id}`);
+  const { statements = [] } = await api("GET", "/api/overhaul/plan/statement");
+  for (const s of statements) await api("DELETE", `/api/overhaul/plan/statement?id=${s.id}`);
+  const plan0 = await api("GET", "/api/overhaul/plan?year=2026");
+  for (const s of plan0.sources ?? []) await api("DELETE", `/api/overhaul/plan?sourceId=${s.id}`);
+  await api("DELETE", "/api/equipment?all=1");
+  console.log(`  판교: 지움 — 업로드 ${sources.length} · 내역서 ${statements.length} · 보수계획 파일 ${(plan0.sources ?? []).length} · 설비 전체`);
+
+  // 2) 보수계획 업로드 → 대분류가 설비로, 태그번호가 기기·태그로 자동 등록된다
+  for (const field of ["기계", "전기", "제어"]) {
+    await apiForm("/api/overhaul/plan/upload", [path.join(PANGYO_SEED, `${field}_01_중장기보수계획.xlsx`)], { field });
+  }
+  const { items: equip = [] } = await api("GET", "/api/equipment");
+  for (const e of equip) {
+    const hit = TYPE_BY_NAME.find(([re]) => re.test(e.name));
+    if (hit && !e.type) await api("PATCH", "/api/equipment", { id: e.id, patch: { type: hit[1] } });
+  }
+  console.log(`  판교: 보수계획 업로드 — 설비 ${equip.length}개 · 기기 ${equip.reduce((n, e) => n + e.device_count, 0)}개`);
+
+  // 3) 2026년 "필수"로 확정 내역서 — 수량·단위는 시공사 수량산출서의 같은 태그 줄을 따른다
+  const qtyByTag = new Map();
+  for (const field of ["기계", "전기", "제어"]) {
+    const wb = XLSX.readFile(path.join(PANGYO_SEED, `${field}_02_수량산출서.xlsx`));
+    for (const name of wb.SheetNames.slice(1)) {
+      for (const r of XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1 })) {
+        if (r[4]) qtyByTag.set(String(r[4]), { qty: Number(r[2]) || 1, unit: r[3] || "식" });
+      }
+    }
+  }
+  const { rows: judged = [] } = await api("GET", "/api/overhaul/plan?year=2026");
+  let stItems = 0;
+  for (const field of ["기계", "전기", "제어"]) {
+    // 이번 공사 범위 = 수량산출서에 실린 항목. 필수라도 수량산출서에 없는 것(주요점검 MI처럼
+    // 다음 회차로 미룬 것)까지 넣으면 내역서와 공정 작업이 어긋난다.
+    const items = judged
+      .filter((r) => r.field === field && r.judge?.classification === "필수" && qtyByTag.has(r.tag_no ?? ""))
+      .map((r) => {
+        const q = qtyByTag.get(r.tag_no ?? "") ?? { qty: 1, unit: "식" };
+        return {
+          planId: r.id, category: r.category ?? "", name: r.name, spec: r.spec ?? "",
+          qty: q.qty, unit: q.unit, grade: r.plannedGrade ?? "A", note: r.tag_no ?? "", classification: "필수",
+        };
+      });
+    if (!items.length) continue;
+    await api("POST", "/api/overhaul/plan/statement", {
+      targetYear: 2026, field, title: `2026년도 판교지사 정기점검보수공사 (${field})`, items,
+    });
+    stItems += items.length;
+  }
+  console.log(`  판교: 확정 내역서 3건 · 항목 ${stItems}건`);
+
+  // 4) 시공사가 일정을 채워 돌려준 수량산출서 업로드 → 태그로 보수계획 설비에 이어진다
+  const files = ["기계", "전기", "제어"].map((f) => path.join(PANGYO_SEED, `${f}_02_수량산출서.xlsx`));
+  const up = await apiForm(`/api/overhaul/upload?projectId=${project.id}`, files, { fieldHint: "자동" });
+  const rows = await getRows(project.id);
+  console.log(`  판교: 수량산출서 업로드 — 작업 ${rows.length}건 (${(up.results ?? []).map((x) => x.extractedCount).join("+")})`);
+
+  // 5) 담당자 — 엑셀에는 없어 "미지정"으로 들어온다. 분야별로 나눠 맡긴다
+  const POOL = { 기계: ["김정훈", "박성민", "이도현"], 전기: ["최윤석", "정해진"], 제어: ["한상우", "오지현"] };
+  const seen = {};
+  for (const t of rows) {
+    const pool = POOL[t.field] ?? POOL["기계"];
+    const k = (seen[t.field] = (seen[t.field] ?? -1) + 1);
+    await api("PATCH", "/api/overhaul/tasks", { id: t.id, patch: { assignee: pool[k % pool.length] } });
+  }
+}
+
 // ---------------------------------------------------------------------------
 const BRANCHES = [
   "중앙지사", "강남지사", "파주지사", "삼송지사", "고양사업소", "화성지사", "동탄지사",
@@ -545,6 +659,11 @@ const BRANCHES = [
   if (mode === "cheongju" || mode === "all") {
     console.log("\n■ 청주 일정·분야 맞추기");
     await fixCheongju();
+  }
+  if (mode === "pangyo-rebuild") {
+    console.log("\n■ 판교 재구성");
+    await rebuildPangyo();
+    await pangyoInProgress();
   }
   if (mode === "photos") {
     console.log("\n■ 판교 사진 교체");

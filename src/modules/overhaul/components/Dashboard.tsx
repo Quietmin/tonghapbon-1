@@ -127,7 +127,7 @@ export default function Dashboard() {
       <ScreenHeader
         icon="dashboard"
         title="대시보드"
-        desc={`${m.project.name} 정기 오버홀 공정 현황`}
+        desc={`${m.project.name} 공정 현황`}
         bullets={[]}
         tone="soft"
         action={
@@ -277,7 +277,7 @@ export default function Dashboard() {
         <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary-container to-status-info opacity-90" />
         <div className="absolute inset-0 flex flex-col justify-end p-6 text-white">
           <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Live Site</p>
-          <h2 className="text-xl font-bold">{m.project.unit ?? "—"} 오버홀 현장</h2>
+          <h2 className="text-xl font-bold">{m.project.branch ?? ""} 오버홀 현장</h2>
           <p className="text-sm opacity-90 mt-1">
             전체 작업 {m.taskCount}건 · 완료 {m.doneCount}건
           </p>
