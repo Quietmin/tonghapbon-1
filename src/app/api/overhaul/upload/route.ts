@@ -12,7 +12,7 @@ export const maxDuration = 60;
  *
  * multipart/form-data
  *   file       (필수, 여러 개 가능)
- *   fieldHint  (선택) 자동 / 기계 / 전기 / 제어 — 업로드 시 사용자가 지정한 분야
+ *   fieldHint  (선택) 전체(=자동) / 기계 / 전기 / 제어 — 업로드 시 사용자가 지정한 분야
  *   dryRun     (선택) "1"이면 분석만 하고 저장하지 않는다 (미리보기용)
  */
 export async function POST(req: Request) {
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     const fieldHintRaw = String(form.get("fieldHint") ?? "").trim();
-    const fieldHint = fieldHintRaw && fieldHintRaw !== "자동" ? fieldHintRaw : null;
+    const fieldHint = fieldHintRaw && fieldHintRaw !== "자동" && fieldHintRaw !== "전체" ? fieldHintRaw : null;
     const dryRun = String(form.get("dryRun") ?? "") === "1";
 
     const project = await resolveProjectFromRequest(req);

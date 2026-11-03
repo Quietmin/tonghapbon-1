@@ -52,6 +52,7 @@ export interface JudgedPlanRow extends PlanRow {
 
 export async function saveParsedPlan(params: {
   fileName: string;
+  /** 업로드 화면에서 고른 분야. null(= 전체)이면 항목마다 시트 이름으로 읽은 분야(item.field)를 쓴다 */
   field: string | null;
   /** 이 계획이 속한 지사 — 판정·매트릭스·산출서가 모두 이 값으로 갈린다 */
   branch: string | null;
@@ -61,11 +62,15 @@ export async function saveParsedPlan(params: {
   fileData?: Uint8Array | null;
 }): Promise<{ sourceId: string; itemCount: number }> {
   const { fileName, field, branch, sheetCount, items, fileData } = params;
+  const fieldOf = (it: ParsedPlanItem) => field ?? it.field;
+  // 이력 목록에 보일 분야 — 한 분야로 모이면 그 분야, 섞였으면 "전체"
+  const fieldsInFile = [...new Set(items.map(fieldOf).filter((f): f is string => !!f))];
+  const sourceField = field ?? (fieldsInFile.length === 1 ? fieldsInFile[0] : fieldsInFile.length ? "전체" : null);
 
   const source = await queryOne<{ id: string }>(
     `insert into maintenance_plan_source (file_name, field, branch, sheet_count, item_count, file_data)
      values ($1, $2, $3, $4, $5, $6) returning id`,
-    [fileName, field, branch, sheetCount, items.length, fileData ?? null],
+    [fileName, sourceField, branch, sheetCount, items.length, fileData ?? null],
   );
   if (!source) throw new Error("업로드 이력을 저장하지 못했습니다.");
 
@@ -74,15 +79,17 @@ export async function saveParsedPlan(params: {
   //  세 모듈이 공유하는 설비 마스터에는 대분류 수준으로 올려둔다.)
   // 엑셀 대분류의 머리 번호("1. ")는 떼고 등록한다 — 마스터가 번호로 오염되면 안 된다.
   // 설비 마스터는 지사에 속하므로 업로드의 지사를 따른다 (지사 없으면 등록 생략).
-  const categories = [
-    ...new Set(
-      items
-        .map((i) => (i.category ? normalizeEquipmentName(i.category) : ""))
-        .filter((c): c is string => !!c),
-    ),
-  ];
+  // 대분류마다 그 대분류 항목들의 분야를 붙인다 — 한 파일에 분야가 섞여 있어도 설비가 제 분야로 등록된다
+  const categoryField = new Map<string, string | null>();
+  for (const it of items) {
+    if (!it.category) continue;
+    const c = normalizeEquipmentName(it.category);
+    if (c && !categoryField.has(c)) categoryField.set(c, fieldOf(it));
+  }
   const equipMap = branch
-    ? await ensureEquipments(categories.map((c) => ({ name: c, branch, field: field ?? undefined })))
+    ? await ensureEquipments(
+        [...categoryField].map(([name, f]) => ({ name, branch, field: f ?? undefined })),
+      )
     : new Map<string, string>();
 
   // 639건을 한 건씩 INSERT하면 왕복이 그만큼 쌓여 25초가 걸렸다.
@@ -109,7 +116,7 @@ export async function saveParsedPlan(params: {
         it.tagNo,
         it.maker,
         it.spec,
-        field,
+        fieldOf(it),
         branch,
         it.cycleRaw,
         it.cycle.kind === "fixed" ? (it.cycle.years ?? null) : null,

@@ -113,7 +113,9 @@ export default function MaintenancePlan() {
    * "전체"로 보다가 파일을 올리면 분야가 안 붙은 채 저장돼, 그 뒤로 분야 필터에
    * 영원히 안 걸리는 함정이 생긴다.
    */
-  const [uploadField, setUploadField] = useState("전기");
+  // 전체 = 한 파일에 기계·전기·제어가 시트로 나뉘어 있으면 시트 이름으로 갈라 저장한다
+  const [uploadField, setUploadField] = useState("전체");
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("필수");
   const [q, setQ] = useState("");
   /**
@@ -170,6 +172,7 @@ export default function MaintenancePlan() {
         return;
       }
       setError(null);
+      setUploadNote(null);
       setBusy(`${excel.map((f) => f.name).join(", ")} 분석 중…`);
       try {
         const fd = new FormData();
@@ -179,6 +182,20 @@ export default function MaintenancePlan() {
           await fetch("/api/overhaul/plan/upload", { method: "POST", body: fd })
         ).json();
         if (!json.ok) throw new Error(json.error ?? "등록에 실패했습니다.");
+        // 어느 분야로 몇 건 들어갔는지 — 분야를 못 읽은 항목이 있으면 바로 알 수 있게
+        const byField: Record<string, number> = {};
+        for (const r of json.results ?? []) {
+          for (const [f, n] of Object.entries((r.byField ?? {}) as Record<string, number>)) {
+            byField[f] = (byField[f] ?? 0) + n;
+          }
+        }
+        const parts = ["기계", "전기", "제어"].filter((f) => byField[f]).map((f) => `${f} ${byField[f]}`);
+        const unknown = byField["미분류"] ?? 0;
+        setUploadNote(
+          `등록됨: ${parts.join(" · ") || "0건"}${
+            unknown ? ` · 분야를 못 읽은 ${unknown}건(시트 이름에 기계·전기·제어가 없음 — 분야를 골라 다시 올리세요)` : ""
+          }`,
+        );
         await load(data?.targetYear);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -430,7 +447,7 @@ export default function MaintenancePlan() {
             <span className="text-label-caps uppercase text-on-surface-variant">
               등록할 파일의 분야
             </span>
-            {["기계", "전기", "제어"].map((f) => (
+            {["전체", "기계", "전기", "제어"].map((f) => (
               <button
                 key={f}
                 onClick={() => setUploadField(f)}
@@ -444,7 +461,9 @@ export default function MaintenancePlan() {
               </button>
             ))}
             <span className="text-xs text-on-surface-variant">
-              올리는 파일의 설비가 전부 이 분야로 저장됩니다.
+              {uploadField === "전체"
+                ? "시트(또는 파일) 이름의 기계·전기·제어로 나눠 저장합니다 — 한 파일에 시트로 나뉘어 있어도 됩니다."
+                : `올리는 파일의 설비가 전부 ${uploadField} 분야로 저장됩니다.`}
             </span>
           </div>
 
@@ -474,14 +493,19 @@ export default function MaintenancePlan() {
             <p className="text-title-sm text-on-surface">
               {busy ??
                 (hasPlan
-                  ? `${uploadField} 관리계획 엑셀을 추가로 넣으세요`
+                  ? `${uploadField === "전체" ? "" : `${uploadField} `}관리계획 엑셀을 추가로 넣으세요`
                   : "중장기 유지보수 관리계획 엑셀을 넣으세요")}
             </p>
             <p className="text-sm text-on-surface-variant mt-1">
-              분야별로 한 번씩만 등록하면 됩니다. 매년 다시 넣을 필요 없습니다. · 여러 개 한
-              번에 가능
+              분야별 파일이든 한 파일(분야별 시트)이든 한 번만 등록하면 됩니다. 매년 다시 넣을 필요
+              없습니다. · 여러 개 한 번에 가능
             </p>
           </div>
+          {uploadNote && (
+            <p className="mt-2 text-sm text-on-surface flex items-center gap-1.5">
+              <Icon name="check_circle" className="text-base text-status-success-text" /> {uploadNote}
+            </p>
+          )}
         </div>
 
         <input
