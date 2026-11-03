@@ -730,9 +730,9 @@ export default function ChatbotDock() {
           }}
           placeholder={
             voiceState === "recording"
-              ? "듣고 있어요… 다 말하면 ■ 를 누르세요"
+              ? "듣는 중… ■로 끝"
               : voiceState === "processing"
-                ? "말씀을 글로 바꾸는 중…"
+                ? "변환 중…"
                 : "예: 전체 공정률 / 최근 고장이력 알려줘"
           }
           aria-label="챗봇에게 물어보기"
