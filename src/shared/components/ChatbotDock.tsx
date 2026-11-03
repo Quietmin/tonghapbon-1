@@ -730,7 +730,7 @@ export default function ChatbotDock() {
           }}
           placeholder={
             voiceState === "recording"
-              ? "듣는 중… ■로 끝"
+              ? "음성 듣는 중… ■ 누르면 입력"
               : voiceState === "processing"
                 ? "변환 중…"
                 : "예: 전체 공정률 / 최근 고장이력 알려줘"
