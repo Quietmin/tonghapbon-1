@@ -12,6 +12,7 @@ import type OpenAI from "openai";
 import { query } from "@/shared/lib/db";
 import { listIssues, countByStatus } from "@/modules/status/lib/repo";
 import { BRANCHES } from "@/shared/lib/branches";
+import { conceptScore, expandQuery, type ExpandedQuery } from "./chatbotGlossary";
 
 const MAX_ROWS = 10;
 const MAX_TEXT = 300;
@@ -46,10 +47,26 @@ function keywordOf(v: unknown): string | null {
 // 1) 고장이력 (failure_history — 메인 DB)
 // ---------------------------------------------------------------------------
 
+/** 검색어가 있을 때 후보를 넉넉히 가져와 용어집 점수로 다시 줄 세운다 — 최근순만으로 자르면 덜 맞는 건이 앞에 선다 */
+const CANDIDATE_ROWS = 40;
+
+/** 검색 결과를 용어집 점수(질문 속 대상과 몇 개 맞는가) 순으로 다시 세우고, 하나도 안 맞는 건은 뺀다. 같은 점수는 원래 순서(최근순) */
+function rankByConcepts<T extends Record<string, unknown>>(rows: T[], q: ExpandedQuery, fields: string[], limit: number): T[] {
+  return rows
+    .map((r, i) => ({ r, i, s: conceptScore(fields.map((f) => String(r[f] ?? "")).join(" "), q) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .slice(0, limit)
+    .map((x) => x.r);
+}
+
 async function searchFailureHistory(args: Record<string, unknown>, branch: string | null) {
   const keyword = keywordOf(args.keyword);
   const status = args.status === "조치중" || args.status === "조치완료" ? (args.status as string) : null;
   const limit = clampLimit(args.limit);
+  // 같은 뜻 낱말까지 넓힌다(chatbotGlossary.ts) — "BFP 누유"로 물어도 "급수펌프 누설" 이력이 걸리게
+  const expanded = keyword ? expandQuery(keyword) : null;
+  const terms = expanded?.terms.length ? expanded.terms : keyword ? [keyword] : [];
 
   const conds: string[] = [];
   const params: unknown[] = [];
@@ -59,25 +76,26 @@ async function searchFailureHistory(args: Record<string, unknown>, branch: strin
   };
   if (branch) add("branch = $#", branch);
   if (status) add("status = $#", status);
-  if (keyword) {
-    params.push(`%${keyword}%`);
-    const p = `$${params.length}`;
-    conds.push(
-      `(title ilike ${p} or equipment_name ilike ${p} or device_name ilike ${p}
-        or heat_facility ilike ${p} or situation ilike ${p} or content_summary ilike ${p})`,
+  if (terms.length) {
+    add(
+      `concat_ws(' ', title, equipment_name, device_name, heat_facility, situation, content_summary) ilike any($#::text[])`,
+      terms.map((t) => `%${t}%`),
     );
   }
   const where = conds.length ? `where ${conds.join(" and ")}` : "";
 
-  const rows = await query<Record<string, unknown>>(
+  const fetched = await query<Record<string, unknown>>(
     `select id::text as id, title, branch, heat_facility, equipment_name, device_name, failure_field, status,
             occurred_at, recovered_at, situation, cause_4m1e, emergency_action,
             recovery_detail, recurrence_prevention, content_summary
        from failure_history ${where}
       order by occurred_at desc nulls last, created_at desc
-      limit ${limit}`,
+      limit ${expanded?.concepts.length ? CANDIDATE_ROWS : limit}`,
     params,
   );
+  const rows = expanded?.concepts.length
+    ? rankByConcepts(fetched, expanded, ["title", "equipment_name", "device_name", "heat_facility", "situation", "content_summary"], limit)
+    : fetched;
   const total = await query<{ n: number }>(
     `select count(*)::int as n from failure_history ${where}`,
     params,
@@ -86,6 +104,7 @@ async function searchFailureHistory(args: Record<string, unknown>, branch: strin
   return {
     totalMatched: total[0]?.n ?? rows.length,
     shown: rows.length,
+    ...(expanded?.terms.length ? { searchedTerms: expanded.terms } : {}),
     items: rows.map((r) => ({
       ...r,
       situation: shortText(r.situation),
@@ -115,15 +134,20 @@ async function searchManuals(args: Record<string, unknown>) {
   const docType = args.doc_type === "manual" || args.doc_type === "fault" || args.doc_type === "report" ? (args.doc_type as string) : null;
   const limit = clampLimit(args.limit);
 
+  // 같은 뜻 낱말까지 넓힌다(chatbotGlossary.ts) — 제목이 "GT 발전기 … 절연저항"이어도 "가스터빈 발전기 메거"로 찾게
+  const expanded = keyword ? expandQuery(keyword, 12) : null;
+  // PostgREST or= 문법에서 구분자로 쓰이는 문자는 검색어에서 제거한다
+  const terms = (expanded?.terms.length ? expanded.terms : keyword ? [keyword] : [])
+    .map((t) => t.replace(/[,()*"\\]/g, " ").trim())
+    .filter(Boolean);
+
   const qs = new URLSearchParams();
   qs.set("select", "id,doc_type,title,file_name,manual_type,field,year,branch,facility,fault_content,page_count,created_at");
   qs.set("order", "created_at.desc");
-  qs.set("limit", String(limit));
+  qs.set("limit", String(expanded?.concepts.length ? CANDIDATE_ROWS : limit));
   if (docType) qs.set("doc_type", `eq.${docType}`);
-  if (keyword) {
-    // PostgREST or= 문법에서 구분자로 쓰이는 문자는 키워드에서 제거한다
-    const k = keyword.replace(/[,()*"\\]/g, " ").trim();
-    if (k) qs.set("or", `(title.ilike.*${k}*,file_name.ilike.*${k}*,facility.ilike.*${k}*,fault_content.ilike.*${k}*,manual_type.ilike.*${k}*)`);
+  if (terms.length) {
+    qs.set("or", `(${terms.flatMap((t) => ["title", "facility", "fault_content", "manual_type"].map((c) => `${c}.ilike.*${t}*`)).join(",")})`);
   }
 
   const res = await fetch(`${url}/rest/v1/docgen_documents?${qs.toString()}`, {
@@ -131,9 +155,13 @@ async function searchManuals(args: Record<string, unknown>) {
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) return { error: `보관함 조회 실패 (HTTP ${res.status}) — 보관함 서버가 일시중지 상태일 수 있습니다.` };
-  const rows = (await res.json()) as Record<string, unknown>[];
+  const fetched = (await res.json()) as Record<string, unknown>[];
+  const rows = expanded?.concepts.length
+    ? rankByConcepts(fetched, expanded, ["title", "file_name", "facility", "fault_content", "manual_type"], limit)
+    : fetched;
   return {
     shown: rows.length,
+    ...(expanded?.terms.length ? { searchedTerms: expanded.terms } : {}),
     note: "문서 열람은 화면의 '매뉴얼 관리 > 보관함'에서 제목으로 찾아 열 수 있다. 본문 내용(절차·조치사항 등)이 필요하면 id 로 read_document 를 호출한다.",
     items: rows.map((r) => ({ ...r, fault_content: shortText(r.fault_content) })),
   };

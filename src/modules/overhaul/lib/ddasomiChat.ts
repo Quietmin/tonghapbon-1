@@ -74,6 +74,8 @@ export interface DdasomiReply {
   scope?: string;
   /** AI 답변이 실제로 조회한 대상 — 화면이 보관했다가 다음 질문의 history 에 싣는다 */
   memory?: TurnMemory;
+  /** 인터넷 자료로 답했을 때의 출처 — 화면이 답변 아래 링크로 보여 준다 */
+  sources?: { title: string; url: string }[];
 }
 
 /**
@@ -162,6 +164,7 @@ export async function getDdasomiReply(
           matches: used.length ? used : undefined,
           scope: result.scope,
           memory: result.memory,
+          sources: Array.isArray(result.sources) && result.sources.length ? result.sources : undefined,
         };
       }
       if (result && result.ok === false) aiFailReason = result.reason;

@@ -50,6 +50,8 @@ export type AskFn = (
       usedDocs?: number[] | null;
       /** 이번 답이 실제로 조회한 대상 — 다음 질문 때 history 에 실어 되돌려 보낸다 */
       memory?: TurnMemory;
+      /** 보관함에 자료가 없어 인터넷 자료로 답했을 때의 출처 */
+      sources?: { title: string; url: string }[];
     }
   | { ok: false; reason: AskFailReason }
   | null

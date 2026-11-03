@@ -115,6 +115,8 @@ interface Msg {
   scope?: string;
   /** AI 답변이 실제로 조회한 대상 — 다음 질문 때 history 에 실어 서버로 되돌려 보낸다 */
   memory?: TurnMemory;
+  /** 보관함에 자료가 없어 인터넷 자료로 답했을 때의 출처 — 말풍선 아래 링크로 그린다 */
+  sources?: { title: string; url: string }[];
 }
 
 let msgSeq = 0;
@@ -452,6 +454,7 @@ export default function ChatbotDock() {
         matches: reply.matches,
         scope: reply.scope,
         memory: reply.memory,
+        sources: reply.sources,
       },
     ]);
   }
@@ -664,6 +667,25 @@ export default function ChatbotDock() {
                             {openingId === doc.id ? "여는 중…" : "미리보기"}
                           </div>
                         </button>
+                      ))}
+                    </div>
+                  )}
+                  {Array.isArray(m.sources) && m.sources.length > 0 && (
+                    <div className="w-full flex flex-col gap-1 px-1">
+                      <div className="flex items-center gap-1 text-xs font-bold text-on-surface-variant">
+                        <Icon name="public" className="text-sm" />
+                        인터넷 출처 — 우리 설비 기준이 아니니 적용 전 확인하세요
+                      </div>
+                      {m.sources.map((s) => (
+                        <a
+                          key={s.url}
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary font-semibold underline underline-offset-2 truncate hover:opacity-80"
+                        >
+                          {s.title}
+                        </a>
                       ))}
                     </div>
                   )}
