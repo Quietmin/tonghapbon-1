@@ -7,17 +7,21 @@
 // 멈추면 그 구간 전체를 한 번만 인식한다. 다음 칸으로 넘어가는 것도 더 이상 자동이 아니라
 // 사용자가 직접 "다음"을 눌러야 한다(VoiceSequenceFill.tsx 쪽 변경).
 //
-// 같은 OPENAI_API_KEY/GPT_CHAT_ENABLED 로 켜고 끈다(오버홀 챗봇 api/overhaul/chatbot과 공유).
+// 모델은 두 단계로 나뉜다 — 받아쓰기(STT)와 그 결과를 칸에 맞게 다듬는 정리 단계.
+// 받아쓰기는 오버홀 챗봇과 같은 OPENAI_API_KEY/GPT_CHAT_ENABLED 로 켜고 끄지만,
+// 정리 단계의 모델은 챗봇(OPENAI_MODEL)과 별도로 OPENAI_VOICE_CLEANUP_MODEL 로 고른다
+// — 음성 입력 쪽 모델을 바꿔도 챗봇 답변 품질에 영향이 없게 분리했다.
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-/** STT 모델 — "GPT 음성 인식"을 쓰기로 했다(요청사항). 계정에 따라 쓸 수 없으면
- *  OPENAI_TRANSCRIBE_MODEL 환경변수로 whisper-1 등으로 바꿀 수 있다(코드 수정 없이). */
-const TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe";
-/** 받아쓴 원문을 칸에 맞게 정리하는 모델 — 오버홀 챗봇과 같은 환경변수를 공유한다 */
-const CLEAN_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+/** STT 모델 — 기본은 gpt-transcribe(계정에서 확인됨). 계정에 따라 다른 모델을 쓰려면
+ *  OPENAI_TRANSCRIBE_MODEL 로 바꿀 수 있다(코드 수정 없이). */
+const TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-transcribe";
+/** 받아쓴 원문을 칸에 맞게 정리하는 모델 — 오버홀 챗봇의 OPENAI_MODEL 과는 독립된
+ *  별도 환경변수다(계정에서 확인됨, 기본 gpt-6-luna). */
+const VOICE_CLEANUP_MODEL = process.env.OPENAI_VOICE_CLEANUP_MODEL || "gpt-6-luna";
 /** 짧은 음성 한 칸 분량이면 충분히 넉넉한 상한 */
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
 const MAX_FIELD_LABEL_LEN = 60;
@@ -47,13 +51,29 @@ function upstreamReason(err: unknown): string {
   return "upstream_error";
 }
 
+/** 녹음 Blob 의 실제 MIME 에 맞는 확장자를 고른다 — OpenAI 전사 API 는 파일명 확장자와
+ *  content-type 이 서로 맞아야 한다고 안내한다("We recommend an extension-bearing
+ *  filename and an appropriate content type"). 전에는 녹음 포맷과 무관하게 항상
+ *  "recording.webm"으로 올렸는데, 브라우저가 webm 을 못 만들어 mp4/ogg 로 녹음된
+ *  경우(voiceRecording.ts 의 폴백) 확장자가 실제 내용과 달라지는 문제가 있었다. */
+function extensionForMime(mime: string): string {
+  const m = mime.toLowerCase();
+  if (m.includes("webm")) return "webm";
+  if (m.includes("mp4") || m.includes("m4a")) return "mp4";
+  if (m.includes("ogg")) return "ogg";
+  if (m.includes("wav")) return "wav";
+  if (m.includes("mpeg") || m.includes("mp3")) return "mp3";
+  if (m.includes("flac")) return "flac";
+  return "webm"; // 알 수 없으면 가장 흔한 포맷으로 가정한다
+}
+
 /**
  * 받아쓴 원문을 그 칸에 바로 넣을 수 있게 정리하는 프롬프트 — 보기가 없는(자유
- * 서술·짧은 값) 칸에만 쓴다. 보기가 있는(select) 칸은 matchOptionWithOpenAI 를
- * 쓴다(아래 설명 참고 — 같은 프롬프트에 두 가지를 다 넣었더니 작은 모델이
- * 헷갈려 했다). 추상적인 규칙 설명만으로는("군더더기 말을 지워라") 모델이
- * "바꾸는 것 자체가 위험하다"고 판단해 입력을 그대로 돌려주는 경우가 많아서,
- * 구체적인 예시(few-shot)를 넣었다 — 작은 모델일수록 설명보다 예시를 더 잘 따른다.
+ * 서술·짧은 값) 칸에만 쓴다. 보기가 있는(select) 칸은 buildOptionMatchPrompt 를
+ * 쓴다(같은 프롬프트에 두 가지를 다 넣었더니 작은 모델이 헷갈려 했다). 추상적인
+ * 규칙 설명만으로는("군더더기 말을 지워라") 모델이 "바꾸는 것 자체가 위험하다"고
+ * 판단해 입력을 그대로 돌려주는 경우가 많아서, 구체적인 예시(few-shot)를 넣었다 —
+ * 작은 모델일수록 설명보다 예시를 더 잘 따른다.
  *
  * 처음엔 "원문에 없는 내용은 지어내지 마라"만 강하게 시켰더니, STT가 발음이 비슷한
  * 단어를 엉뚱하게 잘못 받아적여도(예: "순환수"를 "순한수"로) 모델이 "틀렸을 수도
@@ -68,6 +88,9 @@ function upstreamReason(err: unknown): string {
  * 더 길고 수식어 많은 문장이 나와, 사진 설명처럼 자리가 좁은 칸에서 잘려 보이는
  * 문제가 있었다(실제로 겪음). maxChars 가 주어지면(사진 설명처럼 격자 칸에
  * 들어가는 경우) 그 글자 수 안으로 더 추리라고 덧붙인다.
+ *
+ * 결과는 자유 텍스트가 아니라 { text: string } 구조화 JSON 으로 받는다(Responses API,
+ * reasoning.effort:"none") — 모델이 설명·따옴표를 덧붙이는 사고를 원천적으로 막는다.
  */
 function buildCleanupPrompt(fieldLabel: string, kind: "short" | "long", raw: string, maxChars?: number): string {
   const kindLine =
@@ -78,18 +101,18 @@ function buildCleanupPrompt(fieldLabel: string, kind: "short" | "long", raw: str
     ? `\n이 칸은 자리가 좁다 — 공백 포함 ${maxChars}자를 넘지 않게, 꼭 필요한 말만 남겨서 더 짧게 줄여라.`
     : "";
 
-  return `너는 한국어 음성 받아쓰기 결과를 양식 입력칸에 바로 넣을 수 있게 정리하는 도우미다. 입력을 그대로 돌려주는 것은 "정리"가 아니다 — 아래 규칙대로 반드시 다듬어서 출력해라.
+  return `너는 한국어 음성 받아쓰기 결과를 양식 입력칸에 바로 넣을 수 있게 정리하는 도우미다. 입력을 그대로 돌려주는 것은 "정리"가 아니다 — 아래 규칙대로 반드시 다듬어서 JSON으로 출력해라.
 
 지금 채우려는 칸: "${fieldLabel}"
 ${kindLine}${lengthLine}
 
 예시(다른 칸 기준 — 방식만 참고):
-칸: "작성자" / 원문: "어 작성자는 음 홍길동입니다" → 출력: 홍길동
-칸: "내용" / 원문: "그러니까 방음벽 음 철거 범위를 사진으로 확인합니다" → 출력: 방음벽 철거 범위 사진으로 확인 (개조식 — "-합니다" 종결어미를 빼고 핵심만 남김)
-칸: "설비명" / 원문: "설비명은 1호기 순환수 펌프 순환수 펌프요" → 출력: 1호기 순환수 펌프
-칸: "설비명" / 원문: "일호기 순한수 펌프" → 출력: 1호기 순환수 펌프 (발음이 비슷해 잘못 받아적힌 "순한수"를 현장 설비 용어로 말이 되는 "순환수"로 바로잡음)
-칸: "내용" / 원문: "배관에서 어 누수 같은 소음이 들려서 정기 점검 대상입니다" → 출력: 배관 누수 추정 소음 발생, 정기 점검 대상 (개조식 — 새 사실을 보탠 건 아님)
-칸: "사진 설명"(자리 좁음, 30자 제한) / 원문: "음 이 사진은 1호기 순환수 펌프 베어링 부위에서 기름이 새는 걸 확인한 사진이에요" → 출력: 1호기 순환수 펌프 베어링 유출 확인 (개조식 + 글자 수 제한에 맞춰 짧게)
+칸: "작성자" / 원문: "어 작성자는 음 홍길동입니다" → text: "홍길동"
+칸: "내용" / 원문: "그러니까 방음벽 음 철거 범위를 사진으로 확인합니다" → text: "방음벽 철거 범위 사진으로 확인" (개조식 — "-합니다" 종결어미를 빼고 핵심만 남김)
+칸: "설비명" / 원문: "설비명은 1호기 순환수 펌프 순환수 펌프요" → text: "1호기 순환수 펌프"
+칸: "설비명" / 원문: "일호기 순한수 펌프" → text: "1호기 순환수 펌프" (발음이 비슷해 잘못 받아적힌 "순한수"를 현장 설비 용어로 말이 되는 "순환수"로 바로잡음)
+칸: "내용" / 원문: "배관에서 어 누수 같은 소음이 들려서 정기 점검 대상입니다" → text: "배관 누수 추정 소음 발생, 정기 점검 대상" (개조식 — 새 사실을 보탠 건 아님)
+칸: "사진 설명"(자리 좁음, 30자 제한) / 원문: "음 이 사진은 1호기 순환수 펌프 베어링 부위에서 기름이 새는 걸 확인한 사진이에요" → text: "1호기 순환수 펌프 베어링 유출 확인" (개조식 + 글자 수 제한에 맞춰 짧게)
 
 사용자가 음성으로 말한 원문(받아쓰기 결과 — 인식 오류나 더듬거림이 섞여 있을 수 있다):
 "${raw}"
@@ -98,8 +121,8 @@ ${kindLine}${lengthLine}
 1. 사용자가 "${fieldLabel}는/은/이/가 ~~"처럼 칸 이름을 같이 말했으면, 그 이름을 말한 부분은 반드시 빼고 실제 내용만 남긴다.
 2. "음", "어", "그러니까" 같은 군더더기 말과 더듬거나 같은 말 반복은 반드시 지운다.
 3. 단어나 구절이 뜻이 안 통하거나 이 칸(${fieldLabel})의 맥락과 안 맞으면, 발음이 비슷해 잘못 받아적혔을 가능성을 추론해서 가장 말이 되는 표현으로 바로잡는다 — 이건 지어내는 게 아니라 교정이다.
-4. 다만 원문에 아예 등장하지 않은 새로운 사실·수치·이름을 보태지는 않는다(교정은 "있던 말을 더 말이 되게" 고치는 것까지만, 없던 정보를 만들어 내는 게 아니다).
-5. 출력은 그 칸에 바로 들어갈 내용만 적는다 — 설명, 따옴표, 접두사 없이 결과 텍스트만.${maxChars ? ` 글자 수 제한(${maxChars}자)을 꼭 지켜라.` : ""} 원문에 쓸 만한 내용이 전혀 없으면 빈 문자열만 출력한다.`;
+4. 다만 원문에 아예 등장하지 않은 새로운 사실·수치·이름·단위·날짜·부정(아니다/없다 등) 표현을 보태거나 뒤집지는 않는다(교정은 "있던 말을 더 말이 되게" 고치는 것까지만, 없던 정보를 만들어 내거나 뜻을 바꾸는 게 아니다).
+5. 결과는 JSON의 text 필드에 넣는다.${maxChars ? ` 글자 수 제한(${maxChars}자)을 꼭 지켜라.` : ""} 원문에 쓸 만한 내용이 전혀 없으면 text를 빈 문자열로 한다.`;
 }
 
 /**
@@ -118,6 +141,15 @@ function buildTranscribeHint(fieldLabel: string, options: string[] | null): stri
   return base;
 }
 
+/** gpt-transcribe 의 keywords 파라미터 — prompt(문장형 맥락)와 달리, 실제로 나올 수
+ *  있는 낱말을 있는 그대로 나열해 인식 정확도를 높인다. 지금 칸의 보기 목록(설비명·
+ *  지사명 등 select 류 칸의 후보)을 그대로 쓴다 — 자유 서술 칸은 고정된 후보가 없어
+ *  비워 둔다. */
+function buildKeywords(options: string[] | null): string[] {
+  if (!options || options.length === 0) return [];
+  return options.slice(0, 20);
+}
+
 async function transcribeWithOpenAI(
   audio: Blob,
   apiKey: string,
@@ -125,10 +157,13 @@ async function transcribeWithOpenAI(
   options: string[] | null,
 ): Promise<string | null> {
   const form = new FormData();
-  form.append("file", audio, "recording.webm");
+  form.append("file", audio, `recording.${extensionForMime(audio.type)}`);
   form.append("model", TRANSCRIBE_MODEL);
-  form.append("language", "ko");
+  // gpt-transcribe 는 복수형 languages 를 쓴다(language 단수 필드와는 별개 — 같이
+  // 보내지 않는다. 공식 가이드: "these models use languages instead of language").
+  form.append("languages[]", "ko");
   if (fieldLabel) form.append("prompt", buildTranscribeHint(fieldLabel, options));
+  for (const kw of buildKeywords(options)) form.append("keywords[]", kw);
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -142,25 +177,60 @@ async function transcribeWithOpenAI(
   return typeof data?.text === "string" ? data.text.trim() : null;
 }
 
-async function cleanWithOpenAI(prompt: string, apiKey: string): Promise<string | null> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+/**
+ * 정리 단계 공통 호출 — Responses API(챗봇이 쓰는 Chat Completions 와는 다른
+ * 엔드포인트) + reasoning.effort:"none"(정리 작업은 깊은 추론이 필요 없어 속도를
+ * 우선한다) + 구조화 출력(text.format: json_schema, strict)을 쓴다. 자유 텍스트
+ * 프롬프트로만 "이 형식대로 출력해라"를 시켰을 때는 모델이 가끔 설명을 덧붙이거나
+ * 원문을 그대로 베껴 오는 등 들쭉날쭉했는데, 스키마로 강제하면 그 칸에만 값이
+ * 들어오는 게 구조적으로 보장된다.
+ */
+async function callStructuredCleanup(
+  prompt: string,
+  schemaName: string,
+  schema: Record<string, unknown>,
+  apiKey: string,
+  maxOutputTokens: number,
+): Promise<Record<string, unknown> | null> {
+  const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: CLEAN_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.1,
-      max_tokens: 300,
+      model: VOICE_CLEANUP_MODEL,
+      input: prompt,
+      reasoning: { effort: "none" },
+      max_output_tokens: maxOutputTokens,
+      text: { format: { type: "json_schema", name: schemaName, strict: true, schema } },
     }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error("[api/voice/transcribe] 정리 단계 실패:", res.status, body.slice(0, 300));
+    console.error(`[api/voice/transcribe] ${schemaName} 실패:`, res.status, body.slice(0, 300));
     return null;
   }
   const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
-  return typeof text === "string" ? text.trim() : null;
+  const message = (Array.isArray(data?.output) ? data.output : []).find((item: any) => item?.type === "message");
+  const outputText = (Array.isArray(message?.content) ? message.content : []).find(
+    (c: any) => c?.type === "output_text",
+  );
+  const raw = outputText?.text;
+  if (typeof raw !== "string") return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function cleanWithOpenAI(prompt: string, apiKey: string): Promise<string | null> {
+  const result = await callStructuredCleanup(
+    prompt,
+    "voice_cleanup",
+    { type: "object", properties: { text: { type: "string" } }, required: ["text"], additionalProperties: false },
+    apiKey,
+    300,
+  );
+  return typeof result?.text === "string" ? (result.text as string).trim() : null;
 }
 
 /**
@@ -171,10 +241,13 @@ async function cleanWithOpenAI(prompt: string, apiKey: string): Promise<string |
  * 돌려주는 등 들쭉날쭉했다 — 작은 모델이 "이 중 하나만 그대로 베껴 써라"를
  * 안정적으로 못 지켰다.
  *
- * 대신 모델에게는 "보기 번호(숫자)"만 답하게 한다 — 보기 문구 자체는 모델이
- * 한 글자도 직접 생성하지 않고, 이 함수가 번호로 내가 이미 들고 있는 options
- * 배열에서 그대로 꺼내 쓴다. 숫자 하나만 고르는 쪽이 모델에게도 더 쉬운 작업이라
- * 훨씬 안정적으로 맞혔고, 한국어 문구를 직접 베끼게 하는 경로 자체를 없앴다.
+ * 대신 모델에게는 "보기 번호(숫자)"만 optionIndex 필드로 답하게 한다 — 보기
+ * 문구 자체는 모델이 한 글자도 직접 생성하지 않고, 이 함수가 번호로 내가 이미
+ * 들고 있는 options 배열에서 그대로 꺼내 쓴다. 번호가 범위 밖(0 포함)이면 — 즉
+ * 맞는 보기를 못 찾았으면 — null 을 돌려주고, 호출부는 그 칸을 빈 문자열로
+ * 응답한다. 클라이언트(VoiceSequenceFill)는 빈 문자열을 받으면 그 칸에 값을
+ * 쓰지 않고 안내만 띄우므로, 결과적으로 "일치하는 보기가 없으면 기존 값을
+ * 그대로 둔다"가 된다.
  */
 async function matchOptionWithOpenAI(
   fieldLabel: string,
@@ -189,29 +262,21 @@ ${options.map((o, i) => `${i + 1}. ${o}`).join("\n")}
 
 받아쓴 원문: "${raw}"
 
-정답 번호 하나만 숫자로 출력해라(예: 3). 뜻이 통하는 보기가 전혀 없으면 0을 출력해라. 번호 말고 다른 글자는 절대 출력하지 마라.`;
+정답 보기의 번호(1부터 시작)를 optionIndex 필드에 넣어라. 뜻이 통하는 보기가 전혀 없으면 optionIndex 를 0으로 한다.`;
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: CLEAN_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0,
-      max_tokens: 10,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error("[api/voice/transcribe] 선택형 매칭 실패:", res.status, body.slice(0, 300));
-    return null;
-  }
-  const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content;
-  if (typeof content !== "string") return null;
-  const match = content.match(/\d+/);
-  if (!match) return null;
-  const idx = parseInt(match[0], 10);
+  const result = await callStructuredCleanup(
+    prompt,
+    "voice_option_match",
+    {
+      type: "object",
+      properties: { optionIndex: { type: "integer" } },
+      required: ["optionIndex"],
+      additionalProperties: false,
+    },
+    apiKey,
+    50,
+  );
+  const idx = typeof result?.optionIndex === "number" ? (result.optionIndex as number) : NaN;
   return idx >= 1 && idx <= options.length ? options[idx - 1] : null;
 }
 
@@ -262,7 +327,7 @@ export async function POST(req: Request) {
       // 선택형 칸 — 모델은 번호만 고르고, 실제 문구는 내가 options 배열에서 그대로
       // 꺼내 쓴다(한국어 글자를 모델이 직접 생성하지 않아 깨질 일이 없다). 매칭 안
       // 되면 원문으로 때우지 않고 빈 문자열을 돌려준다 — 클라이언트가 "못 알아들었다"는
-      // 안내를 그 자리에서 보여주게 한다.
+      // 안내를 그 자리에서 보여주고, 그 칸의 기존 값은 그대로 둔다.
       const matched = await matchOptionWithOpenAI(fieldLabel, options, raw, apiKey).catch(() => null);
       return NextResponse.json({ ok: true, raw, text: matched ?? "" });
     }
