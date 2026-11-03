@@ -11,7 +11,8 @@ export const maxDuration = 60;
  *
  * multipart/form-data
  *   file    (필수) 계획 엑셀
- *   field   (선택) 기계 / 전기 / 제어 — 이 파일이 담당하는 분야
+ *   field   (선택) 기계 / 전기 / 제어 — 이 파일 전체를 그 분야로 저장한다.
+ *           전체(또는 생략)면 시트 이름(없으면 파일 이름)에 적힌 분야로 항목마다 나눠 저장한다
  *   dryRun  (선택) "1"이면 분석만 하고 저장하지 않는다 (미리보기용)
  */
 export async function POST(req: Request) {
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     const fieldRaw = String(form.get("field") ?? "").trim();
-    const field = fieldRaw && fieldRaw !== "자동" ? fieldRaw : null;
+    const field = fieldRaw && fieldRaw !== "자동" && fieldRaw !== "전체" ? fieldRaw : null;
     const dryRun = String(form.get("dryRun") ?? "") === "1";
     const thisYear = new Date().getFullYear();
 
@@ -63,6 +64,8 @@ export async function POST(req: Request) {
         itemCount: parsed.items.length,
         byMethod: parsed.byMethod,
         byCycleKind: parsed.byCycleKind,
+        // 실제로 저장되는 분야별 건수 — 분야를 골랐으면 전부 그 분야
+        byField: field ? { [field]: parsed.items.length } : parsed.byField,
         sample: parsed.items.slice(0, 20).map((i) => ({
           category: i.category,
           name: i.name,

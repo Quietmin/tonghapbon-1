@@ -42,6 +42,12 @@ export interface ParsedPlanItem {
   grades: { year: number; grade: string }[];
   /** A등급 이력에서 역산한 마지막 보수연도 (없으면 null) */
   lastDoneYear: number | null;
+  /**
+   * 시트 이름(없으면 파일 이름)에서 읽은 분야 — 기계·전기·제어를 한 파일에 시트로 나눠 담아
+   * 올려도 갈라 저장하기 위한 값. 업로드 화면에서 분야를 "전체"로 둘 때 쓰고,
+   * 특정 분야를 고르면 그 분야가 우선한다. 못 읽으면 null.
+   */
+  field: string | null;
   sheetName: string;
   rowIndex: number;
 }
@@ -57,6 +63,19 @@ export interface ParsedPlanResult {
   byMethod: Record<string, number>;
   /** 주기 해석 종류별 건수 */
   byCycleKind: Record<string, number>;
+  /** 시트·파일 이름으로 읽은 분야별 건수 — 못 읽은 항목은 "미분류" */
+  byField: Record<string, number>;
+}
+
+const PLAN_FIELDS = ["기계", "전기", "제어"] as const;
+
+/**
+ * 이름에 분야가 딱 하나 들어 있으면 그 분야 — "1. 전기설비", "기계", "제어 중장기계획.xlsx".
+ * 둘 이상이면(예: "기계·전기 공통") 한 분야로 정하지 않는다.
+ */
+export function fieldFromName(name: string | null | undefined): string | null {
+  const hits = PLAN_FIELDS.filter((f) => (name ?? "").includes(f));
+  return hits.length === 1 ? hits[0] : null;
 }
 
 const norm = (v: Cell): string => (v == null ? "" : String(v).trim());
@@ -171,6 +190,7 @@ function analyzeSheet(
   sheetName: string,
   rows: Row[],
   thisYear: number,
+  field: string | null,
 ): { items: ParsedPlanItem[]; ok: boolean } {
   const layout = detectLayout(rows);
   if (!layout) return { items: [], ok: false };
@@ -232,6 +252,7 @@ function analyzeSheet(
       completion: col.completion != null ? norm(row[col.completion]) || null : null,
       grades,
       lastDoneYear,
+      field,
       sheetName,
       rowIndex: r + 1,
     });
@@ -258,7 +279,7 @@ export function parseMaintenancePlan(
       blankrows: true,
       defval: "",
     });
-    const res = analyzeSheet(sheetName, rows, thisYear);
+    const res = analyzeSheet(sheetName, rows, thisYear, fieldFromName(sheetName) ?? fieldFromName(fileName));
     if (res.ok && res.items.length) {
       parsedSheets.push(sheetName);
       items.push(...res.items);
@@ -269,7 +290,10 @@ export function parseMaintenancePlan(
 
   const byMethod: Record<string, number> = {};
   const byCycleKind: Record<string, number> = {};
+  const byField: Record<string, number> = {};
   for (const it of items) {
+    const f = it.field ?? "미분류";
+    byField[f] = (byField[f] || 0) + 1;
     const m = it.method || "(미지정)";
     byMethod[m] = (byMethod[m] || 0) + 1;
     byCycleKind[it.cycle.kind] = (byCycleKind[it.cycle.kind] || 0) + 1;
@@ -283,5 +307,6 @@ export function parseMaintenancePlan(
     items,
     byMethod,
     byCycleKind,
+    byField,
   };
 }

@@ -385,7 +385,10 @@ function analyzeSheet(
       classifyEquipment([cleanName, spec, tag]) ||
       classifyEquipment([hint]) ||
       (EQUIP_TO_FIELD[hint] ? hint : null);
-    const field = classifyField(equipment, [hint, cleanName, spec, tag, fileName]);
+    // 분야는 시트 이름 전체도 본다 — "기계공사 (보조기기)"의 괄호 밖 "기계공사"가 단서다.
+    // 기계·전기·제어를 한 파일에 시트로 나눠 올려도 분야별 파일로 올린 것과 같게 나뉜다
+    // (분야별 파일일 때는 파일 이름 "기계_02_…"가 같은 역할을 했다).
+    const field = classifyField(equipment, [hint, sheetName, cleanName, spec, tag, fileName]);
 
     const issues: string[] = [];
     if (qty == null) issues.push("수량 불명확");
