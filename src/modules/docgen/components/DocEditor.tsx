@@ -39,10 +39,44 @@ import AutoTextarea from "./AutoTextarea";
  * 원본(legacy Photo-Report)은 appMode 변수 하나로 한 화면에서 분기했다 —
  * 그 구조를 그대로 살려, 모드별로 다른 부분만 props 로 받는다.
  */
-let seq = 0;
-function nextId() {
-  seq += 1;
-  return `item-${seq}`;
+/**
+ * 예전에는 모듈 전역 카운터(`item-1`, `item-2`, …)로 id 를 매겼다. 그런데
+ * 그 카운터는 페이지를 새로 열 때마다 0 으로 돌아간다 — 그 상태에서 보관함/
+ * 임시저장을 복원하면(그때 저장된 사진들도 똑같은 카운터로 매겨졌던 id,
+ * 즉 "item-1"부터 다시 시작) 복원된 항목들의 id 를 전혀 건드리지 않은 채
+ * 이어서 새 사진을 추가하면 카운터가 다시 1부터 올라가 "item-1"이 중복된다.
+ * id 가 겹치면 회전·교체·삭제·순서 이동이 전부 `it.id === id` 로 대상을
+ * 고르는데, 그 비교가 두 항목을 동시에 맞혀 버려 엉뚱한 사진이 같이
+ * 회전/삭제되거나, 원본 저장 시 같은 Storage 경로(`{sourceId}/{item.id}.ext`)
+ * 에 서로 다른 사진이 겹쳐 올라가 한쪽이 조용히 사라진다.
+ * crypto.randomUUID() 는 세션이 바뀌어도, 몇 번을 복원해도 절대 겹치지
+ * 않으므로 이 문제 자체가 생기지 않는다.
+ */
+function nextId(): string {
+  return `item-${crypto.randomUUID()}`;
+}
+
+/**
+ * 보관함/임시저장에서 불러온 항목들 중 id 가 겹치는 게 있으면(바로 위 주석의
+ * 예전 버그로 이미 그렇게 저장된 문서가 있을 수 있다) 메모리 안에서만 새
+ * id 를 매겨 푼다. 저장돼 있는 원본 행·Storage 파일은 전혀 건드리지 않는다
+ * — 화면에 올라온 뒤부터만 안전하면 된다. 맨 처음 나온 항목의 id 는 그대로
+ * 두고, 그 뒤에 또 나오는 항목만 새 id 로 바꾼다(순서는 그대로 유지).
+ */
+function dedupeItemIds<T extends DocItem>(items: T[]): T[] {
+  const seen = new Set<string>();
+  let changed = false;
+  const next = items.map((it) => {
+    if (!seen.has(it.id)) {
+      seen.add(it.id);
+      return it;
+    }
+    changed = true;
+    const freshId = nextId();
+    seen.add(freshId);
+    return { ...it, id: freshId };
+  });
+  return changed ? next : items;
 }
 
 /**
@@ -349,7 +383,9 @@ export default function DocEditor({
       );
       setFileName(source.fileName);
       setAuthor(source.author);
-      setItems(restored);
+      // dedupeItemIds: 이 문서가 예전 id 중복 버그로 저장된 거라면 화면에
+      // 올리기 전에 메모리에서만 바로잡는다(저장된 행·파일은 안 건드린다).
+      setItems(dedupeItemIds(restored));
       onRestoreMeta?.(source.meta);
       setEditingSource({ id: source.id, lineageId: source.lineageId });
       setNotice(
@@ -475,7 +511,7 @@ export default function DocEditor({
       );
       setFileName(payload.fileName ?? "");
       setAuthor(payload.author ?? "");
-      setItems(restored);
+      setItems(dedupeItemIds(restored));
       onRestoreMeta?.(payload.meta ?? {});
       setDraftMeta(null);
       setNotice("임시저장한 내용을 불러왔습니다.");
@@ -811,11 +847,15 @@ export default function DocEditor({
     /*
      * "수정 가능한 원본"(사진 + 모든 입력값)을 PDF 와 별개로 저장한다. 03
      * (supabase/docgen/03-docgen-sources.sql)을 아직 안 돌린 프로젝트에서는
-     * 테이블이 없어 이 호출이 그냥 실패한다 — 조용히 넘긴다. PDF 보관은 03 과
-     * 무관하게 그대로 되어야 하므로, 실패해도 사용자에게 경고를 띄우지 않고
-     * link 없이(= 이 버전엔 [수정] 버튼이 안 뜨는 채로) 계속 진행한다.
+     * 테이블이 없어 이 호출이 그냥 실패한다. PDF 보관은 03 과 무관하게 그대로
+     * 되어야 하므로 이 실패가 PDF/보관함 저장 자체를 막지는 않지만(link 없이
+     * 계속 진행 — 이 버전엔 [수정] 버튼이 안 뜬다), 예전처럼 console.error 로만
+     * 남기고 조용히 넘기지는 않는다 — "보관함에 저장했습니다"만 보고 원본도
+     * 같이 저장된 줄 알았는데 나중에 [수정]이 없어서 당황하는 걸 막으려면,
+     * 실패했다는 사실과 이유를 그 자리에서 바로 알려야 한다.
      */
     let sourceLink: { lineageId: string; sourceId: string } | undefined;
+    let sourceSaveErrorMsg: string | null = null;
     try {
       const saved = await saveDocumentSource({
         mode,
@@ -831,6 +871,7 @@ export default function DocEditor({
       // 없지만) 이어서 그 버전을 고치는 셈이 되도록 갱신해 둔다.
       setEditingSource({ id: saved.id, lineageId: saved.lineageId });
     } catch (e) {
+      sourceSaveErrorMsg = e instanceof Error ? e.message : "원본 저장에 실패했습니다.";
       console.error("원본 저장 실패(03-docgen-sources.sql 미실행일 수 있음):", e);
     }
 
@@ -863,6 +904,14 @@ export default function DocEditor({
             : "PDF 를 내려받고 보관함에도 저장했습니다."
           : "보관함에 저장했습니다. (장치에는 다운로드하지 않았습니다)",
       );
+      // notice(성공)와 error(원본 저장 실패)는 서로 다른 배너라 동시에 떠도
+      // 섞이지 않는다 — PDF/보관함은 됐지만 [수정]용 원본만 안 됐다는 걸
+      // 성공 메시지에 묻어가지 않게 분리해서 보여준다.
+      if (sourceSaveErrorMsg) {
+        setError(
+          `PDF·보관함 저장은 됐지만, 나중에 고칠 수 있는 원본 저장에는 실패했습니다: ${sourceSaveErrorMsg} (이 문서는 [수정]으로 다시 열 수 없습니다)`,
+        );
+      }
     } catch (e) {
       // 저장 실패를 조용히 넘기면 "저장된 줄 알았는데 없다"가 된다 — 반드시 알린다.
       const msg = e instanceof Error ? e.message : "보관함 저장에 실패했습니다.";
