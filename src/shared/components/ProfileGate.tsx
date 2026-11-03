@@ -45,7 +45,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [branches, setBranches] = useState<string[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
-  /** 미리 채워 둘 값 — 지사만 이미 골라 둔 사람(설비관리에서)은 지사가 채워져 있다 */
+  /** 미리 채워 둘 값 — 지사만 이미 골라 둔 사람(오버홀 공정관리에서)은 지사가 채워져 있다 */
   const [draftBranch, setDraftBranch] = useState("");
   const [draftDept, setDraftDept] = useState("");
   const [open, setOpen] = useState(false);

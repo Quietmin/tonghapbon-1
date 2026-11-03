@@ -11,7 +11,7 @@ import {
 import { BranchGrid } from "./BranchControls";
 
 /**
- * PC 처음 화면 — 선택한 지사의 설비관리 현황 대시보드.
+ * PC 처음 화면 — 선택한 지사의 오버홀 공정 현황 대시보드.
  *
  * 구성: 머리줄(지사·회차·기간·D-day) → 지표 카드 4개 → 분야별 진척 / 지연 위험 작업 →
  * 최근 실적 입력 / 챕터 바로가기. 폰 첫 화면은 page.tsx 의 별도 레이아웃이 맡는다.
@@ -284,7 +284,7 @@ function Kpis({
 }
 
 /**
- * 설비관리 공정 현황만 — 유지보수 부서의 첫 화면에서 현황 영역 아래에 붙인다.
+ * 오버홀 공정 현황만 — 유지보수 부서의 첫 화면에서 현황 영역 아래에 붙인다.
  * 지사를 안 골랐거나 데이터를 못 읽은 경우는 그리지 않는다(위의 현황 영역이 이미 안내한다).
  */
 export async function EquipmentSection() {
@@ -297,7 +297,7 @@ export async function EquipmentSection() {
       <Card lift={false} className="p-0">
         <EmptyState
           icon="analytics"
-          title="설비관리 공정 현황이 아직 없어요"
+          title="오버홀 공정 현황이 아직 없어요"
           desc="작업·공정의 엑셀 등록에서 수량산출서를 올리면 공정률과 지연 위험이 여기에 나타납니다."
           action={
             <Link
@@ -335,7 +335,7 @@ export default async function HomeDashboard() {
       <div className="space-y-gutter">
         <Header
           title="지사 선택"
-          sub="유지보수 업무는 지사별로 따로 운영됩니다. 소속 지사를 고르면 그 지사의 설비관리 현황이 처음 화면에 보입니다. 한 번 고르면 기억되고, 언제든 바꿀 수 있습니다."
+          sub="유지보수 업무는 지사별로 따로 운영됩니다. 소속 지사를 고르면 그 지사의 오버홀 공정 현황이 처음 화면에 보입니다. 한 번 고르면 기억되고, 언제든 바꿀 수 있습니다."
         />
         <BranchGrid />
         <Shortcuts />

@@ -15,7 +15,7 @@ import { isDepartment, type Department } from "./departments";
  * 서버 전용이다 (next/headers).
  */
 
-/** 내 부서 쿠키. 지사는 설비관리와 같은 oh_branch 쿠키를 그대로 쓴다 (activeBranch.ts) */
+/** 내 부서 쿠키. 지사는 오버홀 공정관리와 같은 oh_branch 쿠키를 그대로 쓴다 (activeBranch.ts) */
 export const DEPT_COOKIE = "oh_dept";
 export const DEPT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 

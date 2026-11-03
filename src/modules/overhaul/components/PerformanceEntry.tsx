@@ -6,6 +6,7 @@ import { taskProgress, taskStatus } from "../lib/progress";
 import { compressImage, formatBytes } from "../lib/imageCompress";
 import type { OverhaulTask, OverhaulEntry } from "../lib/repo";
 import { invalidateEntryHistory } from "./EntryHistoryPreview";
+import PhotoViewer, { type ViewerPhoto } from "./PhotoViewer";
 
 /**
  * 실적 입력 — 일자별 완료수량·작업내용·지연사유·분해 전후 사진을 기록하고,
@@ -67,13 +68,18 @@ const MAX_NEW_BYTES = 3_500_000;
 function PhotoGroup({
   label,
   items,
+  others,
   onChange,
   onError,
+  onOpen,
 }: {
   label: string;
   items: PhotoItem[];
+  /** 같은 작업의 다른 날짜에 올린 같은 칸 사진 — 보기만 한다(지우려면 그 날짜를 불러온다) */
+  others: ViewerPhoto[];
   onChange: (next: PhotoItem[]) => void;
   onError: (msg: string | null) => void;
+  onOpen: (key: string) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [working, setWorking] = useState<string | null>(null);
@@ -116,6 +122,7 @@ function PhotoGroup({
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-xs font-bold text-on-surface">{label}</span>
         <span className="text-xs text-on-surface-variant">
+          {others.length > 0 && `다른 날짜 ${others.length}장 · 이 날짜 `}
           {items.length}/{MAX_PER_SLOT}장
         </span>
       </div>
@@ -134,10 +141,27 @@ function PhotoGroup({
       />
 
       <div className="grid grid-cols-3 gap-2">
+        {others.map((ph) => (
+          <button
+            key={ph.key}
+            type="button"
+            onClick={() => onOpen(ph.key)}
+            title={`${ph.date}에 올린 사진 — 빼려면 그 날짜를 불러오세요`}
+            className="relative aspect-[4/3] rounded-lg overflow-hidden bg-surface-container-low border border-dashed border-outline-variant cursor-zoom-in"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ph.src} alt={`${label} ${ph.date}`} loading="lazy" className="w-full h-full object-cover" />
+            <span className="absolute top-1 left-1 px-1.5 rounded bg-black/60 text-white text-xs font-mono-data">
+              {ph.date.slice(5).replace("-", ".")}
+            </span>
+          </button>
+        ))}
         {items.map((it) => (
           <div key={it.key} className="relative group aspect-[4/3] rounded-lg overflow-hidden bg-surface-container-low">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={thumbOf(it)} alt={label} loading="lazy" className="w-full h-full object-cover" />
+            <button type="button" onClick={() => onOpen(it.key)} className="w-full h-full cursor-zoom-in">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={thumbOf(it)} alt={label} loading="lazy" className="w-full h-full object-cover" />
+            </button>
             <button
               type="button"
               onClick={() => remove(it.key)}
@@ -149,7 +173,7 @@ function PhotoGroup({
               </span>
             </button>
             {it.note && (
-              <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-xs text-center py-0.5">
+              <span className="pointer-events-none absolute bottom-0 left-0 right-0 bg-black/55 text-white text-xs text-center py-0.5">
                 {it.note}
               </span>
             )}
@@ -184,6 +208,7 @@ function HistoryTimeline({
   activeDate,
   onPick,
   onDelete,
+  onView,
 }: {
   entries: OverhaulEntry[];
   unit: string;
@@ -191,6 +216,7 @@ function HistoryTimeline({
   activeDate: string;
   onPick: (date: string) => void;
   onDelete: (date: string) => void;
+  onView: (key: string) => void;
 }) {
   // 날짜 오름차순으로 훑어야 "그날 증가분"을 직전 누적과의 차이로 구할 수 있다
   const ascending = useMemo(() => [...entries].sort((a, b) => (a.entry_date < b.entry_date ? -1 : 1)), [entries]);
@@ -224,7 +250,9 @@ function HistoryTimeline({
           <Icon name="history" className="text-base text-primary" /> 정비 이력
           <span className="text-xs font-normal text-on-surface-variant">{entries.length}건</span>
         </h2>
-        <span className="text-xs text-on-surface-variant">행을 클릭하면 해당 일자를 불러와 수정합니다</span>
+        <span className="text-xs text-on-surface-variant">
+          행을 클릭하면 해당 일자를 불러와 수정합니다 · 사진을 누르면 크게 봅니다
+        </span>
       </div>
       <div className="relative pl-5">
         <div className="absolute left-[7px] top-1 bottom-1 w-px bg-border-subtle" />
@@ -302,19 +330,29 @@ function HistoryTimeline({
                   )}
                   {e.photos.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {/* 사진은 목록 응답에 없다 — 썸네일이 id로 한 장씩 받아 온다 */}
+                      {/* 사진은 목록 응답에 없다 — 썸네일이 id로 한 장씩 받아 온다.
+                          행 전체가 버튼이라 안에 버튼을 못 둔다 — 삭제 아이콘처럼 span 으로 누름을 받는다 */}
                       {e.photos.map((ph) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <span
                           key={ph.id}
-                          src={savedPhotoUrl(ph.id)}
-                          alt={ph.slot === "before" ? "분해 전" : "분해 후"}
-                          title={ph.slot === "before" ? "분해 전" : "분해 후"}
-                          loading="lazy"
-                          className={`w-16 h-12 object-cover rounded-lg border-2 ${
-                            ph.slot === "before" ? "border-primary/40" : "border-status-success/40"
-                          }`}
-                        />
+                          role="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            onView(`p${ph.id}`);
+                          }}
+                          className="cursor-zoom-in"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={savedPhotoUrl(ph.id)}
+                            alt={ph.slot === "before" ? "분해 전" : "분해 후"}
+                            title={ph.slot === "before" ? "분해 전" : "분해 후"}
+                            loading="lazy"
+                            className={`w-16 h-12 object-cover rounded-lg border-2 ${
+                              ph.slot === "before" ? "border-primary/40" : "border-status-success/40"
+                            }`}
+                          />
+                        </span>
                       ))}
                     </div>
                   )}
@@ -407,6 +445,28 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ key?: string; compare?: boolean } | null>(null);
+
+  // 작업 하나의 분해 전·후 사진 전부 — 분해 전은 첫날, 분해 후는 며칠 뒤에 올리는 게 보통이라
+  // 날짜를 넘나들어 모아 보여 준다. 지금 폼의 날짜는 저장 전 상태(새로 고른 사진·뺀 사진)를 따른다.
+  const allPhotos = useMemo<ViewerPhoto[]>(() => {
+    if (!form) return [];
+    const list: ViewerPhoto[] = [];
+    for (const e of entries) {
+      if (e.entry_date === form.date) continue;
+      for (const slot of ["before", "after"] as const) {
+        for (const it of toItems(e, slot)) list.push({ key: it.key, src: thumbOf(it), slot, date: e.entry_date });
+      }
+    }
+    for (const slot of ["before", "after"] as const) {
+      for (const it of form[slot]) list.push({ key: it.key, src: thumbOf(it), slot, date: form.date });
+    }
+    // 분해 전 → 분해 후, 각각 날짜 순 (정렬이 안정적이라 같은 날짜 안의 순서는 그대로)
+    const slotOrder = (p: ViewerPhoto) => (p.slot === "before" ? 0 : 1);
+    return list.sort((a, b) => slotOrder(a) - slotOrder(b) || a.date.localeCompare(b.date));
+  }, [entries, form]);
+  const othersOf = (slot: "before" | "after") =>
+    allPhotos.filter((p) => p.slot === slot && p.date !== form?.date);
 
   const priorCumulative = useCallback((dateStr: string) => priorCumulativeOf(entries, dateStr), [entries]);
   const buildForm = useCallback((dateStr: string) => buildFormOf(entries, dateStr), [entries]);
@@ -649,30 +709,45 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
         </div>
 
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
-            분해 전 / 후 사진
-            <span className="ml-2 text-xs font-normal text-on-surface-variant">
-              칸마다 여러 장 넣을 수 있습니다 · 고르면 자동으로 줄여서 올립니다
-            </span>
-          </label>
+          <div className="flex items-start justify-between gap-3">
+            <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+              분해 전 / 후 사진
+              <span className="ml-2 text-xs font-normal text-on-surface-variant">
+                다른 날짜에 올린 사진도 함께 보입니다 · 누르면 크게 봅니다 · 고르면 자동으로 줄여서 올립니다
+              </span>
+            </label>
+            {allPhotos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setViewer({ compare: true })}
+                className="shrink-0 text-xs font-semibold text-primary flex items-center gap-1 hover:underline"
+              >
+                <Icon name="compare" className="text-sm" /> 전·후 비교
+              </button>
+            )}
+          </div>
           <div className="flex gap-4 mt-2">
             <PhotoGroup
               label="분해 전 (BEFORE)"
               items={form.before}
+              others={othersOf("before")}
               onChange={(v) => {
                 setForm({ ...form, before: v });
                 setSaved(false);
               }}
               onError={setSaveError}
+              onOpen={(key) => setViewer({ key })}
             />
             <PhotoGroup
               label="분해 후 (AFTER)"
               items={form.after}
+              others={othersOf("after")}
               onChange={(v) => {
                 setForm({ ...form, after: v });
                 setSaved(false);
               }}
               onError={setSaveError}
+              onOpen={(key) => setViewer({ key })}
             />
           </div>
         </div>
@@ -724,7 +799,17 @@ export function EntryPanel({ taskId, onChanged }: { taskId: string; onChanged?: 
             if (d === form.date && fresh) setForm(buildFormOf(fresh, d));
           })();
         }}
+        onView={(key) => setViewer({ key })}
       />
+
+      {viewer && (
+        <PhotoViewer
+          photos={allPhotos}
+          startKey={viewer.key}
+          startCompare={viewer.compare}
+          onClose={() => setViewer(null)}
+        />
+      )}
 
       <p className="text-xs text-on-surface-variant flex items-start gap-2 px-1">
         <Icon name="info" className="text-sm mt-0.5" />

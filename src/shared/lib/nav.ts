@@ -35,7 +35,7 @@ export interface NavGroup {
    * 어디서 보든 같은 색으로 보인다. 색 규칙 자체는 ui.tsx 의 ACCENT_STYLE 참고.
    */
   accent: "primary" | "tertiary";
-  /** 모바일 하단바용 짧은 이름 (NavItem.short 와 같은 이유) */
+  /** 모바일 하단바용 짧은 이름 — 이름이 길어 하단 탭 한 칸에 안 들어가는 챕터만 둔다 */
   short?: string;
   icon: string;
   /** 그룹 대표 경로 (그룹 헤더 클릭 시 이동하는 챕터 첫 화면) */
@@ -47,15 +47,15 @@ export interface NavGroup {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    // 설비관리 = 기존 "오버홀 공정관리" 챕터 (이름만 바꿈).
+    // 오버홀 공정관리 챕터 (한때 "설비관리"로 불렀다가 원래 이름으로 되돌렸다).
     // 설비 마스터를 기준 데이터로 두고, 그 설비들의 오버홀을
     // 계약 전(보수계획 수립) → 계약 후(공정관리) 순서로 관리한다.
     // 지사별 독립 운영 — /overhaul은 지사 관문(BranchGate)을 지나고,
     // /equipment는 전 지사 개요에서 지사를 고른다 (같은 oh_branch 쿠키를 공유).
     key: "equipment",
-    label: "설비관리",
+    label: "오버홀 공정관리",
     accent: "primary",
-    short: "설비",
+    short: "공정관리",
     icon: "precision_manufacturing",
     root: "/equipment",
     desc: "설비 마스터를 기준으로 오버홀을 관리합니다 — 계약 전 보수계획 수립부터 계약 후 공정·실적 기록까지.",
@@ -80,7 +80,6 @@ export const NAV_GROUPS: NavGroup[] = [
     key: "manual",
     label: "매뉴얼관리",
     accent: "primary",
-    short: "매뉴얼",
     icon: "menu_book",
     root: "/manual",
     desc: "보관된 매뉴얼을 지사·분야·작성자·파일명으로 찾아보고, 새 매뉴얼을 작성합니다.",
@@ -98,7 +97,6 @@ export const NAV_GROUPS: NavGroup[] = [
     // 기록이라 주황으로 갈랐지만 이 탭만 선택했을 때 튀어 보인다는 의견에 따라 맞췄다.
     // (화면 본문의 고장보고서 조회·작성 화면은 아직 주황 강조색을 그대로 쓴다)
     accent: "primary",
-    short: "고장",
     icon: "report",
     root: "/failure",
     desc: "지난 고장 보고서를 지사·분야·설비명·고장내용으로 찾아보고, 새 보고서를 등록합니다.",
@@ -113,9 +111,9 @@ export const NAV_GROUPS: NavGroup[] = [
     // 네 번째 챕터 — 현황을 조회하고 등록한다. 화면 내용은 아직 정해지는 중이라 지금은 뼈대만 있다
     // (/status, /status/new). 챕터 첫 화면이 곧 조회다 — 매뉴얼관리·고장관리와 같은 구조.
     key: "status",
-    label: "현황관리",
+    label: "설비 현황 관리",
     accent: "primary",
-    short: "현황",
+    short: "설비현황",
     icon: "assessment",
     root: "/status",
     desc: "현황을 조회하고, 새 현황을 등록합니다.",
@@ -132,7 +130,7 @@ export const NAV_GROUPS: NavGroup[] = [
  * 작은 링크 줄로 남겨 둔다 — 나중에 정식 위치가 정해지면 옮긴다.
  * (고장이력 대시보드 /failure/dashboard 와 정비 챗봇 전체화면 /chatbot 은 아직 빈 화면이라
  * 링크를 뺐다. 경로는 살아 있으니 화면이 완성되면 해당 챕터 메뉴에 정식으로 올린다.
- * 오버홀 공정관리는 설비관리 챕터의 정식 메뉴가 되어 여기서 뺐다)
+ * 오버홀 공정 화면들은 오버홀 공정관리 챕터의 정식 메뉴가 되어 여기서 뺐다)
  */
 export const HIDDEN_ROUTES: NavItem[] = [
 ];
@@ -144,7 +142,7 @@ export function isActive(pathname: string, item: NavItem): boolean {
 
 /**
  * 지금 보고 있는 화면이 속한 챕터 — 대표 경로(root) 밖의 하위 메뉴까지 본다
- * (예: 설비관리 챕터의 /overhaul/* 화면들). 사이드바(Sidebar.tsx)와 모바일
+ * (예: 오버홀 공정관리 챕터의 /overhaul/* 화면들). 사이드바(Sidebar.tsx)와 모바일
  * 챕터 서브내비(ChapterSubNav.tsx)가 같은 판정을 쓰도록 여기 하나로 둔다.
  */
 export function activeGroup(pathname: string): NavGroup | null {
