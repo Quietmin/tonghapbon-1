@@ -334,6 +334,31 @@ export default function EquipmentCrud({
     }
   };
 
+  // 지사 설비 전체 삭제(초기화) — 엑셀을 새로 올려 처음부터 구성하고 싶을 때.
+  // 분야 필터와 무관하게 이 지사 전체가 지워지므로, 두 번 물어서 실수를 막는다.
+  const resetAll = async () => {
+    if (!items?.length) return;
+    const deviceTotal = items.reduce((n, e) => n + e.device_count, 0);
+    const msg =
+      `이 지사의 설비 ${items.length}개를 모두 삭제할까요?` +
+      (deviceTotal ? ` 딸린 기기·태그 ${deviceTotal}개도 함께 지워집니다.` : "") +
+      `\n보수계획·고장이력·작업 데이터는 남지만, 설비와의 연결은 끊어집니다.`;
+    if (!confirm(msg)) return;
+    if (!confirm("정말 초기화할까요? 되돌릴 수 없습니다.")) return;
+    setBusy(true);
+    try {
+      const json = await (await fetch("/api/equipment?all=1", { method: "DELETE" })).json();
+      if (!json.ok) throw new Error(json.error ?? "초기화에 실패했습니다.");
+      setSelectedId(null);
+      setEditing(null);
+      changed();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const removeDevice = async (d: Device) => {
     if (!confirm(`태그 "${d.tag}"를 삭제할까요?`)) return;
     setBusy(true);
@@ -366,10 +391,24 @@ export default function EquipmentCrud({
           <Icon name="precision_manufacturing" className="text-base text-primary" />
           설비 목록
         </h2>
-        <Button onClick={() => setEditing("new")} disabled={editing === "new"}>
-          <Icon name="add" className="text-base" />
-          설비 추가
-        </Button>
+        <span className="flex items-center gap-2">
+          {!!items?.length && (
+            <Button
+              variant="ghost"
+              onClick={() => void resetAll()}
+              disabled={busy}
+              title="이 지사의 설비·기기를 모두 삭제하고 처음부터 다시 구성합니다"
+              className="text-error hover:bg-error/10"
+            >
+              <Icon name="delete_sweep" className="text-base" />
+              전체 삭제
+            </Button>
+          )}
+          <Button onClick={() => setEditing("new")} disabled={editing === "new"}>
+            <Icon name="add" className="text-base" />
+            설비 추가
+          </Button>
+        </span>
       </div>
 
       {error && (

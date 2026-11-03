@@ -5,6 +5,7 @@ import {
   createEquipment,
   updateEquipment,
   deleteEquipment,
+  deleteAllEquipment,
   type EquipmentPatch,
 } from "@/shared/lib/equipment";
 
@@ -84,7 +85,20 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const id = new URL(req.url).searchParams.get("id");
+    const sp = new URL(req.url).searchParams;
+
+    // ?all=1 — 활성 지사의 설비 전체 삭제(초기화). 지사는 쿠키에서만 읽는다 —
+    // 파라미터로 지사를 받으면 다른 지사를 실수로(또는 장난으로) 비울 수 있다.
+    if (sp.get("all") === "1") {
+      const branch = await resolveBranch();
+      if (!branch) {
+        return NextResponse.json({ ok: false, error: "지사를 먼저 선택하세요." }, { status: 400 });
+      }
+      const removed = await deleteAllEquipment(branch);
+      return NextResponse.json({ ok: true, removed });
+    }
+
+    const id = sp.get("id");
     if (!id) {
       return NextResponse.json({ ok: false, error: "설비 id가 없습니다." }, { status: 400 });
     }
