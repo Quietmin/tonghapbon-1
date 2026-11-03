@@ -67,7 +67,7 @@ export default function ProjectBar() {
       : "계약기간 미설정";
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border-subtle bg-surface-container-low px-4 py-2.5">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border-subtle bg-surface-container-low px-4 py-2.5 print:hidden">
       <span className="flex items-center gap-1.5 text-label-caps uppercase text-on-surface-variant">
         <Icon name="engineering" className="text-base" />
         회차
