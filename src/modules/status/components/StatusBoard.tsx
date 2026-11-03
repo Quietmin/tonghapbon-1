@@ -96,12 +96,11 @@ export default function StatusBoard({
 
   return (
     <>
-      {/* 상태 칩 — 건수 + 누르면 그 상태만. 폰 폭에서는 5개(전체 포함)가 줄바꿈
-          없이 한 줄에 들어가도록 가로 스크롤로 두고(no-scrollbar 로 스크롤바만
-          숨긴다 — 넘기는 동작 자체는 그대로 된다), md 이상에서는 넓어진 폭에
-          맞게 다시 줄바꿈을 허용한다. */}
+      {/* 상태 칩 — 건수 + 누르면 그 상태만. 폰 폭에서는 5개(전체 포함)가 가로 스크롤
+          없이 한눈에 들어오도록 3칸 그리드로 두 줄(전체·미완료·조치 중 / 조치 예정·조치
+          완료)에 나눠 담고, md 이상은 넓어진 폭에 맞게 한 줄로 이어 붙인다. */}
       <div
-        className="flex flex-nowrap md:flex-wrap gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0"
+        className="grid grid-cols-3 gap-2 md:flex md:flex-wrap"
         role="group"
         aria-label="조치 상태별 보기"
       >
@@ -116,7 +115,7 @@ export default function StatusBoard({
               type="button"
               aria-pressed={on}
               onClick={() => setFilter("status", c.key)}
-              className={`shrink-0 px-3.5 min-h-10 rounded-full text-sm font-bold border whitespace-nowrap transition-colors ${
+              className={`md:shrink-0 w-full md:w-auto px-3.5 min-h-10 rounded-full text-sm font-bold border whitespace-nowrap transition-colors ${
                 on
                   ? "bg-primary text-on-primary border-primary"
                   : "bg-surface-container-lowest text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
@@ -198,7 +197,7 @@ export default function StatusBoard({
             desc={
               hasFilter || filters.status
                 ? "조건을 바꾸거나 모두 해제해 보세요."
-                : "운영 근무자가 현황 등록에서 이슈를 올리면 여기에 나타납니다."
+                : "운영 근무자가 현황 작성에서 이슈를 올리면 여기에 나타납니다."
             }
             action={
               !hasFilter && !filters.status ? (
@@ -207,7 +206,7 @@ export default function StatusBoard({
                   className="px-4 py-2.5 rounded-sm font-bold text-sm inline-flex items-center gap-2 bg-primary text-on-primary hover:opacity-90"
                 >
                   <Icon name="edit_note" className="text-base" />
-                  현황 등록하기
+                  현황 작성하기
                 </Link>
               ) : undefined
             }

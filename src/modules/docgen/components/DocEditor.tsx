@@ -1017,8 +1017,7 @@ export default function DocEditor({
     <>
       <ScreenHeader
         icon="edit_note"
-        // 고장보고서만 "등록"이라 부른다(메뉴 이름과 같게). 사진대장·매뉴얼은 그대로 "작성"
-        title={`${MODE_TITLES[mode]} ${mode === "fault" ? "등록" : "작성"}`}
+        title={`${MODE_TITLES[mode]} 작성`}
         desc={`사진을 추가하고 설명을 적으면 A4 규격 ${label} 문서를 자동으로 구성합니다. 최대 ${MAX_PHOTOS}장.`}
         // 모바일은 타이틀만 — 빈 배열이면 ScreenHeader가 desc·bullets 모두 생략한다
         bullets={[]}
@@ -1268,13 +1267,24 @@ export default function DocEditor({
                     </div>
 
                     {"kind" in item ? (
-                      <AutoTextarea
-                        value={item.body}
-                        onChange={(v) => updateText(item.id, v)}
-                        minRows={3}
-                        placeholder="칸 하나를 통째로 쓰는 텍스트입니다."
-                        className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none"
-                      />
+                      <div className="flex items-start gap-1.5 px-1 pt-1">
+                        <VoiceDictationButton
+                          label="텍스트 칸 음성 입력"
+                          className="mt-1"
+                          onResult={(text) => {
+                            const prev = item.body;
+                            const sep = prev && !/\s$/.test(prev) ? " " : "";
+                            updateText(item.id, prev + sep + text);
+                          }}
+                        />
+                        <AutoTextarea
+                          value={item.body}
+                          onChange={(v) => updateText(item.id, v)}
+                          minRows={3}
+                          placeholder="칸 하나를 통째로 쓰는 텍스트입니다."
+                          className="w-full px-2 py-2 bg-surface-container text-sm text-on-surface outline-none"
+                        />
+                      </div>
                     ) : (
                       <>
                         <div className="aspect-4/3 bg-surface-container flex items-center justify-center overflow-hidden">

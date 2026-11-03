@@ -14,7 +14,7 @@ import StatusCountCards from "./StatusCountCards";
 /**
  * PC 처음 화면 — 내 부서에 따라 화면이 갈린다.
  *
- * - 운영부: 현황 등록 바로가기 + 내 지사의 현황 상태별 건수 + 최근 등록한 현황
+ * - 운영부: 현황 작성 바로가기 + 내 지사의 현황 상태별 건수 + 최근 등록한 현황
  * - 유지보수(계전부·기계부·공무부): 같은 구성에 자기 부서 데이터만 — 조치 필요 건수·목록,
  *   추후 조치 예정 일정, 그 아래 설비관리 공정 현황
  * - 부서를 아직 안 골랐으면(팝업이 뜨는 상태) 예전 설비관리 대시보드를 그대로 보여 준다
@@ -77,7 +77,7 @@ async function OperationsHome({ branch }: { branch: string | null }) {
           <Icon name="edit_note" className="text-3xl" />
         </span>
         <span className="min-w-0">
-          <span className="block text-headline-md">현황 등록</span>
+          <span className="block text-headline-md">현황 작성</span>
         </span>
         <Icon name="arrow_forward" className="ml-auto text-3xl shrink-0" />
       </Link>
@@ -90,7 +90,7 @@ async function OperationsHome({ branch }: { branch: string | null }) {
           <IssueListPanel
             title="현황 목록"
             rows={summary.list}
-            emptyText="아직 등록된 현황이 없습니다. 위의 현황 등록으로 첫 이슈를 올려 보세요."
+            emptyText="아직 등록된 현황이 없습니다. 위의 현황 작성으로 첫 이슈를 올려 보세요."
             moreLabel="현황 조회"
           />
         </>

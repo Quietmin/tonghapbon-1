@@ -133,12 +133,14 @@ export default function PdfPreviewModal({
         "둘 중 하나가 visible 이 아니면 나머지도 auto 로 본다"는 규칙이 있어
         overflow-x 도 조용히 스크롤 가능해진다 — 캔버스 폭이 반올림 등으로
         컨테이너보다 1px 만 넘어도 좌우로 밀리는 "흔들림"이 생긴다. 명시적으로
-        hidden 을 줘서 세로로만 고정한다(터치 패닝도 pan-y 로 한 번 더 막는다).
+        hidden 을 줘서 세로로만 고정한다. 터치는 세로 스크롤(pan-y)과 두 손가락
+        확대(pinch-zoom)만 허용하고 한 손가락 좌우 스와이프만 막는다 — pan-y 만 쓰면
+        핀치 줌 자체가 막혀 모바일에서 PDF를 확대해 볼 수 없었다.
       */}
       <div
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-surface-container"
-        style={{ touchAction: "pan-y" }}
+        style={{ touchAction: "pan-y pinch-zoom" }}
       >
         {status === "loading" && (
           <LoadingState label="PDF 불러오는 중…" rows={3} />

@@ -36,7 +36,7 @@ const EMPTY: FormState = {
 };
 
 /**
- * 현황 등록 — 운영 근무자가 이슈가 생긴 설비를 알리는 화면.
+ * 현황 작성 — 운영 근무자가 이슈가 생긴 설비를 알리는 화면.
  * 설비명·이슈 내용·담당부서·작성자(+지사)를 적어 등록하면 현황 조회에 '미완료'로
  * 올라가고, 유지보수 담당자가 거기서 조치 상태를 갱신한다. 폰에서도 쓰므로 한 열로 쌓는다.
  *
@@ -199,7 +199,7 @@ export default function StatusRegisterForm({
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       <Card lift={false} className="p-6 flex flex-col gap-4">
         <div className="flex justify-end">
-          <VoiceSequenceFill fields={voiceFields} title="음성으로 현황 등록하기" />
+          <VoiceSequenceFill fields={voiceFields} title="음성으로 현황 작성하기" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
@@ -302,7 +302,7 @@ export default function StatusRegisterForm({
 
       <div className="flex justify-end pb-6">
         <Button type="submit" variant="primary" disabled={saving} className="max-sm:w-full">
-          {saving ? "등록 중…" : "현황 등록"}
+          {saving ? "작성 중…" : "현황 작성"}
         </Button>
       </div>
     </form>
