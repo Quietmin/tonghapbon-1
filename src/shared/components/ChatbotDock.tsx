@@ -200,52 +200,75 @@ function useDraggablePosition() {
     return () => window.removeEventListener("resize", onResize);
   }, [clamp]);
 
-  const onPointerDown = useCallback((e: ReactPointerEvent<HTMLElement>) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return; // 마우스는 왼쪽 버튼만
-    dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: posRef.current.x, baseY: posRef.current.y, moved: false };
-    // 여기서 바로 포인터를 잡지 않는다 — setPointerCapture 를 걸면 그 뒤의 click
-    // 이벤트까지 이 캡처한 요소(바깥 div) 쪽으로 다시 겨냥돼, 안쪽 버튼을 눌러도
-    // 버튼의 onClick 이 전혀 안 불린다(그냥 누르기=클릭까지 드래그로 먹혀버리던
-    // 원인). 문턱을 넘겨 실제로 끄는 게 확정된 순간(onPointerMove)에만 잡는다.
-  }, []);
-
-  const onPointerMove = useCallback(
+  /*
+   * 포인터 캡처(setPointerCapture) 두 가지를 다 시도해 봤는데 둘 다 문제가 있었다.
+   *   - pointerdown 에서 바로 걸면: 끌기는 잘 되는데(커서가 작은 버튼 56~112px
+   *     밖으로 나가도 계속 쫓아간다), 그냥 클릭했을 때도 캡처가 걸려 있어서 뒤이어
+   *     오는 mouseup/click 이(브라우저가 포인터 캡처 중엔 마우스 호환 이벤트도 같이
+   *     캡처한 요소로 겨냥한다) 안쪽 버튼이 아니라 이 바깥 div 로 가 버린다 — 버튼의
+   *     onClick 이 전혀 안 불리는 원인이었다. pointerup 핸들러 안에서 즉시
+   *     releasePointerCapture 를 불러도 소용없었다 — mouseup 의 타겟은 이미 그 전에
+   *     정해진 뒤라 너무 늦다(실제로 재현·확인함).
+   *   - 문턱을 넘을 때까지 캡처를 미루면: 클릭은 멀쩡한데, 빠르게 끌 때 첫
+   *     pointermove 가 오기도 전에 커서가 이미 버튼 밖으로 나가 버리는 경우가 있어
+   *     (버튼이 작아서) 그 뒤로 pointermove 를 하나도 못 받고 드래그가 멈춰 버렸다.
+   *
+   * 그래서 캡처 자체를 쓰지 않는다. 대신 pointerdown 이 일어난 그 순간 window 에
+   * 직접 pointermove/pointerup 리스너를 달아 포인터를 쫓는다 — 커서가 어디로
+   * 가든(버튼 밖이든 화면 끝이든) window 는 계속 이벤트를 받으므로 추적이 끊기지
+   * 않고, click 이벤트의 타겟은 애초에 전혀 건드리지 않으니(캡처를 안 거니까)
+   * 그냥 누르기는 항상 원래 버튼으로 간다.
+   */
+  const onPointerDown = useCallback(
     (e: ReactPointerEvent<HTMLElement>) => {
-      const st = dragRef.current;
-      if (!st) return;
-      const dx = e.clientX - st.startX;
-      const dy = e.clientY - st.startY;
-      if (!st.moved && Math.hypot(dx, dy) < DRAG_CLICK_THRESHOLD) return;
-      if (!st.moved) e.currentTarget.setPointerCapture?.(e.pointerId);
-      st.moved = true;
-      const next = clamp(st.baseX + dx, st.baseY + dy);
-      lastPosRef.current = next;
-      setPos(next);
+      if (e.pointerType === "mouse" && e.button !== 0) return; // 마우스는 왼쪽 버튼만
+      const pointerId = e.pointerId;
+      dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: posRef.current.x, baseY: posRef.current.y, moved: false };
+
+      const onMove = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        const st = dragRef.current;
+        if (!st) return;
+        const dx = ev.clientX - st.startX;
+        const dy = ev.clientY - st.startY;
+        if (!st.moved && Math.hypot(dx, dy) < DRAG_CLICK_THRESHOLD) return;
+        st.moved = true;
+        const next = clamp(st.baseX + dx, st.baseY + dy);
+        lastPosRef.current = next;
+        setPos(next);
+      };
+      const onUp = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        const st = dragRef.current;
+        dragRef.current = null;
+        if (!st?.moved) return;
+        justDraggedRef.current = true;
+        // justDraggedRef 는 도크 전체(열기 버튼·최소화·닫기)가 같이 쓴다. 막아야 하는
+        // 건 딱 하나 — 드래그를 끝낸 바로 그 pointerup 이 만드는 "유령 클릭"뿐이다
+        // (마우스를 떼면 브라우저가 같은 동작 안에서 바로 click 을 하나 더 쏜다).
+        // 그 유령 클릭은 pointerup 과 같은 동기 작업 안에서 일어나므로, microtask 로
+        // 미뤄 끄면 그 클릭이 지나간 *바로 다음*에 풀린다 — 시간을 정해 두면(예:
+        // 300ms) 그 안에 사용자가 다른 버튼(예: 헤더를 끌고 바로 닫기)을 눌러도 같이
+        // 막혀 버리는데, microtask 는 그 문제가 없다.
+        queueMicrotask(() => {
+          justDraggedRef.current = false;
+        });
+        try {
+          localStorage.setItem(DOCK_POS_KEY, JSON.stringify(lastPosRef.current));
+        } catch {
+          /* 못 저장해도 이번 화면에서는 그대로 보이니 무시한다 */
+        }
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
     },
     [clamp],
   );
-
-  const endDrag = useCallback(() => {
-    const st = dragRef.current;
-    dragRef.current = null;
-    if (!st?.moved) return;
-    justDraggedRef.current = true;
-    // justDraggedRef 는 도크 전체(열기 버튼·최소화·닫기)가 같이 쓴다. 막아야 하는 건
-    // 딱 하나 — 드래그를 끝낸 바로 그 pointerup 이 만드는 "유령 클릭"뿐이다(마우스를
-    // 떼면 브라우저가 같은 동작 안에서 바로 click 을 하나 더 쏜다). 그 유령 클릭은
-    // pointerup 과 같은 동기 작업 안에서 일어나므로, microtask 로 미뤄 끄면 그 클릭이
-    // 지나간 *바로 다음*에 풀린다 — 시간을 정해 두면(예: 300ms) 그 안에 사용자가
-    // 다른 버튼(예: 헤더를 끌고 바로 닫기)을 눌러도 같이 막혀 버리는데, microtask 는
-    // 그 문제가 없다.
-    queueMicrotask(() => {
-      justDraggedRef.current = false;
-    });
-    try {
-      localStorage.setItem(DOCK_POS_KEY, JSON.stringify(lastPosRef.current));
-    } catch {
-      /* 못 저장해도 이번 화면에서는 그대로 보이니 무시한다 */
-    }
-  }, []);
 
   /** 버튼 onClick 맨 앞에서 부른다 — true 면 방금 드래그였다는 뜻이니 열기 동작을 건너뛴다 */
   const consumeDraggedFlag = useCallback(() => {
@@ -267,12 +290,9 @@ function useDraggablePosition() {
      * 밖에서는 변수가 있어도 적용되지 않는다).
      */
     panelStyle: { "--dock-x": `${pos.x}px`, "--dock-y": `${pos.y}px` } as CSSProperties,
-    dragHandlers: {
-      onPointerDown,
-      onPointerMove,
-      onPointerUp: endDrag,
-      onPointerCancel: endDrag,
-    },
+    // onPointerDown 하나면 된다 — 움직임 추적은 window 리스너가 알아서 하니,
+    // move/up/cancel 을 요소에 따로 걸 필요가 없다.
+    dragHandlers: { onPointerDown },
     consumeDraggedFlag,
   };
 }
@@ -433,9 +453,6 @@ export default function ChatbotDock() {
           if (window.innerWidth < 768) return;
           drag.dragHandlers.onPointerDown(e);
         }}
-        onPointerMove={drag.dragHandlers.onPointerMove}
-        onPointerUp={drag.dragHandlers.onPointerUp}
-        onPointerCancel={drag.dragHandlers.onPointerCancel}
       >
         <span className="ddasomi-face-crop w-7 h-7 shrink-0">
           <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img" />

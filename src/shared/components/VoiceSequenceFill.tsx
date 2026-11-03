@@ -210,15 +210,12 @@ export default function VoiceSequenceFill({
       {phase === "explain" && (
         <Dialog onClose={() => setPhase("idle")} labelledBy="voiceSeqTitle" size="sm">
           <DialogHeader id="voiceSeqTitle" title={title} onClose={() => setPhase("idle")} />
-          <p className="text-sm text-on-surface-variant leading-relaxed">
-            이 순서대로 한 칸씩 녹음합니다. 빨간 버튼을 눌러 녹음하고, 다시 눌러 멈추면
-            그 칸에 바로 채워져요. 내용을 확인하고(필요하면 직접 고쳐 쓰고) "다음"을
-            눌러야 다음 칸으로 넘어갑니다.
-          </p>
           <p className="text-sm font-bold text-on-surface leading-relaxed break-keep">{fieldList}</p>
-          <ul className="text-xs text-on-surface-variant leading-relaxed list-disc pl-4 flex flex-col gap-1">
-            <li>칸 이름을 같이 말해도 괜찮아요(예: "작성자는 홍길동이에요") — 알아서 내용만 뽑아 넣어요.</li>
-            <li>잘못 들었으면 다시 녹음하면 덮어써지고, "이전"을 누르면 전 칸으로 돌아가요.</li>
+          <ul className="text-sm text-on-surface-variant leading-relaxed list-disc pl-4 flex flex-col gap-1.5">
+            <li>빨간 버튼 누르면 녹음, 다시 누르면 멈추고 자동 입력</li>
+            <li>확인 후 "다음"을 눌러야 다음 칸으로 이동</li>
+            <li>칸 이름을 같이 말해도 OK(예: "작성자는 홍길동")</li>
+            <li>다시 녹음하면 덮어쓰기, "이전"으로 되돌아가기</li>
           </ul>
           <div className="flex justify-end gap-2 mt-1">
             <Button variant="ghost" onClick={() => setPhase("idle")}>
