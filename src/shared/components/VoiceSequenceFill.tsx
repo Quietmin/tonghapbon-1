@@ -60,6 +60,9 @@ function matchOption(heard: string, options: readonly string[]): string | null {
 
 type Phase = "idle" | "explain" | "active";
 
+/** 지금 음성으로 채우는 중인 칸에 둘러서, 여러 칸 중 "지금 이 칸"을 한눈에 알아보게 한다 */
+const HIGHLIGHT_CLASSES = ["ring-2", "ring-red-500", "rounded-lg"];
+
 export default function VoiceSequenceFill({
   fields,
   title = "음성으로 한 번에 입력하기",
@@ -84,13 +87,28 @@ export default function VoiceSequenceFill({
   fieldsRef.current = fields;
   const activeIndexRef = useRef(0);
   activeIndexRef.current = activeIndex;
+  // 직전 칸에 둘렀던 빨간 테두리 — 다음 칸으로 넘어가면 떼어 내야 한다
+  const highlightedRef = useRef<HTMLElement | null>(null);
 
-  const scrollToField = useCallback((field: VoiceField | undefined) => {
-    const el = field?.getElement?.();
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (el instanceof HTMLElement) el.focus?.({ preventScroll: true });
+  const clearHighlight = useCallback(() => {
+    highlightedRef.current?.classList.remove(...HIGHLIGHT_CLASSES);
+    highlightedRef.current = null;
   }, []);
+
+  const scrollToField = useCallback(
+    (field: VoiceField | undefined) => {
+      clearHighlight();
+      const el = field?.getElement?.();
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el instanceof HTMLElement) {
+        el.focus?.({ preventScroll: true });
+        el.classList.add(...HIGHLIGHT_CLASSES);
+        highlightedRef.current = el;
+      }
+    },
+    [clearHighlight],
+  );
 
   const begin = useCallback(() => {
     if (!supported) return;
@@ -109,6 +127,7 @@ export default function VoiceSequenceFill({
 
   const finish = useCallback((msg?: string) => {
     recorder.cancel();
+    clearHighlight();
     setPhase("idle");
     if (msg) setNotice(msg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,9 +193,13 @@ export default function VoiceSequenceFill({
     else setNotice(null);
   }
 
-  // 언마운트되면(화면 이동 등) 녹음을 반드시 끈다 — 안 그러면 마이크가 계속 켜져 있다
+  // 언마운트되면(화면 이동 등) 녹음을 반드시 끈다 — 안 그러면 마이크가 계속 켜져 있다.
+  // 둘러 둔 빨간 테두리도 같이 뗀다(화면이 그대로 남는 경우를 대비한 안전망).
   useEffect(() => {
-    return () => recorder.cancel();
+    return () => {
+      recorder.cancel();
+      clearHighlight();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -237,7 +260,7 @@ export default function VoiceSequenceFill({
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-bold text-on-surface truncate">
-              {activeIndex + 1}/{fields.length} · {activeField?.label ?? ""}
+              입력단계 {activeIndex + 1}/{fields.length} · {activeField?.label ?? ""}
             </span>
             <button
               type="button"
