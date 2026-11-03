@@ -204,7 +204,8 @@
   /* 정렬 기준은 .desc-text(사진대장·매뉴얼)와 같은 양쪽정렬이다 — 원본과 동일.
      두 문서의 사진 설명이 서로 다른 기준으로 찍히면 같은 앱에서 나온 문서로 보이지 않는다. */
   border-top: 1px solid #000; min-height: calc(1.4em + 3mm); padding: 1.5mm 2mm;
-  font-size: 10px; font-weight: 600; line-height: 1.4; text-align: justify;
+  /* 굵기 400 — .desc-text 와 같은 이유다. 600 으로 찍으면 ①②③·※ 가 뭉개진다. */
+  font-size: 10px; font-weight: 400; line-height: 1.4; text-align: justify;
   display: flex; flex-direction: column; align-items: stretch; justify-content: center;
   white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; box-sizing: border-box;
   overflow: hidden;
