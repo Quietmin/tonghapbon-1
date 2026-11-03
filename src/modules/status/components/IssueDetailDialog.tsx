@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Dialog, { DialogHeader } from "@/shared/components/Dialog";
 import { StatusChip } from "@/shared/components/ui";
+import { STATUS_LABELS } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { formatDate, formatDateTime } from "./badges";
 import { FaultReportLink, IssuePhotos } from "./StatusPhotos";
@@ -30,7 +31,7 @@ export default function IssueDetailDialog({
     <Dialog onClose={onClose} labelledBy="issueDetailTitle">
       <DialogHeader
         id="issueDetailTitle"
-        above={<StatusChip status={row.status} />}
+        above={<StatusChip status={row.status} label={STATUS_LABELS[row.status]} />}
         title={row.equipment_name}
         onClose={onClose}
       />

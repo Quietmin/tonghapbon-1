@@ -14,7 +14,7 @@ import {
   rowKeyHandler,
 } from "@/shared/lib/tableStyle";
 import { useToast } from "@/shared/components/Toast";
-import { DEPARTMENTS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
+import { DEPARTMENTS, STATUS_LABELS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { formatDate, formatDateTime } from "./badges";
 import { FaultReportLink, IssuePhotos } from "./StatusPhotos";
@@ -96,28 +96,36 @@ export default function StatusBoard({
 
   return (
     <>
-      {/* 상태 칩 — 건수 + 누르면 그 상태만 */}
-      <div className="flex flex-wrap gap-2" role="group" aria-label="조치 상태별 보기">
-        {[{ key: "", label: "전체", count: total }, ...STATUS_OPTIONS.map((s) => ({ key: s, label: s, count: counts[s] ?? 0 }))].map(
-          (c) => {
-            const on = filters.status === c.key;
-            return (
-              <button
-                key={c.key || "all"}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setFilter("status", c.key)}
-                className={`px-3.5 min-h-10 rounded-full text-sm font-bold border transition-colors ${
-                  on
-                    ? "bg-primary text-on-primary border-primary"
-                    : "bg-surface-container-lowest text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
-                }`}
-              >
-                {c.label} <span className="tabular-nums">{c.count}</span>
-              </button>
-            );
-          },
-        )}
+      {/* 상태 칩 — 건수 + 누르면 그 상태만. 폰 폭에서는 5개(전체 포함)가 줄바꿈
+          없이 한 줄에 들어가도록 가로 스크롤로 두고(no-scrollbar 로 스크롤바만
+          숨긴다 — 넘기는 동작 자체는 그대로 된다), md 이상에서는 넓어진 폭에
+          맞게 다시 줄바꿈을 허용한다. */}
+      <div
+        className="flex flex-nowrap md:flex-wrap gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0"
+        role="group"
+        aria-label="조치 상태별 보기"
+      >
+        {[
+          { key: "", label: "전체", count: total },
+          ...STATUS_OPTIONS.map((s) => ({ key: s, label: STATUS_LABELS[s], count: counts[s] ?? 0 })),
+        ].map((c) => {
+          const on = filters.status === c.key;
+          return (
+            <button
+              key={c.key || "all"}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setFilter("status", c.key)}
+              className={`shrink-0 px-3.5 min-h-10 rounded-full text-sm font-bold border whitespace-nowrap transition-colors ${
+                on
+                  ? "bg-primary text-on-primary border-primary"
+                  : "bg-surface-container-lowest text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
+              }`}
+            >
+              {c.label} <span className="tabular-nums">{c.count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* 조건 */}
@@ -217,7 +225,7 @@ export default function StatusBoard({
                   className="w-full text-left p-4 flex flex-col gap-2 active:bg-surface-container-high"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <StatusChip status={r.status} />
+                    <StatusChip status={r.status} label={STATUS_LABELS[r.status]} />
                     <span className="text-xs text-on-surface-variant whitespace-nowrap">
                       {formatDateTime(r.created_at)}
                     </span>
@@ -264,7 +272,7 @@ export default function StatusBoard({
                     className={CLICKABLE_ROW}
                   >
                     <td className={`${TD_Y} px-3 align-top text-center`}>
-                      <StatusChip status={r.status} />
+                      <StatusChip status={r.status} label={STATUS_LABELS[r.status]} />
                       {r.scheduled_date && (
                         <span className="block text-xs text-on-surface-variant mt-1">
                           예정 {formatDate(r.scheduled_date)}
@@ -357,7 +365,7 @@ export function UpdateDialog({
     <Dialog onClose={onClose} labelledBy="statusDlgTitle">
       <DialogHeader
         id="statusDlgTitle"
-        above={<StatusChip status={row.status} />}
+        above={<StatusChip status={row.status} label={STATUS_LABELS[row.status]} />}
         title={row.equipment_name}
         onClose={onClose}
       />
@@ -390,7 +398,7 @@ export function UpdateDialog({
                     : "bg-surface-container-low text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
                 }`}
               >
-                {s}
+                {STATUS_LABELS[s]}
               </button>
             );
           })}
@@ -410,7 +418,7 @@ export function UpdateDialog({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-bold text-on-surface-variant">
-              조치 예정일{status === "추후 조치 예정" ? " (추후 조치 예정일 때 입력)" : ""}
+              조치 예정일{status === "추후 조치 예정" ? " (조치 예정일 때 입력)" : ""}
             </span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
           </label>

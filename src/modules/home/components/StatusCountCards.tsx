@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card } from "@/shared/components/ui";
-import { STATUS_OPTIONS, type IssueStatus } from "@/modules/status/lib/constants";
+import { STATUS_LABELS, STATUS_OPTIONS, type IssueStatus } from "@/modules/status/lib/constants";
 
 /** 상태별 건수 카드 4장 — 누르면 현황 조회로 간다 */
 const TONE: Record<IssueStatus, string> = {
@@ -16,7 +16,7 @@ export default function StatusCountCards({ counts }: { counts: Record<string, nu
       {STATUS_OPTIONS.map((s) => (
         <Link key={s} href="/status" className="block h-full">
           <Card className="p-5 h-full flex flex-col gap-1">
-            <span className="text-sm font-bold text-on-surface-variant">{s}</span>
+            <span className="text-sm font-bold text-on-surface-variant">{STATUS_LABELS[s]}</span>
             <span className="flex items-baseline gap-1">
               <span className={`text-display-lg tabular-nums ${TONE[s]}`}>{counts[s] ?? 0}</span>
               <span className="text-title-sm text-on-surface-variant">건</span>

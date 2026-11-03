@@ -12,6 +12,7 @@ import {
   TH_Y,
   rowKeyHandler,
 } from "@/shared/lib/tableStyle";
+import { STATUS_LABELS } from "@/modules/status/lib/constants";
 import type { StatusIssueRow } from "@/modules/status/lib/repo";
 import { UpdateDialog } from "@/modules/status/components/StatusBoard";
 import IssueDetailDialog from "@/modules/status/components/IssueDetailDialog";
@@ -157,7 +158,7 @@ export default function IssueListPanel({
       case "status":
         return (
           <>
-            <StatusChip status={r.status} />
+            <StatusChip status={r.status} label={STATUS_LABELS[r.status]} />
             {/* 예정일 열이 따로 없을 때만 상태 아래에 붙인다 */}
             {!hasScheduleColumn && r.scheduled_date && (
               <span className="block text-xs text-on-surface-variant mt-1">
@@ -218,7 +219,7 @@ export default function IssueListPanel({
                 <div className="flex items-center gap-2 min-w-0">
                   {columns.includes("status") && (
                     <span className="shrink-0">
-                      <StatusChip status={r.status} />
+                      <StatusChip status={r.status} label={STATUS_LABELS[r.status]} />
                     </span>
                   )}
                   <span className="font-bold text-on-surface text-sm truncate">{r.equipment_name}</span>

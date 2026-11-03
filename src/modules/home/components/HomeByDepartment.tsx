@@ -133,7 +133,7 @@ async function MaintenanceHome({
               pageSize={5}
             />
             <IssueListPanel
-              title="추후 조치 예정 일정"
+              title="조치 예정 일정"
               rows={summary.scheduled}
               emptyText="예정된 조치가 없습니다."
               moreLabel="현황 조회"

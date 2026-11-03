@@ -8,6 +8,18 @@ export const STATUS_OPTIONS = ["미완료", "조치중", "추후 조치 예정",
 export type IssueStatus = (typeof STATUS_OPTIONS)[number];
 
 /**
+ * 화면에 보여줄 짧은 이름. STATUS_OPTIONS(= DB 에 저장된 값, 정렬·필터 조건에도
+ * 그대로 쓰인다)는 바꾸지 않는다 — 값을 바꾸면 이미 저장된 행의 상태가 더 이상
+ * 안 맞게 걸려 필터·정렬이 깨진다. 보여줄 글자만 여기서 짧게 바꾼다.
+ */
+export const STATUS_LABELS: Record<IssueStatus, string> = {
+  미완료: "미완료",
+  조치중: "조치 중",
+  "추후 조치 예정": "조치 예정",
+  조치완료: "조치 완료",
+};
+
+/**
  * 담당부서 목록 — 내 부서(처음 접속 시 선택)와 같은 목록이라 shared/lib/departments.ts 한 곳에 둔다.
  * 바꾸면 등록 화면·조회 필터·내 부서 선택이 함께 바뀐다. DB 에는 부서 이름을 그대로 저장하므로
  * 목록을 바꿔도 기존 행은 남지만, 목록에서 빠진 이름의 행은 부서 필터로 걸러 볼 수 없다.
