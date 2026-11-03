@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Stroke } from "../lib/types";
 import { cropImage, drawStrokes, flattenRotation, loadImage } from "../lib/imageEdit";
+import VoiceDictationButton from "@/shared/components/VoiceDictationButton";
 
 /**
  * 사진 편집기 — 펜/형광펜/도형 마킹 + 자르기.
@@ -719,6 +720,21 @@ export default function PhotoEditorModal({
                   }
                 }}
                 className="flex-1 min-w-0 px-3 py-1.5 md:py-2 rounded-lg text-sm bg-white/10 text-white placeholder:text-white/40 outline-none focus:bg-white/15"
+              />
+              {/* 음성 입력 — 작성 화면의 칸들과 같은 받아쓰기. 다시 녹음하면 새로 받아쓴 글로 바꾸고, 사진 위에도 바로 그린다 */}
+              <VoiceDictationButton
+                label="표시할 텍스트 음성 입력"
+                field={{ label: "사진 위에 표시할 짧은 글", kind: "short", maxChars: 40 }}
+                className="w-9 h-9 md:w-10 md:h-10"
+                onResult={(text) => {
+                  setTextValue(text);
+                  const active = activeStrokeRef.current;
+                  if (active && active.tool === "text") {
+                    active.text = text;
+                    redraw();
+                  }
+                  textInputRef.current?.focus();
+                }}
               />
               <button
                 type="button"

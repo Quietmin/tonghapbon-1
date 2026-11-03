@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button, Card, Icon, RequiredMark, InlineError } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
-import VoiceSequenceFill, { type VoiceField } from "@/shared/components/VoiceSequenceFill";
+import { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
 import { DEPARTMENTS } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { PhotoPicker, type PickedPhoto } from "./StatusPhotos";
@@ -159,48 +159,6 @@ export default function StatusRegisterForm({
     }
   }
 
-  /** 음성으로 한 번에 채울 칸 순서 — 화면에 보이는 순서(지사 → 담당부서 → 설비명 →
-   * 작성자 → 이슈 내용)와 같다(매뉴얼 작성 쪽과 같은 방식·같은 부품을 쓴다). */
-  const voiceFields: VoiceField[] = [
-    {
-      key: "branch",
-      label: "지사",
-      kind: "short",
-      options: SORTED_BRANCHES,
-      setValue: (v) => set("branch", v),
-      getElement: () => document.getElementById("statusBranch"),
-    },
-    {
-      key: "department",
-      label: "담당부서",
-      kind: "short",
-      options: DEPARTMENTS,
-      setValue: (v) => set("department", v),
-      getElement: () => document.getElementById("statusDepartment"),
-    },
-    {
-      key: "equipmentName",
-      label: "설비명",
-      kind: "short",
-      setValue: (v) => set("equipmentName", v),
-      getElement: () => document.getElementById("statusEquipmentName"),
-    },
-    {
-      key: "reporter",
-      label: "작성자",
-      kind: "short",
-      setValue: (v) => set("reporter", v),
-      getElement: () => document.getElementById("statusReporter"),
-    },
-    {
-      key: "content",
-      label: "이슈 내용",
-      kind: "long",
-      setValue: (v) => set("content", v),
-      getElement: () => document.getElementById("statusContent"),
-    },
-  ];
-
   if (done) {
     return (
       <Card lift={false} className="p-8 flex flex-col items-center text-center gap-3">
@@ -254,9 +212,6 @@ export default function StatusRegisterForm({
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       <Card lift={false} className="p-6 flex flex-col gap-4">
-        <div className="flex justify-end">
-          <VoiceSequenceFill fields={voiceFields} title="음성으로 현황 작성하기" />
-        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-bold text-on-surface-variant">
@@ -300,54 +255,60 @@ export default function StatusRegisterForm({
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="statusEquipmentName" className="text-xs font-bold text-on-surface-variant">
               설비명
               <RequiredMark />
-            </span>
-            <input aria-label="예: 1호기 순환펌프"
-              id="statusEquipmentName"
-              value={form.equipmentName}
-              onChange={(e) => set("equipmentName", e.target.value)}
-              placeholder="예: 1호기 순환펌프"
-              className="input"
-              onBlur={() => touch("equipmentName")}
-              aria-invalid={invalid("equipmentName")}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">
+            </label>
+            <WithVoiceInput field={{ label: "설비명", kind: "short" }} onResult={(v) => set("equipmentName", v)}>
+              <input aria-label="예: 1호기 순환펌프"
+                id="statusEquipmentName"
+                value={form.equipmentName}
+                onChange={(e) => set("equipmentName", e.target.value)}
+                placeholder="예: 1호기 순환펌프"
+                className="input"
+                onBlur={() => touch("equipmentName")}
+                aria-invalid={invalid("equipmentName")}
+              />
+            </WithVoiceInput>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="statusReporter" className="text-xs font-bold text-on-surface-variant">
               작성자
               <RequiredMark />
-            </span>
-            <input aria-label="이름을 입력하세요."
-              id="statusReporter"
-              value={form.reporter}
-              onChange={(e) => set("reporter", e.target.value)}
-              placeholder="이름을 입력하세요."
-              className="input"
-              onBlur={() => touch("reporter")}
-              aria-invalid={invalid("reporter")}
-            />
-          </label>
+            </label>
+            <WithVoiceInput field={{ label: "작성자", kind: "short" }} onResult={(v) => set("reporter", v)}>
+              <input aria-label="이름을 입력하세요."
+                id="statusReporter"
+                value={form.reporter}
+                onChange={(e) => set("reporter", e.target.value)}
+                placeholder="이름을 입력하세요."
+                className="input"
+                onBlur={() => touch("reporter")}
+                aria-invalid={invalid("reporter")}
+              />
+            </WithVoiceInput>
+          </div>
         </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold text-on-surface-variant">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="statusContent" className="text-xs font-bold text-on-surface-variant">
               이슈 내용
               <RequiredMark />
-            </span>
-          <textarea
-            id="statusContent"
-            value={form.content}
-            onChange={(e) => set("content", e.target.value)}
-            rows={5}
-            placeholder="어떤 설비에서 무슨 일이 있었는지 적어 주세요."
-            className="input"
-            onBlur={() => touch("content")}
-            aria-invalid={invalid("content")}
-          />
-        </label>
+            </label>
+          <WithVoiceInput field={{ label: "이슈 내용", kind: "long" }} onResult={(v) => set("content", v)} multiline>
+            <textarea
+              id="statusContent"
+              value={form.content}
+              onChange={(e) => set("content", e.target.value)}
+              rows={5}
+              placeholder="어떤 설비에서 무슨 일이 있었는지 적어 주세요."
+              className="input"
+              onBlur={() => touch("content")}
+              aria-invalid={invalid("content")}
+            />
+          </WithVoiceInput>
+        </div>
 
         <PhotoPicker photos={photos} onChange={setPhotos} onError={setError} />
       </Card>

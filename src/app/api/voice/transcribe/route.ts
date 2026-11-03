@@ -4,8 +4,8 @@
 // 브라우저 내장 Web Speech API(연속 인식 + 자동 재시작)는 같은 말을 중복으로 쏟아내고
 // 침묵 타이머로 제멋대로 다음 칸에 넘어가 버려 다루기 어려웠다 — 그래서 "녹음 한 번 =
 // 텍스트 한 번"으로 바꿨다. 사용자가 누르고 있는 동안(또는 토글) 한 칸 분량을 녹음하고,
-// 멈추면 그 구간 전체를 한 번만 인식한다. 다음 칸으로 넘어가는 것도 더 이상 자동이 아니라
-// 사용자가 직접 "다음"을 눌러야 한다(VoiceSequenceFill.tsx 쪽 변경).
+// 멈추면 그 구간 전체를 한 번만 인식한다. 지금은 작성 화면의 글 입력칸마다 음성 버튼이 따로 붙는다
+// (VoiceDictationButton.tsx — 예전의 여러 칸을 차례로 도는 VoiceSequenceFill 은 2026-11 에 없앴다).
 //
 // 모델은 두 단계로 나뉜다 — 받아쓰기(STT)와 그 결과를 칸에 맞게 다듬는 정리 단계.
 // 받아쓰기는 오버홀 챗봇과 같은 OPENAI_API_KEY/GPT_CHAT_ENABLED 로 켜고 끄지만,
@@ -285,9 +285,9 @@ async function cleanWithOpenAI(prompt: string, apiKey: string): Promise<string |
  * 문구 자체는 모델이 한 글자도 직접 생성하지 않고, 이 함수가 번호로 내가 이미
  * 들고 있는 options 배열에서 그대로 꺼내 쓴다. 번호가 범위 밖(0 포함)이면 — 즉
  * 맞는 보기를 못 찾았으면 — null 을 돌려주고, 호출부는 그 칸을 빈 문자열로
- * 응답한다. 클라이언트(VoiceSequenceFill)는 빈 문자열을 받으면 그 칸에 값을
+ * 응답한다. 클라이언트(VoiceDictationButton)는 빈 문자열을 받으면 그 칸에 값을
  * 쓰지 않고 안내만 띄우므로, 결과적으로 "일치하는 보기가 없으면 기존 값을
- * 그대로 둔다"가 된다.
+ * 그대로 둔다"가 된다. (지금은 고르는 칸에 음성 버튼을 두지 않아 화면에서 쓰이지 않는다)
  */
 async function matchOptionWithOpenAI(
   fieldLabel: string,

@@ -33,7 +33,7 @@ import { A4Page, FaultA4Page, chunkFaultPages, chunkPages } from "./A4Preview";
 import { PageBanner } from "./Letterhead";
 import PhotoEditorModal, { type PhotoEditorResult } from "./PhotoEditorModal";
 import AutoTextarea from "./AutoTextarea";
-import VoiceDictationButton from "@/shared/components/VoiceDictationButton";
+import VoiceDictationButton, { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
 
 /**
  * 3개 모드(사진대장·매뉴얼·고장 보고서)가 공유하는 편집기.
@@ -216,6 +216,11 @@ export interface DocEditorProps {
    * 임시저장할 때만 saveMeta 와 합쳐 넣고, 복구할 때 onRestoreMeta 로 함께 돌려준다.
    */
   draftExtra?: Record<string, unknown>;
+  /**
+   * 처음부터 넣어 둘 사진 — 현황 이슈에서 [고장보고서 작성]으로 넘어올 때 그 이슈의 현장 사진을 받는다.
+   * 배열이 비어 있지 않게 바뀌는 첫 순간 한 번만 사진 추가와 같은 절차로 넣는다(다시 넣지 않는다).
+   */
+  initialFiles?: File[];
 }
 
 export default function DocEditor({
@@ -233,6 +238,7 @@ export default function DocEditor({
   saveMeta,
   onRestoreMeta,
   draftExtra,
+  initialFiles,
 }: DocEditorProps) {
   const [fileName, setFileName] = useState("");
   const [author, setAuthor] = useState("");
@@ -546,7 +552,7 @@ export default function DocEditor({
 
   // 사진마다 실제 픽셀 크기를 알아야(자르기·마킹 좌표 정규화) 해서, 파일을 읽어
   // object URL 을 만드는 동안 잠깐 비동기로 기다린다(사진 선택 즉시 화면이 굳지 않음).
-  const addFiles = useCallback((files: FileList | null) => {
+  const addFiles = useCallback((files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
     setError(null);
 
@@ -590,6 +596,14 @@ export default function DocEditor({
       })
       .catch(() => setError("사진을 불러오지 못했습니다. 다시 시도해 주세요."));
   }, []);
+
+  // 넘겨받은 사진(initialFiles)은 처음 도착했을 때 한 번만 넣는다 — 부모가 다시 그려도 중복으로 쌓이지 않게
+  const initialFilesAddedRef = useRef(false);
+  useEffect(() => {
+    if (initialFilesAddedRef.current || !initialFiles || initialFiles.length === 0) return;
+    initialFilesAddedRef.current = true;
+    addFiles(initialFiles);
+  }, [initialFiles, addFiles]);
 
   /**
    * 사진 교체 — 설명·순서는 그대로 두고 그림만 바꾼다 (원본 replaceFileInput 대응).
@@ -971,19 +985,21 @@ export default function DocEditor({
         파일명
         <RequiredMark />
       </label>
-      <input
-        id="docFileName"
-        type="text"
-        value={fileName}
-        onChange={(e) => setFileName(e.target.value)}
-        placeholder={MODE_PLACEHOLDERS[mode]}
-        aria-invalid={fileNameInvalid}
-        className={`px-3 py-2.5 rounded-xl border text-sm text-on-surface outline-none md:rounded-sm ${
-          fileNameInvalid
-            ? "bg-error/10 border-error ring-1 ring-error/40"
-            : "bg-surface-container-high border-border-subtle focus:border-primary md:bg-surface-container-low md:focus:bg-surface-container-lowest"
-        }`}
-      />
+      <WithVoiceInput field={{ label: "파일명", kind: "short" }} onResult={setFileName}>
+        <input
+          id="docFileName"
+          type="text"
+          value={fileName}
+          onChange={(e) => setFileName(e.target.value)}
+          placeholder={MODE_PLACEHOLDERS[mode]}
+          aria-invalid={fileNameInvalid}
+          className={`px-3 py-2.5 rounded-xl border text-sm text-on-surface outline-none md:rounded-sm ${
+            fileNameInvalid
+              ? "bg-error/10 border-error ring-1 ring-error/40"
+              : "bg-surface-container-high border-border-subtle focus:border-primary md:bg-surface-container-low md:focus:bg-surface-container-lowest"
+          }`}
+        />
+      </WithVoiceInput>
     </div>
   );
 
@@ -995,14 +1011,16 @@ export default function DocEditor({
       <label htmlFor="docAuthor" className="text-xs font-bold text-on-surface-variant">
         작성자 <span className="font-normal">(보관함 표시용, 선택)</span>
       </label>
-      <input
-        id="docAuthor"
-        type="text"
-        value={author}
-        onChange={(e) => setAuthor(e.target.value)}
-        placeholder="이름을 입력하세요."
-        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
-      />
+      <WithVoiceInput field={{ label: "작성자", kind: "short" }} onResult={setAuthor}>
+        <input
+          id="docAuthor"
+          type="text"
+          value={author}
+          onChange={(e) => setAuthor(e.target.value)}
+          placeholder="이름을 입력하세요."
+          className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
+        />
+      </WithVoiceInput>
     </div>
   ) : null;
 
@@ -1268,14 +1286,12 @@ export default function DocEditor({
 
                     {"kind" in item ? (
                       <div className="flex items-start gap-1.5 px-1 pt-1">
+                        {/* 다시 녹음하면 이어 붙이지 않고 새로 받아쓴 글로 바꾼다 */}
                         <VoiceDictationButton
                           label="텍스트 칸 음성 입력"
                           className="mt-1"
-                          onResult={(text) => {
-                            const prev = item.body;
-                            const sep = prev && !/\s$/.test(prev) ? " " : "";
-                            updateText(item.id, prev + sep + text);
-                          }}
+                          field={{ label: "텍스트 칸", kind: "long" }}
+                          onResult={(text) => updateText(item.id, text)}
                         />
                         <AutoTextarea
                           value={item.body}
@@ -1299,14 +1315,11 @@ export default function DocEditor({
                           />
                         </div>
                         <div className="flex items-start gap-1.5 px-1 pt-1">
+                          {/* 다시 녹음하면 이어 붙이지 않고 새로 받아쓴 글로 바꾼다 */}
                           <VoiceDictationButton
                             label="사진 설명 음성 입력"
                             className="mt-1"
-                            onResult={(text) => {
-                              const prev = item.desc;
-                              const sep = prev && !/\s$/.test(prev) ? " " : "";
-                              updateDesc(item.id, prev + sep + text);
-                            }}
+                            onResult={(text) => updateDesc(item.id, text)}
                           />
                           <AutoTextarea
                             value={item.desc}

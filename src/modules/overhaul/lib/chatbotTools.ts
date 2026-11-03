@@ -142,7 +142,7 @@ async function searchManuals(args: Record<string, unknown>) {
     .filter(Boolean);
 
   const qs = new URLSearchParams();
-  qs.set("select", "id,doc_type,title,file_name,manual_type,field,year,branch,facility,fault_content,page_count,created_at");
+  qs.set("select", "id,doc_type,title,file_name,manual_type,field,year,branch,facility,fault_content,page_count,created_at,pdf_path");
   qs.set("order", "created_at.desc");
   qs.set("limit", String(expanded?.concepts.length ? CANDIDATE_ROWS : limit));
   if (docType) qs.set("doc_type", `eq.${docType}`);
@@ -306,7 +306,7 @@ async function readDocument(args: Record<string, unknown>) {
 
   const headers = { apikey: anonKey, Authorization: `Bearer ${anonKey}` };
   const [docRes, chunkRes] = await Promise.all([
-    fetch(`${url}/rest/v1/docgen_documents?select=id,doc_type,title,branch,field,facility,fault_content&id=eq.${id}`, {
+    fetch(`${url}/rest/v1/docgen_documents?select=id,doc_type,title,branch,field,facility,fault_content,created_at,pdf_path&id=eq.${id}`, {
       headers,
       signal: AbortSignal.timeout(8000),
     }),

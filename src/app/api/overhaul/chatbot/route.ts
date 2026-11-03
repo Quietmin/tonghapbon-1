@@ -57,6 +57,102 @@ const MAX_WEB_SOURCES = 5;
 
 type WebSource = { title: string; url: string };
 
+/** 답변 아래 미리보기 카드 상한 */
+const MAX_FOUND_DOCS = 5;
+
+/** 도구(search_manuals·read_document)로 찾은 보관함 문서 — 화면이 미리보기 카드로 그린다(DocMatch 와 같은 모양) */
+type FoundDoc = {
+  id: string;
+  title: string;
+  docType: string;
+  branch: string | null;
+  field: string | null;
+  createdAt: string;
+  pdfPath: string;
+  snippet: string;
+  similarity: number;
+  /** read_document 로 본문까지 읽었는지 — 읽은 문서는 답의 근거이므로 언제나 카드로 보인다 */
+  read: boolean;
+};
+
+/** 도구 결과에서 미리보기로 열 수 있는(pdf_path 가 있는) 문서를 모은다 */
+function collectFoundDocs(name: string, output: string, into: Map<string, FoundDoc>) {
+  if (name !== "search_manuals" && name !== "read_document") return;
+  let data: any;
+  try {
+    data = JSON.parse(output);
+  } catch {
+    return;
+  }
+  const rows: any[] = name === "read_document" ? (data?.document ? [data.document] : []) : Array.isArray(data?.items) ? data.items : [];
+  for (const r of rows) {
+    if (typeof r?.id !== "string" || typeof r?.pdf_path !== "string" || !r.pdf_path) continue;
+    const prev = into.get(r.id);
+    into.set(r.id, {
+      id: r.id,
+      title: String(r.title ?? r.file_name ?? "").slice(0, 160),
+      docType: typeof r.doc_type === "string" ? r.doc_type : "manual",
+      branch: typeof r.branch === "string" ? r.branch : null,
+      field: typeof r.field === "string" ? r.field : null,
+      createdAt: typeof r.created_at === "string" ? r.created_at : "",
+      pdfPath: r.pdf_path,
+      snippet: String(r.fault_content ?? r.manual_type ?? r.facility ?? "").slice(0, 160),
+      similarity: 1,
+      read: name === "read_document" || prev?.read === true,
+    });
+  }
+}
+
+/**
+ * search_manuals — 화면이 미리 찾아 보낸 문서(의미 검색)가 있어도 보관함 검색(유사 용어집으로 넓힌 낱말 검색)을
+ * 그대로 돌리고, 미리 찾은 문서는 그 뒤에 덧붙인다. 예전에는 미리 찾은 문서로 검색을 통째로 대신했는데,
+ * 의미 검색이 엉뚱한 문서(루프팬 소손 질문에 GT 발전기 문서)만 돌려주면 정작 맞는 보고서를 놓쳤다.
+ * 서버에 보관함 키가 없어 검색이 실패하면 미리 찾은 문서만으로 답한다(예전과 같은 대체 경로).
+ */
+async function searchManualsWithPrefetched(
+  rawArgs: string,
+  branch: string | null,
+  documents: NonNullable<ReturnType<typeof sanitizeDocuments>>,
+): Promise<string> {
+  const prefetched = documents.map((d) => ({
+    id: d.id,
+    doc_type: d.docType,
+    title: d.title,
+    branch: d.branch,
+    field: d.field,
+    snippet: d.snippet,
+  }));
+  let real: any = null;
+  try {
+    real = JSON.parse(await runChatbotTool("search_manuals", rawArgs, branch));
+  } catch {
+    real = null;
+  }
+  if (!real || real.error || !Array.isArray(real.items)) {
+    return JSON.stringify({
+      shown: prefetched.length,
+      note: "화면이 보관함에서 미리 검색한 결과(답변 아래 카드로 표시됨). 본문이 필요하면 id 로 read_document 를 호출한다.",
+      items: prefetched,
+    });
+  }
+  const extra = prefetched.filter((p) => !real.items.some((r: any) => r?.id === p.id));
+  return JSON.stringify({
+    ...real,
+    shown: real.items.length + extra.length,
+    items: [...real.items, ...extra],
+    note: `${real.note ?? ""} 목록 뒤쪽 ${extra.length}건은 화면이 의미 검색으로 미리 찾은 문서다 — 질문과 관련 있을 때만 근거로 쓴다.`.trim(),
+  });
+}
+
+/** 답변에 그 문서 제목이 실제로 나오는가 — 띄어쓰기·괄호를 무시하고, 긴 제목은 앞부분만 맞아도 인정한다 */
+function mentionedIn(answer: string, title: string): boolean {
+  const norm = (v: string) => v.toLowerCase().replace(/[^0-9a-z가-힣]/g, "");
+  const t = norm(title);
+  if (t.length < 4) return false;
+  const a = norm(answer);
+  return a.includes(t) || a.includes(t.slice(0, 12));
+}
+
 /** 유사 용어집 요약(고장 찾기·매뉴얼 찾기 표현, 검색어 작성 요령) — 매 질문의 지시문에 함께 싣는다 */
 const GLOSSARY_BLOCK = glossaryPromptBlock();
 
@@ -515,7 +611,7 @@ ${dataBlock}${
 
 보관함에서 이 질문으로 미리 검색된 관련 문서 ${documents.length}건(id · 제목 · 종류 · 지사/분야 · 발췌). 이 문서들은 답변 아래에 카드로 함께 표시된다:
 ${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType ?? "문서"}] ${d.title} (${[d.branch, d.field].filter(Boolean).join(" · ") || "-"}) — ${d.snippet ?? ""}`).join("\n")}
-문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 발췌만으로 부족하면 id 로 read_document 를 호출해 본문을 읽는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제면 "검색된 문서는 ○○ 관련이라 직접 근거는 아니다"라고 한 줄로 밝힌다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.
+문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 발췌만으로 부족하면 id 로 read_document 를 호출해 본문을 읽는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제인 문서는 답변에서 아예 언급하지 않는다 — 근거로 쓴 문서만 화면에 카드로 나오므로, 관련 없다고 밝히면 보이지 않는 문서를 가리키게 된다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.
 답변 맨 마지막 줄에는 반드시 실제로 근거로 쓴 문서의 번호만 "근거문서: 1, 3" 형식으로 적는다. 하나도 근거로 쓰지 않았으면 "근거문서: 없음"이라고 적는다(이 줄은 화면에 보이지 않고 문서 카드 표시에만 쓰인다).`
       : ""
   }`;
@@ -552,6 +648,7 @@ ${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType 
   let webAllowed = process.env.CHATBOT_WEB_SEARCH !== "false";
   let archiveSearched = false;
   const sources: WebSource[] = [];
+  const foundDocs = new Map<string, FoundDoc>();
   const create = async (
     body: Pick<OpenAI.Responses.ResponseCreateParamsNonStreaming, "input" | "tool_choice" | "previous_response_id">,
   ): Promise<OpenAI.Responses.Response> => {
@@ -598,26 +695,14 @@ ${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType 
       calls.map(async (call) => {
         // 어떤 도구가 불렸는지만 남긴다(질문·결과 내용은 로그에 넣지 않는다)
         console.log("[api/overhaul/chatbot] tool:", call.name);
-        // 클라이언트가 보관함에서 이미 찾은 문서가 있으면 search_manuals 는 그 결과로 대신한다 —
-        // 같은 질문을 두 번 검색하지 않고, 서버에 보관함 키가 없는 환경에서도 같은 근거로 답하게 된다.
         const output =
           call.name === "search_manuals" && documents && documents.length
-            ? JSON.stringify({
-                shown: documents.length,
-                note: "화면이 보관함에서 미리 검색한 결과(답변 아래 카드로 표시됨). 본문이 필요하면 id 로 read_document 를 호출한다.",
-                items: documents.map((d) => ({
-                  id: d.id,
-                  doc_type: d.docType,
-                  title: d.title,
-                  branch: d.branch,
-                  field: d.field,
-                  snippet: d.snippet,
-                })),
-              })
+            ? await searchManualsWithPrefetched(call.arguments, branch, documents)
             : await runChatbotTool(call.name, call.arguments, branch);
         if (memory.lookups.length < 8) memory.lookups.push({ tool: call.name, args: (call.arguments || "{}").slice(0, 200) });
         if (ARCHIVE_TOOLS.has(call.name)) archiveSearched = true;
         collectTargets(call.name, output, memory);
+        collectFoundDocs(call.name, output, foundDocs);
         return { type: "function_call_output" as const, call_id: call.call_id, output };
       }),
     );
@@ -632,7 +717,14 @@ ${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType 
   // 인터넷 검색을 쓰면 모델이 본문에 "([사이트](주소))" 꼴의 출처 표시를 넣는다 — 화면은 마크다운을 그리지 않아
   // 주소가 그대로 보이므로 떼어 낸다(출처는 sources 로 따로 보낸다).
   const text = typeof response.output_text === "string" ? stripInlineCitations(response.output_text).trim() : "";
-  return { text, memory, usage, sources };
+  // 미리보기 카드: 본문을 읽은 문서 + 답변에 제목이 나온 문서만 — 검색에만 걸리고 답에 쓰이지 않은 문서는 빼서
+  // "인터넷 자료로 안내드려요" 같은 답 아래에 무관한 카드가 붙지 않게 한다. 읽은 문서를 앞에 둔다.
+  const docs = [...foundDocs.values()]
+    .filter((d) => d.read || mentionedIn(text, d.title))
+    .sort((a, b) => Number(b.read) - Number(a.read))
+    .slice(0, MAX_FOUND_DOCS)
+    .map(({ read: _read, ...d }) => d);
+  return { text, memory, usage, sources, docs };
 }
 
 export async function POST(req: Request) {
@@ -674,7 +766,7 @@ export async function POST(req: Request) {
 
   const started = Date.now();
   try {
-    const { text: raw, memory, usage, sources } = await callOpenAI({
+    const { text: raw, memory, usage, sources, docs } = await callOpenAI({
       message,
       history,
       context,
@@ -699,6 +791,8 @@ export async function POST(req: Request) {
       memory,
       // sources: 인터넷 자료로 답했을 때의 출처 — 화면이 답변 아래 링크로 보여 준다(없으면 빈 배열)
       sources,
+      // docs: 도구로 찾아 답에 쓴 보관함 문서(고장보고서·매뉴얼) — 화면이 미리보기 카드로 보여 준다
+      docs,
       ...(dev ? { meta: { model, reasoning, ms: Date.now() - started, usage } } : {}),
     });
   } catch (err: any) {

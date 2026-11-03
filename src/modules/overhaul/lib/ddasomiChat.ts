@@ -157,7 +157,12 @@ export async function getDdasomiReply(
       });
       if (result && result.ok && typeof result.answer === "string" && result.answer.trim()) {
         // 모델이 실제로 근거로 쓴 문서만 카드로 남긴다("근거문서: 없음"이면 카드 없음). 번호 줄이 없으면 검색 결과 그대로.
-        const used = Array.isArray(result.usedDocs) ? result.usedDocs.map((i) => matches[i]).filter(Boolean) : matches;
+        // 서버가 도구(search_manuals·read_document)로 찾아 답에 쓴 문서도 미리보기 카드로 덧붙인다 — 같은 문서는 한 번만.
+        const picked = Array.isArray(result.usedDocs) ? result.usedDocs.map((i) => matches[i]).filter(Boolean) : matches;
+        const used = [...picked];
+        for (const d of Array.isArray(result.docs) ? result.docs : []) {
+          if (d && typeof d.id === "string" && typeof d.pdfPath === "string" && !used.some((u) => u.id === d.id)) used.push(d);
+        }
         return {
           text: result.answer.trim(),
           kind: "answer",

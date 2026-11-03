@@ -740,7 +740,8 @@ export default function ChatbotDock() {
           className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary disabled:opacity-60"
         />
         {/* 음성 입력 — 고장보고서·매뉴얼 작성과 같은 방식(누르고 말하고 ■ 로 멈추면 한 번에 받아쓰기).
-            받아쓴 질문은 바로 보내지 않고 입력칸에 넣는다 — 잘못 들린 곳을 고친 뒤 보내게 */}
+            받아쓴 질문은 바로 보내지 않고 입력칸에 넣는다 — 잘못 들린 곳을 고친 뒤 보내게.
+            다시 녹음하면 이어 붙이지 않고 새로 받아쓴 질문으로 바꾼다 */}
         <VoiceDictationButton
           field={{ label: "챗봇 질문", kind: "question" }}
           label="음성으로 질문하기"
@@ -748,7 +749,7 @@ export default function ChatbotDock() {
           className="w-10 h-10 rounded-xl"
           onError={setVoiceError}
           onStateChange={setVoiceState}
-          onResult={(text) => setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))}
+          onResult={setInput}
         />
         <button
           type="button"
