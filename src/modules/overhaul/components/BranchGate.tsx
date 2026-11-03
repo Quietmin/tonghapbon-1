@@ -92,7 +92,7 @@ export default function BranchGate({ children }: { children: React.ReactNode }) 
   // ── 선택 후: 지사 띠 + 원래 화면 ────────────────────────────────────────────
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border-subtle bg-surface-container-low px-4 py-2">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border-subtle bg-surface-container-low px-4 py-2 print:hidden">
         <span className="flex items-center gap-1.5 text-label-caps uppercase text-on-surface-variant">
           <Icon name="apartment" className="text-base" />
           지사

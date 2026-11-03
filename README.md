@@ -48,6 +48,12 @@ src/
   계산해, 이력 반영이 끝나면 다음 해 판정이 자동으로 달라진다 (`maintenanceJudge`).
 - **챗봇**: OpenAI tool-calling(읽기 전용 도구만, 쓰기 도구 없음) + 문서 검색은
   `text-embedding-3-small` 임베딩을 pgvector 코사인 유사도로 매칭하는 RAG.
+  멀티턴 — 화면이 대화 기록을 들고 있다가 함께 보내고, 서버는 답마다 실제로 조회한 대상
+  (지사 범위·고장이력·문서 id)을 돌려줘 "그 설비는?", "아까 보고서에서 조치사항은?"을 잇는다.
+  수치는 매번 도구로 다시 조회한다. 대화는 서버에 저장하지 않는다(탭 sessionStorage, "새 대화"로 초기화).
+  모델은 `gpt-6.1-terra` · reasoning `medium`이 기본값(`OPENAI_CHAT_MODEL`/`OPENAI_CHAT_REASONING`으로 변경).
+  2026-11-03 비교(`node scripts/chatbot-eval.mjs`, 16턴): terra·medium 평균 5.2초·질문당 약 $0.002,
+  terra·high는 품질 차이 없이 느리고 비쌌고, gpt-6-luna는 약 8배 싸지만 평균 8~12초에 조회를 한 번 놓쳤다.
 - **문서 생성**: 사진·설명을 A4 레이아웃으로 자동 조판해 PDF 생성, 임베딩 색인까지
   저장해 챗봇 검색 대상으로 편입.
 

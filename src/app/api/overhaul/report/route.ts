@@ -21,7 +21,10 @@ export async function GET(req: Request) {
       byTask.set(e.task_id, list);
     }
 
-    const report = buildReportData(tasks, byTask, project, today());
+    // ?date=YYYY-MM-DD 로 기준일을 고른다 (없거나 이상하면 오늘)
+    const asked = new URL(req.url).searchParams.get("date");
+    const baseDate = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : today();
+    const report = buildReportData(tasks, byTask, project, baseDate, today());
 
     // 엑셀 내보내기용 원본 목록 — 원본 exporter.js의 컬럼 구성과 동일
     const exportRows = tasks.map((t) => ({
