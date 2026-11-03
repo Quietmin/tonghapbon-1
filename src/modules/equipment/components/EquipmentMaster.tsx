@@ -5,7 +5,6 @@ import { Button, Icon, ScreenHeader, LoadingState } from "@/shared/components/ui
 import { EQUIPMENT_FIELDS } from "@/shared/lib/equipmentMeta";
 import BranchOverview from "./BranchOverview";
 import LongTermPlan from "./LongTermPlan";
-import EquipmentCrud from "./EquipmentCrud";
 
 /**
  * 설비 마스터 — 첫 화면은 전 지사 개요다.
@@ -163,13 +162,8 @@ export default function EquipmentMaster() {
         </button>
       </div>
 
+      {/* 설비 마스터의 유일한 표 — 계획 조망과 기준정보 관리를 한 줄에 합쳤다 */}
       <LongTermPlan key={`${branch}:${planVersion}`} branch={branch} fieldFilter={fieldFilter} />
-
-      <EquipmentCrud
-        key={branch}
-        fieldFilter={fieldFilter}
-        onChanged={() => setPlanVersion((v) => v + 1)}
-      />
     </>
   );
 }

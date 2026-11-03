@@ -60,6 +60,10 @@ export interface LongTermRow {
   name: string;
   type: string | null;
   field: string | null;
+  /** 설비 마스터의 메모 — 표에서 바로 고칠 수 있게 함께 내린다 */
+  note: string | null;
+  /** 딸린 기기·태그 수 (설비 마스터 2단) */
+  deviceCount: number;
   /** 딸린 보수계획 항목(태그) 수 */
   itemCount: number;
   lastDoneYear: number | null;
@@ -112,6 +116,8 @@ export async function listLongTermPlan(
     name: string,
     type: string | null,
     field: string | null,
+    note: string | null,
+    deviceCount: number,
     members: MatrixRow[],
   ): LongTermRow => {
     const cells: LongTermCell[] = years.map((year) => {
@@ -160,19 +166,22 @@ export async function listLongTermPlan(
       }),
     }));
 
-    return { equipmentId, name, type, field, itemCount: members.length, lastDoneYear, cells, items };
+    return {
+      equipmentId, name, type, field, note, deviceCount,
+      itemCount: members.length, lastDoneYear, cells, items,
+    };
   };
 
   const rows: LongTermRow[] = [];
   for (const e of [...equipment].sort((a, b) => a.name.localeCompare(b.name, "ko"))) {
     const k = nameKey(e.name);
     const g = groups.get(k);
-    rows.push(rollup(e.id, e.name, e.type, e.field, g?.rows ?? []));
+    rows.push(rollup(e.id, e.name, e.type, e.field, e.note, e.device_count, g?.rows ?? []));
     groups.delete(k);
   }
   // 남은 그룹 = 설비 마스터에 없는 계획 (마스터 미등록)
   for (const g of [...groups.values()].sort((a, b) => a.label.localeCompare(b.label, "ko"))) {
-    rows.push(rollup(null, g.label, null, null, g.rows));
+    rows.push(rollup(null, g.label, null, null, null, 0, g.rows));
   }
 
   return { years, thisYear, rows };
