@@ -433,31 +433,31 @@ export default function MaintenanceMatrix() {
             <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
               전체 설비
             </p>
-            <p className="text-2xl font-black text-on-surface">{data.summary.total}</p>
+            <p className="text-kpi text-on-surface">{data.summary.total}</p>
           </div>
           <div>
             <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
               올해 도래
             </p>
-            <p className="text-2xl font-black text-error">{data.summary.dueNow}</p>
+            <p className="text-kpi text-error">{data.summary.dueNow}</p>
           </div>
           <div>
             <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
               기한 초과
             </p>
-            <p className="text-2xl font-black text-error">{data.summary.overdue}</p>
+            <p className="text-kpi text-error">{data.summary.overdue}</p>
           </div>
           <div>
             <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
               판단 필요
             </p>
-            <p className="text-2xl font-black text-status-warning-text">{data.summary.needsDecision}</p>
+            <p className="text-kpi text-status-warning-text">{data.summary.needsDecision}</p>
           </div>
           <div>
             <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
               이력 없음
             </p>
-            <p className="text-2xl font-black text-on-surface-variant">{data.summary.noHistory}</p>
+            <p className="text-kpi text-on-surface-variant">{data.summary.noHistory}</p>
           </div>
         </div>
         <p className="text-xs text-on-surface-variant mt-4 flex items-center gap-4">

@@ -25,6 +25,44 @@ const AI_FAIL_TEXT: Record<AskFailReason, string> = {
 
 export type SearchFn = (message: string) => Promise<{ ok: true; matches: DocMatch[] } | null>;
 
+// 질문에서 "무엇에 대한" 말인지 가리키는 핵심어만 남긴다 — 고장·점검·확인처럼 어느 매뉴얼에나 있는 말은 뺀다.
+const QUERY_STOPWORDS = new Set([
+  "고장", "점검", "확인", "매뉴얼", "방법", "순서", "절차", "조치", "원인", "이상", "문제", "발생", "알려줘", "알려", "가르쳐줘",
+  "뭐부터", "뭘", "무엇을", "무엇부터", "어떻게", "어디부터", "먼저", "해야", "하면", "하는", "할지", "봐야", "보면", "보고", "있어", "있으면",
+  "났을", "났어", "나면", "났을때", "때", "경우", "관련", "대해", "대한", "좀", "제발", "지금", "오늘", "설비", "장비", "기기",
+]);
+const PARTICLES = /(에서는|으로는|에게|에서|부터|까지|으로|이나|이랑|처럼|보다|에는|은|는|이|가|을|를|의|에|로|도|와|과|만|요)$/;
+
+export function queryKeywords(message: string): string[] {
+  const out: string[] = [];
+  for (const raw of message.toLowerCase().split(/[\s,.?!·/()\[\]"'“”‘’]+/)) {
+    let w = raw.trim();
+    if (!w) continue;
+    // "고장났을때"처럼 불용어로 시작하는 덩어리는 통째로 뺀다
+    if ([...QUERY_STOPWORDS].some((s) => s.length >= 2 && w.startsWith(s))) continue;
+    w = w.replace(PARTICLES, "");
+    if (w.length < 2 || QUERY_STOPWORDS.has(w)) continue;
+    out.push(w);
+  }
+  return Array.from(new Set(out));
+}
+
+/**
+ * 검색 결과 중 질문과 실제로 관련 있는 문서만 남긴다.
+ * 임베딩 검색은 "유량계 고장"에도 점검·고장이라는 말이 있는 SFC·GCB 매뉴얼을 돌려줬다 — 핵심어(유량계)가
+ * 제목·발췌에 없으면 버리고, 핵심어가 하나도 없는 질문이면 유사도 0.5 이상만 남긴다.
+ */
+export function relevantMatches(message: string, matches: DocMatch[]): DocMatch[] {
+  const keys = queryKeywords(message);
+  return matches.filter((m) => {
+    const sim = typeof (m as { similarity?: number }).similarity === "number" ? (m as { similarity: number }).similarity : 0;
+    if (sim >= 0.5) return true;
+    if (keys.length === 0) return false;
+    const hay = `${m.title} ${m.snippet}`.toLowerCase();
+    return keys.some((k) => hay.includes(k));
+  });
+}
+
 export interface DdasomiReply {
   text: string;
   kind: AnswerKind | "error" | "documents";
@@ -89,6 +127,7 @@ export async function getDdasomiReply(
       // 문서 검색 실패는 조용히 넘기고 아래로 계속 진행한다
     }
   }
+  matches = relevantMatches(message, matches);
   const docsForAi = matches.slice(0, 5).map((m) => ({
     title: m.title, docType: m.docType, branch: m.branch, field: m.field, snippet: m.snippet,
   }));
@@ -103,10 +142,12 @@ export async function getDdasomiReply(
     try {
       const result = await askFn(message, snapshot, docsForAi.length ? { docs: docsForAi } : undefined);
       if (result && result.ok && typeof result.answer === "string" && result.answer.trim()) {
+        // 모델이 실제로 근거로 쓴 문서만 카드로 남긴다("근거문서: 없음"이면 카드 없음). 번호 줄이 없으면 검색 결과 그대로.
+        const used = Array.isArray(result.usedDocs) ? result.usedDocs.map((i) => matches[i]).filter(Boolean) : matches;
         return {
           text: result.answer.trim(),
           kind: "answer",
-          matches: matches.length ? matches : undefined,
+          matches: used.length ? used : undefined,
           scope: result.scope,
         };
       }

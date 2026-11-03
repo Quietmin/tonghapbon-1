@@ -557,7 +557,7 @@ export default function MaintenancePlan() {
                       {c}
                     </p>
                     <p
-                      className={`text-2xl font-black ${
+                      className={`text-kpi ${
                         c === "필수"
                           ? "text-error"
                           : c === "선택"
@@ -573,7 +573,7 @@ export default function MaintenancePlan() {
                   <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
                     선택됨
                   </p>
-                  <p className="text-2xl font-black text-primary">{selected.size}</p>
+                  <p className="text-kpi text-primary">{selected.size}</p>
                 </div>
               </div>
             </div>
@@ -878,12 +878,12 @@ export default function MaintenancePlan() {
                       ? `선택한 ${selected.size}건으로 수량산출서를 만듭니다`
                       : "위 목록에서 항목을 먼저 선택하세요"
                   }
-                  className="flex items-center justify-center gap-2 h-14 px-7 rounded-xl bg-primary text-on-primary text-title-sm font-black shadow-card-hover transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:shadow-none"
+                  className="flex items-center justify-center gap-2 h-14 px-7 rounded-xl bg-primary text-on-primary text-title-sm font-bold shadow-card-hover transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:shadow-none"
                 >
                   <Icon name="table_view" className="text-xl" />
                   {busy ? "만드는 중…" : "확정하고 엑셀 내보내기"}
                   {!!selected.size && !busy && (
-                    <span className="ml-1 px-2 py-0.5 rounded-full bg-on-primary/20 text-sm font-black">
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-on-primary/20 text-sm font-bold">
                       {selected.size}
                     </span>
                   )}

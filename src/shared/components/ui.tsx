@@ -35,10 +35,13 @@ export function RequiredMark() {
 
 export function Card({
   className = "",
-  lift = true,
+  lift = false,
   children,
   ...rest
-}: { lift?: boolean } & HTMLAttributes<HTMLDivElement>) {
+}: {
+  /** 눌러서 이동하는 카드만 true — 마우스를 올리면 살짝 떠오른다. 읽기만 하는 카드는 움직이지 않는다 */
+  lift?: boolean;
+} & HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={`glass-card rounded-xl ${lift ? "" : "no-lift"} ${className}`} {...rest}>
       {children}
@@ -336,7 +339,7 @@ export function ScreenHeader({
     <section className="pt-2 flex flex-col gap-4">
       {/* 모바일 */}
       <div className="md:hidden text-center">
-        <h1 className="text-2xl font-black text-on-surface">{title}</h1>
+        <h1 className="text-2xl font-bold text-on-surface">{title}</h1>
         {bullets === undefined && <p className="text-sm text-on-surface-variant mt-2">{desc}</p>}
         {bullets && bullets.length > 0 && (
           <ul className="mt-2 inline-block text-left">

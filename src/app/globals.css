@@ -16,6 +16,16 @@
   --color-background: #fafafa;
   --color-on-background: #171717;
 
+  /*
+   * 색 역할 — 색마다 맡은 일이 하나다.
+   *   남색(primary)         : 누르는 것·선택된 것·강조 링크. 상태를 뜻하지 않는다.
+   *   상태 색(status-*)      : 완료(초록)·주의(주황)·지연/오류(빨강)·예정(보라) — 상태에만 쓴다.
+   *                           점·막대는 밝은 색, 글자는 짙은 *-text 색(대비 4.5:1).
+   *   빨강(error)           : status-error-text 와 같은 색 하나. 삭제·필수 누락·지연.
+   *   주황(tertiary)         : 따소미(마스코트)와 브랜드 이미지 전용. 화면 강조색으로 쓰지 않는다
+   *                           (상태의 주황, 조치중과 헷갈린다).
+   *   회색 단계(surface-*)   : 바탕과 구분선. 글자는 on-surface / on-surface-variant 두 단계만.
+   */
   --color-surface: #ffffff;
   --color-surface-bright: #ffffff;
   --color-surface-dim: #e5e5e5;
@@ -73,7 +83,7 @@
   --color-on-tertiary-fixed: #5c1d04;
   --color-on-tertiary-fixed-variant: #8a2d08;
 
-  --color-error: #ba1a1a;
+  --color-error: #b3261e;
   --color-error-container: #ffdad6;
   --color-on-error: #ffffff;
   --color-on-error-container: #93000a;
@@ -134,6 +144,15 @@
   --text-title-sm: 17px;
   --text-title-sm--line-height: 22px;
   --text-title-sm--font-weight: 500;
+  /* 핵심 수치(건수·퍼센트·일수) — 제목(500)보다 굵게 해서 한눈에 읽히게. 큰 것은 첫 화면·대시보드의 대표 수치 */
+  --text-kpi-lg: 32px;
+  --text-kpi-lg--line-height: 38px;
+  --text-kpi-lg--letter-spacing: -0.02em;
+  --text-kpi-lg--font-weight: 700;
+  --text-kpi: 26px;
+  --text-kpi--line-height: 32px;
+  --text-kpi--letter-spacing: -0.02em;
+  --text-kpi--font-weight: 700;
   --text-body-md: 15px;
   --text-body-md--line-height: 20px;
   /* Tailwind 기본값과 같다 — 아래 md 이상 블록에서 한 단계 올리기 위해 명시해 둔다 */
@@ -167,6 +186,8 @@
   :root {
     --text-body-md: 16px;
     --text-body-md--line-height: 22px;
+    --text-kpi-lg: 36px;
+    --text-kpi-lg--line-height: 42px;
     --text-xs: 13px;
     --text-xs--line-height: 18px;
     --color-on-surface-variant: #595959;
@@ -259,6 +280,10 @@ body {
     border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow: var(--shadow-card);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .text-kpi,
+  .text-kpi-lg {
+    font-variant-numeric: tabular-nums;
   }
   .glass-card:hover {
     transform: translateY(-2px);

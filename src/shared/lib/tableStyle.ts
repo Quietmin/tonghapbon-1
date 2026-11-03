@@ -5,10 +5,10 @@ import type { KeyboardEvent } from "react";
  * 쓰도록 한 곳에 둔다. 표마다 따로 적으면 한쪽만 고쳐져 화면마다 표가 달라 보인다.
  */
 
-export const TABLE = "w-full text-sm";
+export const TABLE = "w-full text-sm tabular-nums";
 
-/** 머리 줄 — 흐린 글자색 + 아래 선 */
-export const HEAD_ROW = "text-on-surface-variant border-b border-border-subtle";
+/** 머리 줄 — 흐린 글자색 + 옅은 바탕 + 아래 선 (본문 줄과 한눈에 갈린다) */
+export const HEAD_ROW = "text-on-surface-variant bg-surface-container-low border-b border-border-subtle";
 
 /** 머리 칸 / 본문 칸의 위아래 여백(행 높이). 좌우 여백은 표마다 열 구성에 맞춰 붙인다 */
 export const TH_Y = "py-3 font-bold whitespace-nowrap";

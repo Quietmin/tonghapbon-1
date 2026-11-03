@@ -440,14 +440,14 @@ export default function TaskManagement() {
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-2">
             전체 완료율
           </p>
-          <p className="text-2xl font-black text-primary">{s?.overall ?? 0}%</p>
+          <p className="text-kpi text-primary">{s?.overall ?? 0}%</p>
           <ProgressBar value={s?.overall ?? 0} className="mt-2" height="h-1.5" />
         </Card>
         <Card className="p-card-padding">
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-2">
             지연 위험
           </p>
-          <p className="text-2xl font-black text-error">
+          <p className="text-kpi text-error">
             {String(s?.riskCount ?? 0).padStart(2, "0")}
           </p>
           <p className="text-xs text-error mt-1">즉시 조치 필요</p>
@@ -456,14 +456,14 @@ export default function TaskManagement() {
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-2">
             투입 인원
           </p>
-          <p className="text-2xl font-black text-on-surface">{s?.personnel ?? 0}명</p>
+          <p className="text-kpi text-on-surface">{s?.personnel ?? 0}명</p>
           <p className="text-xs text-on-surface-variant mt-1">담당 지정 기준</p>
         </Card>
         <Card className="p-card-padding">
           <p className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold mb-2">
             잔여 기간
           </p>
-          <p className="text-2xl font-black text-on-surface">{s?.remainingDays ?? 0}일</p>
+          <p className="text-kpi text-on-surface">{s?.remainingDays ?? 0}일</p>
           <p className="text-xs text-on-surface-variant mt-1">
             {s?.endDate ? `~ ${s.endDate}` : "계약기간 미설정"}
           </p>

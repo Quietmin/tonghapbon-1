@@ -38,7 +38,14 @@ export type AskFn = (
   context: ChatbotSnapshot,
   opts?: { timeoutMs?: number; docs?: AskDoc[] },
 ) => Promise<
-  | { ok: true; answer: string; /** 이 답이 조회한 지사 범위("청주지사" 또는 "전 지사") */ scope?: string }
+  | {
+      ok: true;
+      answer: string;
+      /** 이 답이 조회한 지사 범위("청주지사" 또는 "전 지사") */
+      scope?: string;
+      /** 모델이 실제로 근거로 쓴 문서의 인덱스(검색 결과 순). null 이면 형식을 못 지킨 것 — 검색 결과를 그대로 쓴다 */
+      usedDocs?: number[] | null;
+    }
   | { ok: false; reason: AskFailReason }
   | null
 >;

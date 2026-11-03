@@ -148,13 +148,13 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
         <Card className="p-card-padding flex items-center gap-6">
           <ProgressRing value={m.overall}>
-            <span className="text-xl font-black text-on-surface">{m.overall}%</span>
+            <span className="text-xl font-bold text-on-surface tabular-nums">{m.overall}%</span>
           </ProgressRing>
           <div>
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">
               전체 공정률
             </p>
-            <h4 className={`text-3xl font-black ${onTrack ? "text-primary" : "text-error"}`}>
+            <h4 className={`text-kpi break-keep ${onTrack ? "text-primary" : "text-error"}`}>
               {onTrack ? "정상 진행" : "지연 주의"}
             </h4>
             <p
@@ -173,7 +173,7 @@ export default function Dashboard() {
             오버홀 경과일
           </p>
           <div className="flex items-end gap-2 mb-2">
-            <span className="text-4xl font-black text-on-surface">{m.sched.elapsed}</span>
+            <span className="text-kpi-lg text-on-surface">{m.sched.elapsed}</span>
             <span className="text-on-surface-variant text-xl mb-1">
               / {m.sched.totalDays || "—"}일
             </span>
@@ -197,7 +197,7 @@ export default function Dashboard() {
               <Icon name="warning" fill />
             </span>
           </div>
-          <h4 className="text-4xl font-black text-error">
+          <h4 className="text-kpi-lg text-error">
             {String(m.riskCount).padStart(2, "0")}
           </h4>
           <p className="text-sm text-on-surface-variant mt-1">
