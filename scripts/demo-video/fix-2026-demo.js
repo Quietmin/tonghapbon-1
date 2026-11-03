@@ -209,49 +209,114 @@ async function emptyGwanggyo() {
 // 공정률 예측(simulate)과 실제 쓰기가 같은 작업을 고르도록 함수 하나로 둔다.
 const DELAY_FRAC = [0.5, 0.4, 0.6, 0.45, 0.55, 0.35];
 
-// 분해 전/후 사진 — 작업 이름에 맞는 실사를 붙인다 (photos/real, 출처는 그 폴더 CREDITS.md).
+// 분해 전/후 사진 — 판교에서 실적이 있는 작업 전부에 붙인다.
+// 사진은 photos/real/lib의 위키미디어 공용 실사(출처는 그 폴더 CREDITS.md)에서 작업 이름에 맞는
+// 종류를 고르고, 작업마다 자르는 위치·배율을 달리해 같은 사진이 반복돼 보이지 않게 한다.
+//   완료 작업      — 처음 실적에 분해 전, 마지막 실적에 분해 후 (실적이 하나면 둘 다 그 실적에)
+//   진행·지연 작업 — 아직 안 끝났으니 분해 전만
 // 예전 일러스트 사진은 "6.9kV 차단기" 같은 글자가 박혀 있어 가스터빈 작업에 붙으면 어색했다.
-const PHOTO_RULES = [
+const PHOTO_LIB = path.join(__dirname, "photos", "real", "lib");
+const PHOTO_CATS = [
+  [/비계/, "scaffold"],
   [/베어링/, "bearing"],
-  [/터닝기어|기어/, "gear"],
-  [/로터|회전자/, "rotor"],
-  [/압축기|블레이드/, "compressor"],
+  [/터닝기어|감속기/, "gear"],
+  [/발전기.*(고정자|회전자|절연)|여자기/, "generator"],
+  [/압축기 블레이드/, "compressor"],
+  [/고온부|HGPI|주요점검/, "hotgas"],
+  [/축정렬|커플링/, "coupling"],
+  [/로터/, "rotor"],
+  [/연소기|연료가스 노즐|점화장치|흡기필터|배기 디퓨저/, "combustor"],
+  [/냉각탑/, "coolingtower"],
+  [/전동기/, "motor"],
+  [/환기팬|송풍기/, "fan"],
+  [/윤활유 냉각기|열교환기|급수가열기/, "platehx"],
+  [/안전밸브/, "safetyvalve"],
+  [/제어밸브|포지셔너/, "controlvalve"],
+  [/수압시험/, "gauge"],
+  [/버너|연소안전/, "burner"],
+  [/튜브|과열기|재열기|증발기|절탄기|복수기/, "boilertube"],
+  [/드럼|탈기기|수위계|촉매|댐퍼/, "vessel"],
+  [/보온/, "insulation"],
+  [/축열조|팽창탱크|저장탱크|리시버/, "tank"],
+  [/이온교환|순수|연화|정화|필터 교체/, "watertreat"],
+  [/비파괴|용접|서포트|행거|배관/, "pipeweld"],
+  [/GIS|피뢰기|계기용 변성기/, "gis"],
+  [/변압기|절연유/, "transformer"],
+  [/MCC/, "mcc"],
+  [/차단기|SWGR|LOAD CENTER|접지장치|수배전/, "switchgear"],
+  [/축전지|충전기|UPS/, "battery"],
+  [/비상발전기/, "dieselgen"],
+  [/계전기|전력량계/, "relay"],
+  [/케이블/, "cable"],
+  [/CEMS|원격감시|분석기|가스감지기|FGSS|비상정지/, "gasdetector"],
+  [/전송기/, "transmitter"],
+  [/DCS|컨트롤러|입출력|콘솔|워크스테이션|네트워크|전원공급|PLC|터빈제어|진동감시|과속도|루프|시운전/, "dcs"],
+  [/밸브/, "valve"],
+  [/펌프|압축기|감압설비|플러싱|계장공기/, "pump"],
+  [/증기터빈|케이싱|그랜드/, "rotor"],
+  [/HRSG/, "boilertube"],
 ];
-function pickPhotoTasks(overdue, delayPick) {
-  const photoTargets = [], photoPairs = [];
-  for (const [re, key] of PHOTO_RULES) {
-    const hit = overdue.find((t) => re.test(t.name) && !delayPick.includes(t.id) && !photoTargets.includes(t.id));
-    if (hit) { photoTargets.push(hit.id); photoPairs.push(key); }
-  }
-  return { photoTargets, photoPairs };
-}
-const photoPayload = (key) => ({
-  keepIds: [],
-  add: [
-    { slot: "before", dataUrl: dataUrl(PHOTO(`real/${key}-before.jpg`)) },
-    { slot: "after", dataUrl: dataUrl(PHOTO(`real/${key}-after.jpg`)) },
-  ],
-});
+const FIELD_FALLBACK = { 기계: "pump", 전기: "switchgear", 제어: "dcs" };
+const photoCat = (t) => (PHOTO_CATS.find(([re]) => re.test(t.name)) ?? [null, FIELD_FALLBACK[t.field] ?? "pump"])[1];
+const hashOf = (str) => { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h; };
 
-// 사진만 바꾼다 — 실적·공정률은 그대로 두고, 사진이 붙어 있던 실적의 사진을 교체한다
-async function replacePangyoPhotos() {
-  const branch = "판교지사";
-  await setBranch(branch);
-  const { project } = await mainProject(branch);
+async function photoPair(t) {
+  const sharp = require("sharp");
+  sharp.cache(false);
+  const cat = photoCat(t);
+  const files = fs.readdirSync(PHOTO_LIB).filter((f) => f.startsWith(cat + "-") && f.endsWith(".jpg")).sort();
+  const h = hashOf(t.id);
+  const src = fs.readFileSync(path.join(PHOTO_LIB, files[h % files.length]));
+  const { width: W, height: H } = await sharp(src).metadata();
+  // 작업마다 다른 구도 — 배율 78~92%, 자르는 위치도 작업마다 다르게
+  const crop = (scale, seed) => {
+    const w = Math.round(W * scale), hh = Math.round(H * scale);
+    return { left: Math.round((W - w) * ((seed % 100) / 100)), top: Math.round((H - hh) * (((seed >>> 7) % 100) / 100)), width: w, height: hh };
+  };
+  const scale = 0.78 + (h % 15) / 100;
+  const after = await sharp(src).extract(crop(scale, h >>> 3)).resize(1024, 768)
+    .modulate({ brightness: 1.04, saturation: 1.05 }).sharpen().jpeg({ quality: 76 }).toBuffer();
+  const grime = Buffer.from(
+    '<svg width="1024" height="768"><defs><radialGradient id="g" cx="50%" cy="50%" r="75%">' +
+      '<stop offset="0%" stop-color="#3b2a14" stop-opacity="0.10"/><stop offset="100%" stop-color="#1c140a" stop-opacity="0.55"/>' +
+      '</radialGradient></defs><rect width="1024" height="768" fill="url(#g)"/></svg>',
+  );
+  // 분해 전 — 같은 설비를 조금 다른 구도로, 유막·먼지가 낀 듯 어둡고 누렇게
+  const before = await sharp(src).extract(crop(Math.max(0.7, scale - 0.08), h >>> 13)).resize(1024, 768)
+    .modulate({ brightness: 0.72, saturation: 0.45 }).tint({ r: 150, g: 120, b: 80 }).blur(0.8)
+    .composite([{ input: grime, blend: "multiply" }]).jpeg({ quality: 74 }).toBuffer();
+  const url = (b) => "data:image/jpeg;base64," + b.toString("base64");
+  return { cat, before: url(before), after: url(after) };
+}
+
+/** 판교 회차에서 실적이 있는 작업 전부에 분해 전/후 사진을 붙인다 (실적 값은 그대로) */
+async function attachPangyoPhotos(project) {
   const rows = await getRows(project.id);
-  let replaced = 0;
-  for (const [re, key] of PHOTO_RULES) {
-    for (const t of rows.filter((r) => re.test(r.name))) {
-      const { entries = [] } = await api("GET", `/api/overhaul/entries?taskId=${t.id}`);
-      const withPhoto = entries.find((e) => (e.photos || []).length);
-      if (!withPhoto) continue;
-      await postEntry(t.id, toDate(withPhoto.entry_date), Number(withPhoto.done_qty),
-        withPhoto.work_detail || "", withPhoto.delay_reason || "", withPhoto.next_plan || "", photoPayload(key));
-      console.log(`  판교: "${t.name}" 사진 → ${key}`);
-      replaced++;
+  let tasks = 0, photos = 0;
+  const byCat = {};
+  for (const t of rows) {
+    const { entries = [] } = await api("GET", `/api/overhaul/entries?taskId=${t.id}`);
+    if (!entries.length) continue;
+    const asc = entries.slice().sort((a, b) => (toDate(a.entry_date) < toDate(b.entry_date) ? -1 : 1));
+    const pair = await photoPair(t);
+    const repost = (e, add) => postEntry(t.id, toDate(e.entry_date), Number(e.done_qty),
+      e.work_detail || "", e.delay_reason || "", e.next_plan || "", { keepIds: [], add });
+    const before = { slot: "before", dataUrl: pair.before };
+    const after = { slot: "after", dataUrl: pair.after };
+    if ((t.actual ?? 0) >= 100) {
+      if (asc.length >= 2) { await repost(asc[0], [before]); await repost(asc[asc.length - 1], [after]); }
+      else await repost(asc[0], [before, after]);
+      photos += 2;
+    } else {
+      await repost(asc[0], [before]);
+      photos += 1;
     }
+    tasks++;
+    byCat[pair.cat] = (byCat[pair.cat] ?? 0) + 1;
+    if (tasks % 30 === 0) console.log(`    …사진 ${tasks}건`);
   }
-  console.log(`  판교: 사진 ${replaced}건 교체`);
+  console.log(`  판교: 실적 있는 작업 ${tasks}건 전부에 사진 ${photos}장 (${Object.keys(byCat).length}종)`);
+  return { tasks, photos };
 }
 function pickDelays(overdue) {
   const picked = [];
@@ -334,10 +399,8 @@ async function pangyoInProgress() {
     "협력사 인력 수급 지연",
   ];
 
-  // 사진 — 완료 작업 4건에 그 설비의 분해 전/후 실사를 붙인다
-  const { photoTargets, photoPairs } = pickPhotoTasks(overdue, delayPick);
 
-  let done = 0, prog = 0, wait = 0, delayed = 0, photos = 0;
+  let done = 0, prog = 0, wait = 0, delayed = 0;
   for (const t of rows) {
     await clearEntries(t.id);
     const planQty = Number(t.planQty) || 1;
@@ -366,10 +429,7 @@ async function pangyoInProgress() {
       if (span >= 3 && planQty > 1) {
         await postEntry(t.id, addDays(s, Math.round(span * 0.55)), midQty(planQty, 0.6), detailFor(t.name, "mid"));
       }
-      const pi = photoTargets.indexOf(t.id);
-      const photoArg = pi >= 0 ? photoPayload(photoPairs[pi]) : undefined;
-      await postEntry(t.id, e, planQty, detailFor(t.name, "end"), "", "", photoArg);
-      if (photoArg) photos++;
+      await postEntry(t.id, e, planQty, detailFor(t.name, "end"));
       done++;
     } else if (s <= TODAY) {
       const frac = Math.min(0.9, Math.max(0.25, daysBetween(s, TODAY) / Math.max(1, daysBetween(s, e))));
@@ -387,7 +447,8 @@ async function pangyoInProgress() {
     rowsAfter.reduce((a, t) => a + (Number(t.planQty) || 1) * (t.actual ?? 0), 0) /
     Math.max(1, rowsAfter.reduce((a, t) => a + (Number(t.planQty) || 1), 0)),
   );
-  console.log(`  판교: ${newStart}~${newEnd} · 완료 ${done} · 진행 ${prog} · 지연 ${delayed} · 대기 ${wait} · 사진 ${photos}건 → 공정률 약 ${pct}%`);
+  console.log(`  판교: ${newStart}~${newEnd} · 완료 ${done} · 진행 ${prog} · 지연 ${delayed} · 대기 ${wait} → 공정률 약 ${pct}%`);
+  await attachPangyoPhotos(project);
 }
 
 // ── ⑤ 청주 — 일정 없는 작업에 일정을 깔고 분야를 맞춘다 ────────────────────
@@ -667,7 +728,8 @@ const BRANCHES = [
   }
   if (mode === "photos") {
     console.log("\n■ 판교 사진 교체");
-    await replacePangyoPhotos();
+    await setBranch("판교지사");
+    await attachPangyoPhotos((await mainProject("판교지사")).project);
   }
   if (mode === "review" || mode === "all") {
     console.log("\n■ 확인 필요·수량 미기재 정리");
