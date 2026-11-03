@@ -104,7 +104,7 @@ export const NAV_GROUPS: NavGroup[] = [
     // exact — /failure/new 에서도 조회가 켜져 보이면 어디 있는지 알 수 없다.
     items: [
       { href: "/failure", label: "고장보고서 조회", icon: "inventory_2", exact: true },
-      { href: "/failure/new", label: "고장보고서 등록", icon: "edit_note" },
+      { href: "/failure/new", label: "고장보고서 작성", icon: "edit_note" },
     ],
   },
   {
@@ -119,7 +119,7 @@ export const NAV_GROUPS: NavGroup[] = [
     desc: "현황을 조회하고, 새 현황을 등록합니다.",
     items: [
       { href: "/status", label: "현황 조회", icon: "monitoring", exact: true },
-      { href: "/status/new", label: "현황 등록", icon: "edit_note" },
+      { href: "/status/new", label: "현황 작성", icon: "edit_note" },
     ],
   },
 ];

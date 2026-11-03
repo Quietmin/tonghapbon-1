@@ -12,7 +12,7 @@ import { Icon, RequiredMark, InlineError } from "./ui";
  * 이루어진 좌우 분할형이고, 마지막에 고른 지사·부서가 미리 채워져 있어 [로그인]만 누르면 된다. 로그인하면
  * 들어온 주소 그대로 화면이 열린다(루트로 들어왔으면 홈). 고르기 전에는 다른 화면을 쓸 수 없다.
  *
- * 선택은 쿠키에 담기고(/api/profile), 서버가 getCurrentUser() 로 읽어 현황 등록의 기본 지사·부서와 현황
+ * 선택은 쿠키에 담기고(/api/profile), 서버가 getCurrentUser() 로 읽어 현황 작성의 기본 지사·부서와 현황
  * 조회의 기본 필터에 쓴다. 로그인했다는 표시는 브라우저를 닫으면 사라지는 세션 쿠키(oh_session)다. 헤더의
  * "강남지사 · 계전부" 칩을 누르면 지사·부서를 바꾸거나 로그아웃할 수 있다(그때는 작은 창이고 닫기 가능).
  *
@@ -286,7 +286,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           >
             <DialogHeader id="profileDlgTitle" title="계정 설정 — 내 지사·부서" onClose={() => setOpen(false)} />
             <p className="text-sm text-on-surface-variant break-keep">
-              고른 지사·부서 기준으로 현황이 먼저 보이고, 현황 등록에도 자동으로 채워집니다. 업무망 로그인이
+              고른 지사·부서 기준으로 현황이 먼저 보이고, 현황 작성에도 자동으로 채워집니다. 업무망 로그인이
               연결되기 전까지 임시로 쓰는 선택입니다.
             </p>
 

@@ -59,7 +59,10 @@
    (원본 주석) 고장 보고서의 .fr-photo-cap 도 같은 기준을 쓴다. */
 .desc-text {
   width: 100%; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere;
-  font-size: 14px; font-weight: 700; line-height: 1.5; text-align: justify;
+  /* 굵기 400 — 원본(뚝DOC) 캡션과 같은 보통 굵기다. 700 으로 찍으면 ①②③·※ 같은
+     원문자·기호가 대체 글꼴로 그려지면서 숫자가 뭉개져 ◉·✳ 처럼 보이고, 글자가
+     빽빽해져 설명란이 잘 읽히지 않는다. (SFC-09 매뉴얼 사례, 2026-11-03) */
+  font-size: 14px; font-weight: 400; line-height: 1.5; text-align: justify;
 }
 /* 텍스트 항목은 사진 칸/설명 칸으로 나누지 않고 칸 하나를 통째로 쓴다.
    위쪽 여백은 좌상단 순번 배지(2mm+6mm)를 피하려고 넉넉히 잡았다. (원본 주석) */
@@ -201,7 +204,8 @@
   /* 정렬 기준은 .desc-text(사진대장·매뉴얼)와 같은 양쪽정렬이다 — 원본과 동일.
      두 문서의 사진 설명이 서로 다른 기준으로 찍히면 같은 앱에서 나온 문서로 보이지 않는다. */
   border-top: 1px solid #000; min-height: calc(1.4em + 3mm); padding: 1.5mm 2mm;
-  font-size: 10px; font-weight: 600; line-height: 1.4; text-align: justify;
+  /* 굵기 400 — .desc-text 와 같은 이유다. 600 으로 찍으면 ①②③·※ 가 뭉개진다. */
+  font-size: 10px; font-weight: 400; line-height: 1.4; text-align: justify;
   display: flex; flex-direction: column; align-items: stretch; justify-content: center;
   white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; box-sizing: border-box;
   overflow: hidden;

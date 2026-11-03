@@ -22,7 +22,7 @@ const COMPRESS = { maxEdge: 1400, quality: 0.8, targetBytes: 600_000, hardLimitB
 export const MAX_TOTAL_PHOTO_CHARS = 3_500_000;
 
 /**
- * 현황 등록 화면의 사진 첨부 — 고르면 브라우저에서 바로 줄이고 썸네일로 보여 준다. 폰에서는 사진 추가를
+ * 현황 작성 화면의 사진 첨부 — 고르면 브라우저에서 바로 줄이고 썸네일로 보여 준다. 폰에서는 사진 추가를
  * 누르면 카메라나 앨범을 고를 수 있다. 사진은 선택 사항이다(없어도 등록된다).
  */
 export function PhotoPicker({
@@ -186,7 +186,7 @@ export function IssuePhotos({ issueId }: { issueId: string }) {
   );
 }
 
-/** 현황 팝업의 "고장보고서 등록" 바로가기 — 설비·내용·지사·발생일시가 채워진 채 등록 화면이 열린다 */
+/** 현황 팝업의 "고장보고서 작성" 바로가기 — 설비·내용·지사·발생일시가 채워진 채 등록 화면이 열린다 */
 export function FaultReportLink({ row }: { row: StatusIssueRow }) {
   return (
     <Link
@@ -194,7 +194,7 @@ export function FaultReportLink({ row }: { row: StatusIssueRow }) {
       className="px-4 py-2.5 rounded-sm font-bold text-sm text-primary hover:bg-surface-container-high inline-flex items-center gap-1.5"
     >
       <Icon name="edit_note" className="text-base" />
-      고장보고서 등록
+      고장보고서 작성
     </Link>
   );
 }

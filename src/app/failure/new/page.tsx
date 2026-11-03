@@ -1,13 +1,13 @@
 import FaultReportEditor, { type FaultReportInitial } from "@/modules/docgen/components/FaultReportEditor";
 import { BRANCHES } from "@/modules/docgen/lib/constants";
 
-export const metadata = { title: "고장보고서 등록 — 유지보수 마스터" };
+export const metadata = { title: "고장보고서 작성 — 유지보수 마스터" };
 
 /**
- * 고장보고서 등록 — 원래 /docgen/fault-report 였던 화면 그대로.
+ * 고장보고서 작성 — 원래 /docgen/fault-report 였던 화면 그대로.
  * 편집기 본체는 modules/docgen 에 있고 여기는 경로만 준다.
  *
- * 현황 이슈의 "고장보고서 등록" 버튼에서 넘어오면 주소의 값(branch·facility·content·occurred)으로
+ * 현황 이슈의 "고장보고서 작성" 버튼에서 넘어오면 주소의 값(branch·facility·content·occurred)으로
  * 지사·설비명·고장내용·발생일시를 미리 채워 같은 내용을 다시 적지 않게 한다. 주소는 누구나 만들 수 있으니
  * 지사는 목록에 있는 값만, 나머지는 길이를 잘라 받는다.
  */
