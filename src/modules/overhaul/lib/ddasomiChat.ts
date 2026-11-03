@@ -6,6 +6,7 @@ import { toDdasomiText } from "./ddasomiVoice";
 import type { ChatbotSnapshot } from "./chatbotSnapshot";
 import type { AskFn, AskFailReason } from "./chatbotAI";
 import type { DocMatch } from "@/modules/docgen/lib/docgenSearch";
+import { FOLLOW_UP_RE, type HistoryTurn, type TurnMemory } from "./chatbotHistory";
 
 const APOLOGY_TEXT = "잠시 문제가 생겼어요. 공정 데이터를 다시 확인해볼게요.";
 // 고장이력·매뉴얼 등 다른 모듈 조회는 서버 GPT만 할 수 있다 — 꺼져 있으면 꺼져 있다고 정확히 알린다.
@@ -71,6 +72,8 @@ export interface DdasomiReply {
   matches?: DocMatch[];
   /** AI 답변이 조회한 지사 범위("청주지사" 또는 "전 지사") — 화면이 칩으로 보여 준다 */
   scope?: string;
+  /** AI 답변이 실제로 조회한 대상 — 화면이 보관했다가 다음 질문의 history 에 싣는다 */
+  memory?: TurnMemory;
 }
 
 /**
@@ -92,6 +95,9 @@ export interface DdasomiReply {
  * 시스템 사용법에는 답할 수 있어야 하기 때문이다(해커톤 시연 요구). 수치를 지어내지 않도록 하는 규칙은
  * 서버 프롬프트(api/overhaul/chatbot/route.ts)가 담당하며, GPT가 꺼져 있거나 실패하면 기존 로컬 안내문으로 대체된다.
  *
+ * history(앞선 대화)가 있으면 GPT 에 함께 보내 이어지는 질문으로 답하게 한다. "그 설비는?"처럼 앞 대화를
+ * 가리키는 질문은 문장만으로 문서를 검색하면 엉뚱한 문서가 걸리므로 문서 검색을 건너뛴다(FOLLOW_UP_RE).
+ *
  * 실적 수정/삭제 요청은 GPT에 보내지 않고 즉시 처리한다 — GPT는 실제로 아무 것도
  * 수행할 수 없으므로, 이런 요청을 보내면 "삭제했다"처럼 실제로 하지 않은 일을 한 것처럼 답할 위험이 있다.
  */
@@ -100,6 +106,7 @@ export async function getDdasomiReply(
   snapshot: ChatbotSnapshot,
   askFn?: AskFn,
   searchFn?: SearchFn,
+  history: HistoryTurn[] = [],
 ): Promise<DdasomiReply> {
   const local = answerQuestion(message, snapshot);
   // 고장이력·매뉴얼·현황 등은 로컬 규칙이 못 본다 — "공정 데이터 없음" 단락에 걸리지 않고
@@ -118,7 +125,8 @@ export async function getDdasomiReply(
   if (
     (local.kind === "no_data" || local.kind === "unsupported") &&
     typeof searchFn === "function" &&
-    !isStructuredDataQuestion(message)
+    !isStructuredDataQuestion(message) &&
+    !(history.length > 0 && FOLLOW_UP_RE.test(message))
   ) {
     try {
       const result = await searchFn(message);
@@ -129,6 +137,7 @@ export async function getDdasomiReply(
   }
   matches = relevantMatches(message, matches);
   const docsForAi = matches.slice(0, 5).map((m) => ({
+    id: m.id,
     title: m.title, docType: m.docType, branch: m.branch, field: m.field, snippet: m.snippet,
   }));
   const cardsOnly = (): DdasomiReply => ({
@@ -140,7 +149,10 @@ export async function getDdasomiReply(
   let aiFailReason: AskFailReason = "error";
   if (typeof askFn === "function") {
     try {
-      const result = await askFn(message, snapshot, docsForAi.length ? { docs: docsForAi } : undefined);
+      const result = await askFn(message, snapshot, {
+        ...(docsForAi.length ? { docs: docsForAi } : {}),
+        ...(history.length ? { history } : {}),
+      });
       if (result && result.ok && typeof result.answer === "string" && result.answer.trim()) {
         // 모델이 실제로 근거로 쓴 문서만 카드로 남긴다("근거문서: 없음"이면 카드 없음). 번호 줄이 없으면 검색 결과 그대로.
         const used = Array.isArray(result.usedDocs) ? result.usedDocs.map((i) => matches[i]).filter(Boolean) : matches;
@@ -149,6 +161,7 @@ export async function getDdasomiReply(
           kind: "answer",
           matches: used.length ? used : undefined,
           scope: result.scope,
+          memory: result.memory,
         };
       }
       if (result && result.ok === false) aiFailReason = result.reason;

@@ -11,6 +11,7 @@
 import type OpenAI from "openai";
 import { query } from "@/shared/lib/db";
 import { listIssues, countByStatus } from "@/modules/status/lib/repo";
+import { BRANCHES } from "@/shared/lib/branches";
 
 const MAX_ROWS = 10;
 const MAX_TEXT = 300;
@@ -27,9 +28,17 @@ function shortText(v: unknown): string | null {
   return t.length > MAX_TEXT ? `${t.slice(0, MAX_TEXT)}…` : t;
 }
 
+// 검색어에 섞여 들어오면 결과를 0건으로 만드는 말 — 지사는 branch 인자가 따로 거르고,
+// "최근·전체·목록"은 정렬·범위를 말하는 것이지 내용 검색어가 아니다. 모델이 "판교지사 최근"을
+// 검색어로 넣어 0건을 받고 "고장이력 없음"으로 답한 일이 있었다.
+const BRANCH_WORDS = BRANCHES.flatMap((b) => [b, b.replace(/(지사|사업소)$/, "")]).sort((a, b) => b.length - a.length);
+const FILLER_RE = /(최근|전체|모든|목록|리스트|현황|이력|내역|알려줘|보여줘|조회)/g;
+
 function keywordOf(v: unknown): string | null {
   if (typeof v !== "string") return null;
-  const t = v.trim();
+  let t = v.trim();
+  for (const b of BRANCH_WORDS) t = t.split(b).join(" ");
+  t = t.replace(FILLER_RE, " ").replace(/\s+/g, " ").trim();
   return t && t.length <= 80 ? t : null;
 }
 
@@ -61,7 +70,7 @@ async function searchFailureHistory(args: Record<string, unknown>, branch: strin
   const where = conds.length ? `where ${conds.join(" and ")}` : "";
 
   const rows = await query<Record<string, unknown>>(
-    `select title, branch, heat_facility, equipment_name, device_name, failure_field, status,
+    `select id::text as id, title, branch, heat_facility, equipment_name, device_name, failure_field, status,
             occurred_at, recovered_at, situation, cause_4m1e, emergency_action,
             recovery_detail, recurrence_prevention, content_summary
        from failure_history ${where}
@@ -107,7 +116,7 @@ async function searchManuals(args: Record<string, unknown>) {
   const limit = clampLimit(args.limit);
 
   const qs = new URLSearchParams();
-  qs.set("select", "doc_type,title,file_name,manual_type,field,year,branch,facility,fault_content,page_count,created_at");
+  qs.set("select", "id,doc_type,title,file_name,manual_type,field,year,branch,facility,fault_content,page_count,created_at");
   qs.set("order", "created_at.desc");
   qs.set("limit", String(limit));
   if (docType) qs.set("doc_type", `eq.${docType}`);
@@ -125,7 +134,7 @@ async function searchManuals(args: Record<string, unknown>) {
   const rows = (await res.json()) as Record<string, unknown>[];
   return {
     shown: rows.length,
-    note: "문서 열람은 화면의 '매뉴얼 관리 > 보관함'에서 제목으로 찾아 열 수 있다.",
+    note: "문서 열람은 화면의 '매뉴얼 관리 > 보관함'에서 제목으로 찾아 열 수 있다. 본문 내용(절차·조치사항 등)이 필요하면 id 로 read_document 를 호출한다.",
     items: rows.map((r) => ({ ...r, fault_content: shortText(r.fault_content) })),
   };
 }
@@ -238,6 +247,76 @@ async function listStatusIssuesTool(args: Record<string, unknown>, branch: strin
 }
 
 // ---------------------------------------------------------------------------
+// 6) 고장이력 한 건 전문 / 7) 보관함 문서 본문
+//    검색 도구는 목록이라 긴 칸을 300자로 자른다. "아까 그 고장 조치사항 자세히",
+//    "그 보고서에서 재발방지 대책은?" 같은 후속 질문은 id 로 원문 전체를 다시 읽어 답한다.
+// ---------------------------------------------------------------------------
+
+const DOC_TEXT_LIMIT = 8000;
+
+async function readFailureReport(args: Record<string, unknown>, branch: string | null) {
+  const id = typeof args.id === "string" || typeof args.id === "number" ? String(args.id).trim() : "";
+  if (!/^\d{1,12}$/.test(id)) return { error: "id 는 search_failure_history 결과의 id(숫자)여야 합니다." };
+  const rows = await query<Record<string, unknown>>(
+    `select id::text as id, title, report_type, branch, heat_facility, equipment_name, device_name, failure_field,
+            status, occurred_at, recovered_at, interruption_duration, situation, alarm_status, cause_4m1e,
+            impact_heat_loss, impact_duration, emergency_action, recovery_detail, recurrence_prevention, content_summary
+       from failure_history
+      where id = $1::bigint and ($2::text is null or branch = $2)`,
+    [id, branch],
+  );
+  if (!rows.length) return { error: "해당 id 의 고장이력이 이 조회 범위(지사)에 없습니다." };
+  return { item: rows[0] };
+}
+
+async function readDocument(args: Record<string, unknown>) {
+  const url = process.env.NEXT_PUBLIC_DOCGEN_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_DOCGEN_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return { error: "매뉴얼 보관함(docgen) 연결이 설정되어 있지 않습니다." };
+  const id = typeof args.document_id === "string" ? args.document_id.trim() : "";
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "document_id 는 search_manuals 결과(또는 대화 맥락)의 문서 id(uuid)여야 합니다." };
+
+  const headers = { apikey: anonKey, Authorization: `Bearer ${anonKey}` };
+  const [docRes, chunkRes] = await Promise.all([
+    fetch(`${url}/rest/v1/docgen_documents?select=id,doc_type,title,branch,field,facility,fault_content&id=eq.${id}`, {
+      headers,
+      signal: AbortSignal.timeout(8000),
+    }),
+    fetch(`${url}/rest/v1/docgen_document_chunks?select=label,chunk_text&document_id=eq.${id}&order=created_at.asc`, {
+      headers,
+      signal: AbortSignal.timeout(8000),
+    }),
+  ]);
+  if (!docRes.ok || !chunkRes.ok) return { error: "보관함 조회 실패 — 보관함 서버가 일시중지 상태일 수 있습니다." };
+  const doc = ((await docRes.json()) as Record<string, unknown>[])[0];
+  if (!doc) return { error: "해당 id 의 문서가 보관함에 없습니다." };
+  const chunks = (await chunkRes.json()) as { label: string; chunk_text: string }[];
+
+  // 같은 조각이 여러 번 색인된 경우가 있어 본문이 같은 조각은 한 번만 싣는다
+  const seen = new Set<string>();
+  let used = 0;
+  const sections: { label: string; text: string }[] = [];
+  for (const c of chunks) {
+    const text = (c.chunk_text ?? "").trim();
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    if (used + text.length > DOC_TEXT_LIMIT) {
+      sections.push({ label: c.label, text: `${text.slice(0, Math.max(0, DOC_TEXT_LIMIT - used))}…(이하 생략)` });
+      break;
+    }
+    used += text.length;
+    sections.push({ label: c.label, text });
+  }
+  return {
+    document: doc,
+    sections,
+    note: sections.length
+      ? "본문은 보관함 원문을 색인한 텍스트다. 여기 적힌 내용만 근거로 답한다."
+      : "이 문서는 본문 색인이 없어 제목·메타데이터만 있다. 내용은 보관함에서 PDF 로 확인하라고 안내한다.",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // OpenAI Responses API용 도구 정의 + 디스패처
 // ---------------------------------------------------------------------------
 
@@ -317,6 +396,32 @@ export const CHATBOT_TOOL_DEFS: OpenAI.Responses.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    type: "function" as const,
+    strict: false,
+    name: "read_failure_report",
+    description:
+      "고장이력 한 건의 전문(상황·원인·응급조치·복구내용·재발방지 대책 전체)을 읽는다. search_failure_history 결과의 id 로 호출한다 — '그 고장 조치사항 자세히' 같은 후속 질문에 사용.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string", description: "search_failure_history 결과의 id" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function" as const,
+    strict: false,
+    name: "read_document",
+    description:
+      "보관함 문서(매뉴얼·고장 보고서·사진대장)의 본문을 읽는다. search_manuals 결과나 대화 맥락에 있는 문서 id 로 호출한다 — '아까 보고서에서 조치사항은?', '그 매뉴얼 점검 순서 알려줘' 같은 질문에 사용.",
+    parameters: {
+      type: "object",
+      properties: { document_id: { type: "string", description: "문서 id (uuid)" } },
+      required: ["document_id"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /**
@@ -344,6 +449,10 @@ export async function runChatbotTool(name: string, rawArgs: string, branch: stri
         return JSON.stringify(await searchLongtermPlan(args, branch));
       case "list_status_issues":
         return JSON.stringify(await listStatusIssuesTool(args, branch));
+      case "read_failure_report":
+        return JSON.stringify(await readFailureReport(args, branch));
+      case "read_document":
+        return JSON.stringify(await readDocument(args));
       default:
         return JSON.stringify({ error: `알 수 없는 도구: ${name}` });
     }

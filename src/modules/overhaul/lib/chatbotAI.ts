@@ -9,9 +9,12 @@
 // Next Route Handler를 호출하고, 서버 쪽 GPT_CHAT_ENABLED/OPENAI_API_KEY 킬스위치로만 활성화를 통제한다.
 import type { ChatbotSnapshot } from "./chatbotSnapshot";
 import type { Classification } from "./chatbotRules";
+import type { HistoryTurn, TurnMemory } from "./chatbotHistory";
 
 /** 보관함 검색 결과 중 GPT 에 근거로 넘길 최소 정보 — 서버가 다시 걸러서(sanitizeDocuments) 프롬프트에 넣는다 */
 export interface AskDoc {
+  /** 보관함 문서 id — 다음 질문("아까 그 문서에서~")에서 서버가 본문을 다시 읽는 데 쓴다 */
+  id?: string;
   title: string;
   docType: string;
   branch: string | null;
@@ -36,7 +39,7 @@ const FAIL_REASON_BY_SERVER: Record<string, AskFailReason> = {
 export type AskFn = (
   message: string,
   context: ChatbotSnapshot,
-  opts?: { timeoutMs?: number; docs?: AskDoc[] },
+  opts?: { timeoutMs?: number; docs?: AskDoc[]; history?: HistoryTurn[] },
 ) => Promise<
   | {
       ok: true;
@@ -45,6 +48,8 @@ export type AskFn = (
       scope?: string;
       /** 모델이 실제로 근거로 쓴 문서의 인덱스(검색 결과 순). null 이면 형식을 못 지킨 것 — 검색 결과를 그대로 쓴다 */
       usedDocs?: number[] | null;
+      /** 이번 답이 실제로 조회한 대상 — 다음 질문 때 history 에 실어 되돌려 보낸다 */
+      memory?: TurnMemory;
     }
   | { ok: false; reason: AskFailReason }
   | null
@@ -79,14 +84,15 @@ export async function classifyQuestionWithAI(
 // 서버가 고장이력·매뉴얼 등을 도구로 조회하는 동안 2~3회 왕복이 생길 수 있어 타임아웃을 넉넉히 잡는다.
 // 실패를 둘로 구분해 돌려준다: "disabled"(서버에 GPT 설정이 없음 — 재시도 무의미)와
 // "error"(일시 오류 — 재시도 가치 있음). 호출부(ddasomiChat)가 안내 문구를 다르게 쓴다.
-export const askDdasomi: AskFn = async (message, context, { timeoutMs = 45000, docs } = {}) => {
+// 대화 기록(history)은 화면이 들고 있다가 함께 보낸다 — 서버는 대화를 저장하지 않는다(chatbotHistory.ts).
+export const askDdasomi: AskFn = async (message, context, { timeoutMs = 55000, docs, history } = {}) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch("/api/overhaul/chatbot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, context, documents: docs?.slice(0, 5) }),
+      body: JSON.stringify({ message, context, documents: docs?.slice(0, 5), history }),
       signal: controller.signal,
     });
     if (!res.ok) return { ok: false, reason: "error" };

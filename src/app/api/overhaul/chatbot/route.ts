@@ -6,29 +6,41 @@
 //   2) 고장이력·매뉴얼 보관함·설비 마스터·중장기보수계획·현황 이슈는 GPT가 필요할 때
 //      읽기 전용 도구(chatbotTools.ts)를 직접 호출해 조회한다 — "시스템 전체"를 보는 경로.
 //
+// 멀티턴: 대화는 서버에 저장하지 않고 화면(ChatbotDock)이 들고 있다가 history 로 함께 보낸다.
+// 서버는 매 답변마다 "이번에 실제로 조회한 대상"(지사 범위·도구 호출·고장이력/문서 id)을 memory 로
+// 돌려주고, 다음 질문 때 그 memory 를 "대화 맥락" 메모로 바꿔 넣는다 — "그 설비는?", "아까 보고서에서
+// 조치사항은?"을 풀 수 있게 하되, 수치는 이전 답을 재사용하지 않고 매번 도구로 다시 조회하게 한다.
+// history 가 없으면 예전과 똑같이 한 번 묻고 답한다(옛 호출과 호환).
+//
 // 기본은 비활성 상태다: GPT_CHAT_ENABLED=true, OPENAI_API_KEY 둘 다 설정되어 있지 않으면
 // 항상 { ok:false, reason:"disabled" } 를 반환하고 OpenAI를 호출하지 않는다(fail-closed).
 //
 // 원본: AI-Do-Sample/api/chat.js → Route Handler로 이식(스냅샷 설명만 하던 버전) →
-// 2026-10 도구 호출(전 모듈 조회)로 확장.
+// 2026-10 도구 호출(전 모듈 조회)로 확장 → 2026-11 멀티턴.
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { resolveBranch } from "@/modules/overhaul/lib/activeBranch";
 import { CHATBOT_TOOL_DEFS, runChatbotTool } from "@/modules/overhaul/lib/chatbotTools";
 import { detectBranchInMessage } from "@/modules/overhaul/lib/chatbotBranch";
+import { isCrossModuleQuestion, isStructuredDataQuestion } from "@/modules/overhaul/lib/chatbotRules";
+import { chatModelConfig, parseReasoning, supportsReasoning, type ChatReasoning } from "@/modules/overhaul/lib/chatbotModel";
+import type { HistoryTurn, TurnMemory } from "@/modules/overhaul/lib/chatbotHistory";
+import { BRANCHES } from "@/shared/lib/branches";
 
 export const dynamic = "force-dynamic";
 // 도구 호출이 2~3회 왕복하면 10초를 넘을 수 있다 — Vercel 함수 상한을 늘린다(Hobby 최대 60초)
 export const maxDuration = 60;
 
-// 모델명은 이 한 곳(또는 OPENAI_MODEL 환경변수)만 바꾸면 된다.
-const MODEL_NAME = process.env.OPENAI_MODEL || "gpt-4.1-mini";
-
 const MAX_MESSAGE_LEN = 500;
-const MAX_BODY_BYTES = 16 * 1024; // context JSON + 검색 문서 요약 5건
-const MAX_OUTPUT_TOKENS = 700;
+const MAX_BODY_BYTES = 64 * 1024; // context JSON + 검색 문서 요약 5건 + 대화 기록
+/** 답변 토큰 상한 — 추론 모델은 생각하는 데 쓰는 토큰도 여기서 나가므로 넉넉히 잡는다 */
+const MAX_OUTPUT_TOKENS = { reasoning: 6000, plain: 900 };
 /** 도구 호출 왕복 상한 — 모델이 도구를 계속 부르며 맴돌지 못하게 끊는다 */
-const MAX_TOOL_ROUNDS = 4;
+const MAX_TOOL_ROUNDS = 5;
+/** 대화 기록 상한 — 오래된 것부터 버린다. 수치는 매번 다시 조회하므로 짧게 둬도 정확도는 떨어지지 않는다 */
+const MAX_HISTORY_TURNS = 12;
+const MAX_TURN_CHARS = 1500;
+const MAX_HISTORY_CHARS = 10000;
 const FIELDS = ["기계", "전기", "제어"];
 
 // 발전소 현장 용어·점검 요령 — 답변이 교과서식이 아니라 현장 실무자 말투로 나오게 하는 지식 블록.
@@ -94,6 +106,13 @@ const SYSTEM_INSTRUCTIONS = `너는 발전소 플랜트 운영·정비 통합 �
 - 도구가 error를 돌려주면 그 사실을 짧게 알리고, 확인된 데이터만으로 답한다.
 - 매뉴얼을 찾았으면 제목을 알려주고 "매뉴얼관리 > 매뉴얼 조회"에서 열 수 있다고 안내한다.
 - 너는 조회만 할 수 있다 — 등록·수정·삭제 요청은 해당 화면에서 직접 하라고 안내한다.
+
+이어지는 대화:
+- 앞선 질문·답변이 함께 주어진다. "그 설비", "거기", "아까 보고서", "첫 번째 건"처럼 가리키는 말은 앞 대화와 [대화 맥락] 메모에서 대상을 찾는다.
+- 대상이 분명하면 다시 묻지 말고 그 대상으로 도구를 호출한다. 후보가 둘 이상이라 모호할 때만 어느 것인지 짧게 되묻는다.
+- 수치·건수·목록·상태는 이전 답변에 나온 값을 그대로 옮기지 말고 이번 질문에 맞게 도구로 다시 조회한다(데이터가 바뀌었을 수 있다).
+- 앞에서 찾은 고장이력·문서의 세부 내용(조치사항·원인·절차)을 물으면 read_failure_report(id) 또는 read_document(document_id)로 원문을 읽고 그 내용만 근거로 답한다.
+- 사용자가 새 설비·문서·지사를 말하면 그것이 새 대상이다 — 이전 대상의 결과를 섞지 않는다.
 
 말투: 친근하지만 현장 실무자에게 신뢰감을 주는 말투. 유아적인 말투 금지.
 현장 지식: 설비 고장·점검·조치 질문에는 교과서식 일반론이 아니라 DCS, DO/DI, m/p, LCP, MCC, 인터록, 릴레이 같은 현장 용어를 써서 실제 점검 순서로 답한다.
@@ -197,6 +216,8 @@ export function sanitizeContext(raw: unknown) {
   };
 }
 
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+
 /**
  * 클라이언트가 보관함에서 검색해 보낸 문서 요약 — 제목·종류·지사·분야·발췌만, 최대 5건, 길이 제한.
  * 여기서 걸러지지 않은 값은 프롬프트에 들어가지 않는다.
@@ -207,6 +228,7 @@ export function sanitizeDocuments(raw: unknown) {
   return raw
     .slice(0, 5)
     .map((d: any) => ({
+      id: typeof d?.id === "string" && UUID_RE.test(d.id) ? d.id : null,
       title: s(d?.title, 120),
       docType: s(d?.docType, 20),
       branch: s(d?.branch, 20),
@@ -241,35 +263,170 @@ function validateMessage(body: any): string | null {
   return message;
 }
 
+// ---------------------------------------------------------------------------
+// 대화 기록 · 맥락 메모
+// ---------------------------------------------------------------------------
+
+const SCOPES = new Set<string>([...BRANCHES, "전 지사"]);
+const TOOL_NAMES = new Set(CHATBOT_TOOL_DEFS.map((t) => (t as { name: string }).name));
+
+function sanitizeMemory(raw: any): TurnMemory | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const str = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+  const arr = (v: unknown): any[] => (Array.isArray(v) ? v.slice(0, 8) : []);
+  const scope = str(raw.scope, 20);
+  return {
+    scope: scope && SCOPES.has(scope) ? scope : "전 지사",
+    scopeAsked: raw.scopeAsked === true,
+    lookups: arr(raw.lookups)
+      .map((l) => ({ tool: str(l?.tool, 40) ?? "", args: str(l?.args, 200) ?? "{}" }))
+      .filter((l) => TOOL_NAMES.has(l.tool)),
+    failures: arr(raw.failures)
+      .map((f) => ({ id: str(f?.id, 12) ?? "", title: str(f?.title, 120) ?? "" }))
+      .filter((f) => /^\d+$/.test(f.id)),
+    docs: arr(raw.docs)
+      .map((d) => ({ id: str(d?.id, 36) ?? "", title: str(d?.title, 120) ?? "", docType: str(d?.docType, 10) }))
+      .filter((d) => UUID_RE.test(d.id)),
+  };
+}
+
+/**
+ * 화면이 보낸 대화 기록을 거른다 — 역할·길이를 고정하고, 길면 오래된 턴부터 버린다.
+ * 기록의 문장은 모델에게 "지난 대화"로만 쓰이고, 수치 근거로는 쓰지 말라고 지시한다(SYSTEM_INSTRUCTIONS).
+ */
+export function sanitizeHistory(raw: unknown): HistoryTurn[] {
+  if (!Array.isArray(raw)) return [];
+  const turns: HistoryTurn[] = [];
+  for (const t of raw.slice(-MAX_HISTORY_TURNS) as any[]) {
+    const role = t?.role === "user" || t?.role === "assistant" ? (t.role as HistoryTurn["role"]) : null;
+    const text = typeof t?.text === "string" ? t.text.trim().slice(0, MAX_TURN_CHARS) : "";
+    if (!role || !text) continue;
+    turns.push({ role, text, memory: role === "assistant" ? sanitizeMemory(t.memory) : undefined });
+  }
+  let total = turns.reduce((n, t) => n + t.text.length, 0);
+  while (turns.length && total > MAX_HISTORY_CHARS) total -= turns.shift()!.text.length;
+  // 첫 턴이 답변이면 앞 질문이 잘린 것 — 질문부터 시작하게 맞춘다
+  while (turns.length && turns[0].role !== "user") turns.shift();
+  return turns;
+}
+
+const MY_BRANCH_RE = /(내|우리|제)\s?지사/;
+
+/**
+ * 이번 질문의 조회 범위(지사).
+ * 질문에 지사가 있으면 그 지사("전 지사"면 전체), "내 지사"라고 하면 내 지사로 돌아간다.
+ * 아무 말이 없으면 직전 답변이 사용자가 고른 범위였을 때 그대로 이어 간다 — "청주지사 현황" 다음의
+ * "조치중인 것만"이 다시 내 지사로 튀지 않게.
+ */
+export function resolveScope(
+  message: string,
+  history: HistoryTurn[],
+  myBranch: string | null,
+): { branch: string | null; asked: boolean } {
+  const asked = detectBranchInMessage(message);
+  if (asked === "ALL") return { branch: null, asked: true };
+  if (asked) return { branch: asked, asked: true };
+  if (MY_BRANCH_RE.test(message)) return { branch: myBranch, asked: false };
+  const last = [...history].reverse().find((t) => t.role === "assistant" && t.memory)?.memory;
+  if (last?.scopeAsked) return { branch: last.scope === "전 지사" ? null : last.scope, asked: true };
+  return { branch: myBranch, asked: false };
+}
+
+function uniqBy<T>(xs: T[], key: (x: T) => string): T[] {
+  const seen = new Set<string>();
+  return xs.filter((x) => {
+    const k = key(x);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+/** 지난 턴들의 memory → 모델에게 주는 [대화 맥락] 메모 (최근 것이 앞) */
+export function contextNote(history: HistoryTurn[]): string | null {
+  const mems = history
+    .filter((t) => t.memory)
+    .map((t) => t.memory!)
+    .reverse();
+  if (!mems.length) return null;
+  const lookups = uniqBy(mems.flatMap((m) => m.lookups), (l) => l.tool + l.args).slice(0, 8);
+  const failures = uniqBy(mems.flatMap((m) => m.failures), (f) => f.id).slice(0, 8);
+  const docs = uniqBy(mems.flatMap((m) => m.docs), (d) => d.id).slice(0, 8);
+  const lines = [
+    "[대화 맥락 — 앞선 턴에서 실제로 조회한 대상. 가리키는 말(그 설비·아까 보고서 등)은 여기서 찾는다. 수치는 여기 없다 — 필요하면 도구로 다시 조회한다]",
+    `- 직전 답변의 조회 범위: ${mems[0].scope}${mems[0].scopeAsked ? " (사용자가 지정)" : ""}`,
+  ];
+  if (lookups.length) lines.push(`- 최근 조회: ${lookups.map((l) => `${l.tool} ${l.args}`).join(" / ")}`);
+  if (failures.length) lines.push(`- 최근 다룬 고장이력: ${failures.map((f) => `id=${f.id} "${f.title}"`).join(", ")}`);
+  if (docs.length) lines.push(`- 최근 다룬 문서: ${docs.map((d) => `id=${d.id} [${d.docType ?? "문서"}] "${d.title}"`).join(", ")}`);
+  return lines.join("\n");
+}
+
+/** 도구 결과에서 다음 턴이 가리킬 수 있는 대상(고장이력·문서 id)을 뽑는다 */
+function collectTargets(name: string, output: string, mem: TurnMemory) {
+  let data: any;
+  try {
+    data = JSON.parse(output);
+  } catch {
+    return;
+  }
+  const addFailure = (r: any) => {
+    if (r?.id && !mem.failures.some((f) => f.id === String(r.id)) && mem.failures.length < 8)
+      mem.failures.push({ id: String(r.id), title: String(r.title ?? r.equipment_name ?? "").slice(0, 120) });
+  };
+  const addDoc = (d: any) => {
+    if (typeof d?.id === "string" && UUID_RE.test(d.id) && !mem.docs.some((x) => x.id === d.id) && mem.docs.length < 8)
+      mem.docs.push({ id: d.id, title: String(d.title ?? "").slice(0, 120), docType: d.doc_type ?? d.docType ?? null });
+  };
+  if (name === "search_failure_history") (data?.items ?? []).slice(0, 5).forEach(addFailure);
+  if (name === "read_failure_report") addFailure(data?.item);
+  if (name === "search_manuals") (data?.items ?? []).slice(0, 5).forEach(addDoc);
+  if (name === "read_document") addDoc(data?.document);
+}
+
 let cachedClient: OpenAI | null = null;
 function getClient(apiKey: string) {
   if (!cachedClient) cachedClient = new OpenAI({ apiKey });
   return cachedClient;
 }
 
+interface Usage {
+  calls: number;
+  input: number;
+  cached: number;
+  output: number;
+  reasoning: number;
+}
+
 /**
  * GPT 호출 + 도구 호출 루프.
  * 모델이 function_call을 내면 chatbotTools를 실행해 결과를 돌려주고 다시 묻는다 —
  * 최대 MAX_TOOL_ROUNDS 왕복까지. 도구 없이 바로 답하면 1회로 끝난다.
+ * 두 번째 호출부터는 previous_response_id 로 이어 붙인다 — 추론 모델의 생각(reasoning) 항목과
+ * 도구 호출을 OpenAI 쪽이 그대로 이어 주므로 직접 다시 보낼 필요가 없다.
  */
 async function callOpenAI({
   message,
+  history,
   context,
   branch,
   branchRequested,
   documents,
   apiKey,
   model,
+  reasoning,
 }: {
   message: string;
+  history: HistoryTurn[];
   context: ReturnType<typeof sanitizeContext>;
   branch: string | null;
+  /** 사용자가 직접 지사를 지정했는지(내 지사와 다를 수 있다) — 프롬프트에 알린다 */
+  branchRequested?: boolean;
   /** 클라이언트가 보관함에서 미리 찾아 보낸 관련 문서(없으면 빈 배열) */
   documents?: ReturnType<typeof sanitizeDocuments>;
-  /** 질문에서 사용자가 직접 지사를 지정했는지(내 지사와 다를 수 있다) — 프롬프트에 알린다 */
-  branchRequested?: boolean;
   apiKey: string;
   model: string;
+  reasoning: ChatReasoning;
 }) {
   const client = getClient(apiKey);
   // 데이터가 없으면 빈 JSON을 보내지 않는다 — 빈 JSON을 보면 작은 모델이 모든 질문을 "데이터 없음"으로 회피하는 경향이 있어서,
@@ -283,69 +440,110 @@ ${JSON.stringify(context)}`
 
 ${FIELD_KNOWLEDGE}
 
-${branchRequested ? `사용자가 질문에서 직접 지정한 조회 범위: ${branch ?? "전 지사"} — 도구 조회는 이 범위로 적용된다. 답할 때 이 범위를 처음에 밝히고, 다른 지사 이야기는 하지 않는다.` : `현재 선택된 지사(내 지사): ${branch ?? "없음(전 지사 조회)"} — 도구 조회는 이 지사 범위로 자동 적용된다. 사용자가 다른 지사를 물으면 그 지사 이름이 질문에 있어야 조회 범위가 바뀐다.`}
+${branchRequested ? `사용자가 지정한 조회 범위: ${branch ?? "전 지사"} — 도구 조회는 이 범위로 적용된다. 답할 때 이 범위를 처음에 밝히고, 다른 지사 이야기는 하지 않는다.` : `현재 선택된 지사(내 지사): ${branch ?? "없음(전 지사 조회)"} — 도구 조회는 이 지사 범위로 자동 적용된다. 사용자가 다른 지사를 물으면 그 지사 이름이 질문에 있어야 조회 범위가 바뀐다.`}
 
 ${dataBlock}${
     documents && documents.length
       ? `
 
-보관함에서 이 질문으로 미리 검색된 관련 문서 ${documents.length}건(제목 · 종류 · 지사/분야 · 발췌). 이 문서들은 답변 아래에 카드로 함께 표시된다:
-${documents.map((d, i) => `${i + 1}. [${d.docType ?? "문서"}] ${d.title} (${[d.branch, d.field].filter(Boolean).join(" · ") || "-"}) — ${d.snippet ?? ""}`).join("\n")}
-문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제면 "검색된 문서는 ○○ 관련이라 직접 근거는 아니다"라고 한 줄로 밝힌다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.
+보관함에서 이 질문으로 미리 검색된 관련 문서 ${documents.length}건(id · 제목 · 종류 · 지사/분야 · 발췌). 이 문서들은 답변 아래에 카드로 함께 표시된다:
+${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType ?? "문서"}] ${d.title} (${[d.branch, d.field].filter(Boolean).join(" · ") || "-"}) — ${d.snippet ?? ""}`).join("\n")}
+문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 발췌만으로 부족하면 id 로 read_document 를 호출해 본문을 읽는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제면 "검색된 문서는 ○○ 관련이라 직접 근거는 아니다"라고 한 줄로 밝힌다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.
 답변 맨 마지막 줄에는 반드시 실제로 근거로 쓴 문서의 번호만 "근거문서: 1, 3" 형식으로 적는다. 하나도 근거로 쓰지 않았으면 "근거문서: 없음"이라고 적는다(이 줄은 화면에 보이지 않고 문서 카드 표시에만 쓰인다).`
       : ""
   }`;
 
-  let input: OpenAI.Responses.ResponseInput = [{ role: "user", content: message }];
-  let response = await client.responses.create({
+  const memory: TurnMemory = {
+    scope: branch ?? "전 지사",
+    scopeAsked: Boolean(branchRequested),
+    lookups: [],
+    failures: [],
+    docs: [],
+  };
+  for (const d of documents ?? []) {
+    if (d.id) memory.docs.push({ id: d.id, title: d.title ?? "", docType: d.docType });
+  }
+
+  const note = contextNote(history);
+  const input: OpenAI.Responses.ResponseInput = [
+    ...history.map((t): OpenAI.Responses.EasyInputMessage => ({ role: t.role, content: t.text })),
+    ...(note ? [{ role: "developer" as const, content: note }] : []),
+    { role: "user", content: message },
+  ];
+
+  const usesReasoning = supportsReasoning(model);
+  const base = {
     model,
     instructions,
-    input,
     tools: CHATBOT_TOOL_DEFS,
-    // 첫 턴은 도구 호출을 강제한다 — 작은 모델이 도구를 건너뛰고 "데이터 없음"으로
-    // 단정하는 것을 막는다. 공정률 질문도 도구 한 번 거칠 뿐 답은 그대로 나온다.
-    tool_choice: "required",
-    temperature: 0.1,
-    max_output_tokens: MAX_OUTPUT_TOKENS,
-  });
+    max_output_tokens: usesReasoning ? MAX_OUTPUT_TOKENS.reasoning : MAX_OUTPUT_TOKENS.plain,
+    // 추론 모델은 temperature 를 받지 않는다(400). 옛 모델로 되돌렸을 때만 낮은 온도를 준다
+    ...(usesReasoning ? { reasoning: { effort: reasoning } } : { temperature: 0.1 }),
+  };
+  const usage: Usage = { calls: 0, input: 0, cached: 0, output: 0, reasoning: 0 };
+  const create = async (
+    body: Pick<OpenAI.Responses.ResponseCreateParamsNonStreaming, "input" | "tool_choice" | "previous_response_id">,
+  ) => {
+    const r = await client.responses.create({ ...base, ...body, stream: false });
+    usage.calls++;
+    usage.input += r.usage?.input_tokens ?? 0;
+    usage.cached += r.usage?.input_tokens_details?.cached_tokens ?? 0;
+    usage.output += r.usage?.output_tokens ?? 0;
+    usage.reasoning += r.usage?.output_tokens_details?.reasoning_tokens ?? 0;
+    return r;
+  };
+  const callsOf = (r: OpenAI.Responses.Response) =>
+    r.output.filter((item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === "function_call");
+
+  // 첫 호출은 도구를 쓸지 모델이 고른다 — 인사·용어 설명에까지 도구를 강제하면 엉뚱한 고장이력을
+  // 끌어와 답하는 일이 있었다("안녕" → 펌프 고장이력). 대신 데이터를 묻는 질문인데 도구 없이
+  // 답하려 하면 한 번 더 도구를 강제해 묻는다(데이터 없이 "없음"으로 단정하는 것 방지).
+  let response = await create({ input, tool_choice: "auto" });
+  const looksLikeData = isStructuredDataQuestion(message) || isCrossModuleQuestion(message);
+  if (callsOf(response).length === 0 && looksLikeData) {
+    response = await create({ input, tool_choice: "required" });
+  }
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const calls = response.output.filter(
-      (item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === "function_call",
-    );
+    const calls = callsOf(response);
     if (calls.length === 0) break;
 
-    // 전체 output이 아니라 function_call 항목만 입력으로 되돌린다 —
-    // (비추론 모델이라 다른 항목이 없고, ResponseOutputItem 전체는 입력 타입과 어긋난다)
-    input = input.concat(calls);
-    for (const call of calls) {
-      // 어떤 도구가 불렸는지만 남긴다(질문·결과 내용은 로그에 넣지 않는다)
-      console.log("[api/overhaul/chatbot] tool:", call.name);
-      // 클라이언트가 보관함에서 이미 찾은 문서가 있으면 search_manuals 는 그 결과로 대신한다 —
-      // 같은 질문을 두 번 검색하지 않고, 서버에 보관함 키가 없는 환경에서도 같은 근거로 답하게 된다.
-      const output =
-        call.name === "search_manuals" && documents && documents.length
-          ? JSON.stringify({
-              shown: documents.length,
-              note: "화면이 보관함에서 미리 검색한 결과(답변 아래 카드로 표시됨). 문서 열람은 카드의 미리보기로.",
-              items: documents.map((d) => ({ doc_type: d.docType, title: d.title, branch: d.branch, field: d.field, snippet: d.snippet })),
-            })
-          : await runChatbotTool(call.name, call.arguments, branch);
-      input.push({ type: "function_call_output", call_id: call.call_id, output });
-    }
-    response = await client.responses.create({
-      model,
-      instructions,
-      input,
-      tools: CHATBOT_TOOL_DEFS,
-      tool_choice: "auto",
-      temperature: 0.1,
-      max_output_tokens: MAX_OUTPUT_TOKENS,
+    const outputs = await Promise.all(
+      calls.map(async (call) => {
+        // 어떤 도구가 불렸는지만 남긴다(질문·결과 내용은 로그에 넣지 않는다)
+        console.log("[api/overhaul/chatbot] tool:", call.name);
+        // 클라이언트가 보관함에서 이미 찾은 문서가 있으면 search_manuals 는 그 결과로 대신한다 —
+        // 같은 질문을 두 번 검색하지 않고, 서버에 보관함 키가 없는 환경에서도 같은 근거로 답하게 된다.
+        const output =
+          call.name === "search_manuals" && documents && documents.length
+            ? JSON.stringify({
+                shown: documents.length,
+                note: "화면이 보관함에서 미리 검색한 결과(답변 아래 카드로 표시됨). 본문이 필요하면 id 로 read_document 를 호출한다.",
+                items: documents.map((d) => ({
+                  id: d.id,
+                  doc_type: d.docType,
+                  title: d.title,
+                  branch: d.branch,
+                  field: d.field,
+                  snippet: d.snippet,
+                })),
+              })
+            : await runChatbotTool(call.name, call.arguments, branch);
+        if (memory.lookups.length < 8) memory.lookups.push({ tool: call.name, args: (call.arguments || "{}").slice(0, 200) });
+        collectTargets(call.name, output, memory);
+        return { type: "function_call_output" as const, call_id: call.call_id, output };
+      }),
+    );
+    response = await create({
+      previous_response_id: response.id,
+      input: outputs,
+      // 마지막 왕복에서는 더 부르지 말고 지금까지 조회한 것으로 답하게 한다
+      tool_choice: round === MAX_TOOL_ROUNDS - 1 ? "none" : "auto",
     });
   }
 
   const text = response.output_text;
-  return typeof text === "string" ? text.trim() : "";
+  return { text: typeof text === "string" ? text.trim() : "", memory, usage };
 }
 
 export async function POST(req: Request) {
@@ -370,20 +568,48 @@ export async function POST(req: Request) {
 
   const context = sanitizeContext(body?.context);
   const documents = sanitizeDocuments(body?.documents);
+  const history = sanitizeHistory(body?.history);
   // 도구 조회 범위 — 기본은 화면과 같은 oh_branch 쿠키(내 지사), 선택 전이면 전 지사.
-  // 질문에 지사 이름이 분명히 있으면("청주지사 현황") 그 지사를, "전 지사"면 전체를 쓴다.
+  // 질문에 지사 이름이 분명히 있으면("청주지사 현황") 그 지사를, "전 지사"면 전체를 쓰고,
+  // 말이 없으면 직전에 사용자가 고른 범위를 이어 간다(resolveScope).
   const myBranch = await resolveBranch();
-  const asked = detectBranchInMessage(message);
-  const branch = asked === "ALL" ? null : (asked ?? myBranch);
-  const branchRequested = asked !== null;
+  const { branch, asked: branchRequested } = resolveScope(message, history, myBranch);
 
+  // 모델 비교 평가(scripts/chatbot-eval.mjs)용 — 개발 서버에서만 요청마다 모델·추론 강도를 바꿔 볼 수 있다
+  let { model, reasoning } = chatModelConfig();
+  const dev = process.env.NODE_ENV !== "production";
+  if (dev) {
+    model = req.headers.get("x-chat-model")?.trim() || model;
+    reasoning = parseReasoning(req.headers.get("x-chat-reasoning")) ?? reasoning;
+  }
+
+  const started = Date.now();
   try {
-    const raw = await callOpenAI({ message, context, branch, branchRequested, documents, apiKey, model: MODEL_NAME });
+    const { text: raw, memory, usage } = await callOpenAI({
+      message,
+      history,
+      context,
+      branch,
+      branchRequested,
+      documents,
+      apiKey,
+      model,
+      reasoning,
+    });
     if (!raw) return fail(200, "upstream_error");
     const { answer, usedDocs } = splitUsedDocs(raw, documents.length);
     // scope: 이 답이 어느 지사 범위로 조회됐는지 — 화면이 답변 위에 칩으로 보여 준다
     // usedDocs: 모델이 실제로 근거로 쓴 문서 인덱스 — 화면은 이 문서만 카드로 보여 준다
-    return NextResponse.json({ ok: true, answer, usedDocs, scope: branch ?? "전 지사", scopeAsked: branchRequested });
+    // memory: 이번에 조회한 대상 — 화면이 다음 질문 때 history 에 실어 되돌려 보낸다
+    return NextResponse.json({
+      ok: true,
+      answer,
+      usedDocs,
+      scope: branch ?? "전 지사",
+      scopeAsked: branchRequested,
+      memory,
+      ...(dev ? { meta: { model, reasoning, ms: Date.now() - started, usage } } : {}),
+    });
   } catch (err: any) {
     // API 키·요청 헤더 등 민감정보가 섞여 나올 수 있는 전체 에러 객체는 절대 로그하지 않는다.
     console.error("[api/overhaul/chatbot] OpenAI 호출 실패:", { status: err?.status, message: err?.message });

@@ -15,6 +15,7 @@ import {
 import { Icon } from "./ui";
 import { getDdasomiReply, type DdasomiReply } from "@/modules/overhaul/lib/ddasomiChat";
 import { askDdasomi } from "@/modules/overhaul/lib/chatbotAI";
+import type { HistoryTurn, TurnMemory } from "@/modules/overhaul/lib/chatbotHistory";
 import type { ChatbotSnapshot } from "@/modules/overhaul/lib/chatbotSnapshot";
 import DdasomiLoading from "@/modules/overhaul/components/chatbot/DdasomiLoading";
 import "@/modules/overhaul/components/chatbot/ddasomi.css";
@@ -112,9 +113,54 @@ interface Msg {
   matches?: DocMatch[];
   /** AI 답변이 조회한 지사 범위 — 있으면 말풍선 위에 "범위: 청주지사" 칩으로 보인다 */
   scope?: string;
+  /** AI 답변이 실제로 조회한 대상 — 다음 질문 때 history 에 실어 서버로 되돌려 보낸다 */
+  memory?: TurnMemory;
 }
 
 let msgSeq = 0;
+
+/**
+ * 대화를 탭 단위로 남긴다(sessionStorage) — 새로고침해도 이어서 물을 수 있고, 탭을 닫거나
+ * "새 대화"를 누르면 사라진다. 서버에는 대화를 저장하지 않는다(chatbotHistory.ts).
+ */
+const CONVERSATION_KEY = "chatbot-conversation";
+const MAX_SAVED_MSGS = 40;
+/** 서버에 함께 보낼 최근 기록 — 질문·답 6쌍. 서버도 길이를 다시 자른다 */
+const HISTORY_MSGS = 12;
+
+function loadConversation(): Msg[] {
+  try {
+    const raw = sessionStorage.getItem(CONVERSATION_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Msg[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    const msgs = parsed.filter((m) => m && (m.role === "user" || m.role === "bot") && typeof m.text === "string");
+    msgSeq = Math.max(msgSeq, ...msgs.map((m) => m.id || 0));
+    return msgs;
+  } catch {
+    return [];
+  }
+}
+
+function saveConversation(msgs: Msg[]) {
+  try {
+    if (msgs.length) sessionStorage.setItem(CONVERSATION_KEY, JSON.stringify(msgs.slice(-MAX_SAVED_MSGS)));
+    else sessionStorage.removeItem(CONVERSATION_KEY);
+  } catch {
+    /* 저장소를 못 쓰면 이번 화면에서만 대화가 이어진다 */
+  }
+}
+
+/** 화면의 말풍선 → 서버에 보낼 대화 기록. 오류 안내는 대화가 아니라서 뺀다 */
+function toHistory(msgs: Msg[]): HistoryTurn[] {
+  return msgs
+    .filter((m) => m.role === "user" || m.kind !== "error")
+    .slice(-HISTORY_MSGS)
+    .map((m) => ({
+      role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+      text: m.text,
+      ...(m.memory ? { memory: m.memory } : {}),
+    }));
+}
 
 /** 실패(네트워크 오류 등)해도 null — 호출부가 이전 snapshot이나 emptySnapshot으로 대체한다 */
 async function fetchSnapshot(): Promise<ChatbotSnapshot | null> {
@@ -322,6 +368,9 @@ export default function ChatbotDock() {
   const { state, setState } = useChatbotDock();
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  // "새 대화"를 누를 때마다 올린다 — 그 전에 보낸 질문의 답이 늦게 와도 새 대화에 끼어들지 않게
+  const conversationRef = useRef(0);
+  const restoredRef = useRef(false);
   const [pending, setPending] = useState(false);
   const snapshotRef = useRef<ChatbotSnapshot | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -359,8 +408,27 @@ export default function ChatbotDock() {
   }, [msgs]);
 
   /** 입력창 텍스트뿐 아니라 퀵 질문·제안 버튼 클릭에서도 재사용한다 */
+  // 탭 안에서 이어 온 대화를 되살리고(마운트 후 1회 — 첫 렌더는 서버와 같아야 한다), 바뀔 때마다 남긴다
+  useEffect(() => {
+    setMsgs(loadConversation());
+    restoredRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (restoredRef.current) saveConversation(msgs);
+  }, [msgs]);
+
+  function newConversation() {
+    conversationRef.current += 1;
+    setMsgs([]);
+    setPending(false);
+    setInput("");
+  }
+
   async function sendText(q: string) {
     if (!q || pending) return;
+    const conversation = conversationRef.current;
+    // 이번 질문 앞까지의 대화 — 서버가 "그 설비는?" 같은 후속 질문을 풀 때 쓴다
+    const history = toHistory(msgs);
     setInput("");
     setMsgs((prev) => [...prev, { id: (msgSeq += 1), role: "user", text: q }]);
     setPending(true);
@@ -370,11 +438,21 @@ export default function ChatbotDock() {
     if (fresh) snapshotRef.current = fresh;
     const snapshot = snapshotRef.current ?? emptySnapshot();
 
-    const reply = await getDdasomiReply(q, snapshot, askDdasomi, searchDocgenDocuments);
+    const reply = await getDdasomiReply(q, snapshot, askDdasomi, searchDocgenDocuments, history);
+    if (conversation !== conversationRef.current) return;
     setPending(false);
     setMsgs((prev) => [
       ...prev,
-      { id: (msgSeq += 1), role: "bot", text: reply.text, kind: reply.kind, suggestions: reply.suggestions, matches: reply.matches, scope: reply.scope },
+      {
+        id: (msgSeq += 1),
+        role: "bot",
+        text: reply.text,
+        kind: reply.kind,
+        suggestions: reply.suggestions,
+        matches: reply.matches,
+        scope: reply.scope,
+        memory: reply.memory,
+      },
     ]);
   }
 
@@ -459,6 +537,22 @@ export default function ChatbotDock() {
         </span>
         <span className="text-title-sm text-on-surface flex-1 truncate">정비 챗봇 (따소미)</span>
 
+        {msgs.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              if (drag.consumeDraggedFlag()) return;
+              newConversation();
+            }}
+            aria-label="새 대화 시작"
+            title="새 대화 — 앞 대화의 맥락을 지우고 처음부터 묻습니다"
+            className="h-9 px-2.5 flex items-center gap-1 rounded-full text-xs font-semibold text-primary hover:bg-surface-container-high"
+          >
+            <Icon name="add_comment" className="text-base" />
+            새 대화
+          </button>
+        )}
+
         <button
           type="button"
           onClick={() => {
@@ -496,6 +590,8 @@ export default function ChatbotDock() {
               플랜트 운영과 정비 관련해서 궁금한 점을 물어보세요.
               <br />
               매뉴얼·고장보고서 내용도 찾아드려요(예: "변압기 고장 관련 보고서 찾아줘").
+              <br />
+              앞 대화를 기억해서 &quot;그 설비는?&quot;처럼 이어서 물어볼 수 있어요.
               <br />
               <strong>준공도서·벤더프린트 검색은 아직 연결 전입니다.</strong>
             </p>

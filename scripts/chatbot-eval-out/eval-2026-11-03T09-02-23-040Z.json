@@ -1,0 +1,1880 @@
+{
+  "base": "http://localhost:3000",
+  "branch": "판교지사",
+  "summary": "| 모델 · 추론 | 턴 | 실패 | 자동점검 통과 | 평균 응답(초) | 최대(초) | 출력 토큰(추론) | 비용($) |\n|---|---|---|---|---|---|---|---|\n| gpt-6.1-terra · medium | 16 | 0 | 15/15 | 5.2 | 11.3 | 2148 (113) | 0.0315 |\n| gpt-6.1-terra · high | 16 | 0 | 15/15 | 5.7 | 11.8 | 3147 (942) | 0.0394 |\n| gpt-6-luna · medium | 16 | 0 | 15/15 | 12.1 | 24.1 | 2750 (783) | 0.0040 |\n| gpt-6-luna · high | 16 | 0 | 15/15 | 8.4 | 20.4 | 3942 (1960) | 0.0047 |",
+  "results": [
+    {
+      "model": "gpt-6.1-terra",
+      "reasoning": "medium",
+      "scenarios": [
+        {
+          "scenario": "인사·소개",
+          "turns": [
+            {
+              "q": "안녕",
+              "ok": true,
+              "answer": "안녕하세요! 무엇을 도와드릴까요?",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 2392,
+              "usage": {
+                "calls": 1,
+                "input": 4329,
+                "cached": 4326,
+                "output": 15,
+                "reasoning": 0
+              },
+              "checks": []
+            },
+            {
+              "q": "너는 어떤 걸 조회할 수 있어?",
+              "ok": true,
+              "answer": "판교지사 기준으로 다음 정보를 조회할 수 있습니다.\n\n1. 오버홀 공정: 공정률, 작업 현황, 지연 위험 작업\n2. 고장관리: 설비별 고장이력, 원인과 조치사항\n3. 매뉴얼관리: 매뉴얼, 고장 보고서, 사진대장\n4. 설비 정보: 설비 마스터, 기기 태그와 사양\n5. 중장기보수계획: 점검주기, 보수년도와 보수 등급\n6. 설비 현황: 미완료·조치중 이슈\n\n조회만 가능하며, 등록이나 수정은 해당 화면에서 직접 하셔야 합니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 3396,
+              "usage": {
+                "calls": 1,
+                "input": 4430,
+                "cached": 4427,
+                "output": 156,
+                "reasoning": 0
+              },
+              "checks": []
+            }
+          ]
+        },
+        {
+          "scenario": "고장이력 후속 질문",
+          "turns": [
+            {
+              "q": "판교지사 최근 고장이력 알려줘",
+              "ok": true,
+              "answer": "판교지사 최근 고장이력은 2건입니다.\n\n1. 2026-10-28 09:40 급수펌프 #1 베어링 과열 트립 — 조치중\n구동측 베어링 온도 95℃에서 보호 트립됐으며, 예비 펌프 #2가 자동 기동했습니다. 윤활유 열화와 커플링 정렬 불량이 원인으로 추정돼 조사 중입니다.\n\n2. 2026-10-21 14:20 1호 주변압기 냉각팬 정지 및 유온 상승 — 조치완료\n냉각팬 #2 전동기 베어링 고착과 MCCB 트립이 원인이었습니다. 예비팬을 기동한 뒤 전동기를 교체해 18:05 정상 운전으로 복구했습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"limit\":10}"
+                }
+              ],
+              "ms": 6425,
+              "usage": {
+                "calls": 2,
+                "input": 9419,
+                "cached": 9413,
+                "output": 209,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                },
+                {
+                  "what": "범위 판교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "첫 번째 건 응급조치 내용 자세히 알려줘",
+              "ok": true,
+              "answer": "판교지사 급수펌프 #1 베어링 과열 트립의 응급조치 내용입니다.\n\n1. 자동 기동된 예비 급수펌프 #2의 운전 상태를 확인했습니다.\n2. 트립된 급수펌프 #1을 격리한 후 윤활유 샘플을 채취했습니다.\n\n근거: 「급수펌프 #1 베어링 과열 트립」 고장상보.",
+              "scope": "판교지사",
+              "tools": [
+                "read_failure_report"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_failure_report",
+                  "args": "{\"id\":\"2\"}"
+                }
+              ],
+              "ms": 5656,
+              "usage": {
+                "calls": 2,
+                "input": 9685,
+                "cached": 8994,
+                "output": 125,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 read_failure_report",
+                  "pass": true
+                },
+                {
+                  "what": "범위 판교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그 설비 점검주기나 보수계획도 있어?",
+              "ok": true,
+              "answer": "판교지사 중장기보수계획에 급수펌프 #1 관련 항목이 등록돼 있습니다.\n\n1. 고압 급수펌프 #1(P-101): 보수주기 3년, 방법 O/H, 마지막 보수 2023년. 등급 이력은 2023·2026·2029년 A등급입니다.\n2. 급수펌프 #1 전동기 분해점검(M-101): 보수주기 4년, 방법 O/H, 마지막 보수 2022년. 등급 이력은 2022·2026·2030년 A등급입니다.\n\n고장 설비와 고압 급수펌프 #1이 동일한지는 태그를 확인해 주세요. 다음 보수년도 판정은 「오버홀 공정관리 > 중장기보수계획」 화면에서 확인할 수 있습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_longterm_plan"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_longterm_plan",
+                  "args": "{\"keyword\":\"급수펌프\",\"limit\":10}"
+                }
+              ],
+              "ms": 7269,
+              "usage": {
+                "calls": 2,
+                "input": 10479,
+                "cached": 9130,
+                "output": 272,
+                "reasoning": 41
+              },
+              "checks": [
+                {
+                  "what": "도구 search_longterm_plan",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "조회 범위 유지·전환",
+          "turns": [
+            {
+              "q": "광교지사 현황 이슈 알려줘",
+              "ok": true,
+              "answer": "광교지사 현황 이슈는 총 8건입니다. 미완료 2건, 조치중 1건, 추후 조치 예정 1건이며 조치완료는 4건입니다.\n\n조치가 필요한 이슈는 다음과 같습니다.\n\n1. 탈기기 수위조절밸브: 수위 헌팅 발생, 유지보수 점검 요청. 미완료.\n2. GT #1 윤활유 펌프: 기동 시 이상 소음 발생, 유지보수 점검 요청. 미완료.\n3. HRSG 급수펌프 B: 축봉부 누수. 메카니컬 씰 교체 예정이며 부품 수배 중.\n4. 6.9kV 차단기 #3: 투입 표시등 점멸 이상. 2026년 11월 5일 오버홀 기간 중 점검 예정.",
+              "scope": "광교지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"limit\":10}"
+                }
+              ],
+              "ms": 6923,
+              "usage": {
+                "calls": 2,
+                "input": 9476,
+                "cached": 9470,
+                "output": 220,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 광교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그 중 미완료는 몇 건이야?",
+              "ok": true,
+              "answer": "광교지사의 미완료 이슈는 2건입니다.",
+              "scope": "광교지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"status\":\"미완료\",\"limit\":10}"
+                }
+              ],
+              "ms": 4270,
+              "usage": {
+                "calls": 2,
+                "input": 9519,
+                "cached": 8956,
+                "output": 45,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 광교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그럼 전 지사 기준으로는 미완료가 몇 건이야?",
+              "ok": true,
+              "answer": "전 지사 기준 미완료 이슈는 2건입니다.",
+              "scope": "전 지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"status\":\"미완료\",\"limit\":10}"
+                }
+              ],
+              "ms": 4411,
+              "usage": {
+                "calls": 2,
+                "input": 9649,
+                "cached": 8998,
+                "output": 61,
+                "reasoning": 14
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 전 지사",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "문서 근거 후속 질문",
+          "turns": [
+            {
+              "q": "윤활유 펌프 고장 보고서 찾아줘",
+              "ok": true,
+              "answer": "윤활유 펌프 고장 보고서 1건을 찾았습니다.\n\n제목: GT1호기 윤활유 펌프 고장\n대상: GT #1 윤활유 펌프\n\n매뉴얼관리 > 매뉴얼 조회에서 문서를 열어볼 수 있습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_manuals"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_manuals",
+                  "args": "{\"keyword\":\"윤활유 펌프\",\"doc_type\":\"fault\",\"limit\":10}"
+                }
+              ],
+              "ms": 5205,
+              "usage": {
+                "calls": 2,
+                "input": 9572,
+                "cached": 4694,
+                "output": 131,
+                "reasoning": 21
+              },
+              "checks": []
+            },
+            {
+              "q": "아까 그 보고서에서 조치사항만 정리해줘",
+              "ok": true,
+              "answer": "「GT1호기 윤활유 펌프 고장」 보고서의 조치사항입니다.\n\n1. 예비 펌프로 절체하여 운전했습니다.\n2. 베어링은 교체 예정입니다.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"08e32aef-6a73-4d89-bb12-24008afced53\"}"
+                }
+              ],
+              "ms": 4830,
+              "usage": {
+                "calls": 2,
+                "input": 9413,
+                "cached": 8891,
+                "output": 91,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 read_document",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "매뉴얼 근거 후속 질문",
+          "turns": [
+            {
+              "q": "6.9kV 차단기 점검 매뉴얼 있어?",
+              "ok": true,
+              "answer": "네, 「6.9kV 차단기 정밀점검 매뉴얼」이 있습니다.\n\n매뉴얼관리 > 매뉴얼 조회에서 열어보실 수 있습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_manuals"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_manuals",
+                  "args": "{\"keyword\":\"6.9kV 차단기\",\"doc_type\":\"manual\",\"limit\":10}"
+                }
+              ],
+              "ms": 4572,
+              "usage": {
+                "calls": 2,
+                "input": 9617,
+                "cached": 4711,
+                "output": 105,
+                "reasoning": 18
+              },
+              "checks": []
+            },
+            {
+              "q": "그 매뉴얼에서 점검 순서 알려줘",
+              "ok": true,
+              "answer": "「6.9kV 차단기 정밀점검 매뉴얼」에서 확인되는 점검 순서는 다음과 같습니다.\n\n1. 인출 전 차단기 상태를 확인하고 조작전원을 차단합니다.\n2. 주접점 마모 상태를 점검하고 접촉저항을 측정합니다.\n\n조회된 본문에는 이 두 항목만 확인됩니다. 실제 작업 전에는 정전·격리 및 무전압 확인을 포함한 현장 안전절차를 확인해 주세요.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"5b413fd8-a834-4d10-af1a-9347cb69d5c1\"}"
+                }
+              ],
+              "ms": 5939,
+              "usage": {
+                "calls": 2,
+                "input": 9315,
+                "cached": 8872,
+                "output": 154,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 read_document",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "공정률 이어 묻기",
+          "turns": [
+            {
+              "q": "전체 공정률 알려줘",
+              "ok": true,
+              "answer": "현재 저장된 실적 기준 전체 공정률은 50.6%입니다. 계획 공정률은 49.4%입니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 2168,
+              "usage": {
+                "calls": 1,
+                "input": 4333,
+                "cached": 4330,
+                "output": 34,
+                "reasoning": 0
+              },
+              "checks": []
+            },
+            {
+              "q": "그럼 전기 분야는?",
+              "ok": true,
+              "answer": "판교지사 전기 분야 공정률은 현재 저장된 실적 기준 66.9%입니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 2412,
+              "usage": {
+                "calls": 1,
+                "input": 4451,
+                "cached": 4448,
+                "output": 28,
+                "reasoning": 0
+              },
+              "checks": []
+            }
+          ]
+        },
+        {
+          "scenario": "대상 전환",
+          "turns": [
+            {
+              "q": "급수펌프 #1 고장 상황 알려줘",
+              "ok": true,
+              "answer": "급수펌프 #1은 구동측 베어링 과열로 트립되어 조치중입니다.\n\n1. 발생 상황: 2026년 10월 28일 09:40, 베어링 온도가 95℃에 도달해 보호 트립됐고 예비 급수펌프 #2가 자동 기동됐습니다.\n2. 추정 원인: 윤활유 열화와 커플링 정렬 불량입니다.\n3. 조치 현황: #2 운전 상태를 확인하고 #1을 격리한 뒤 윤활유 샘플을 채취했습니다. 정렬 측정은 10월 30일 예정이었고, 윤활유 분석 결과는 대기 중으로 기록돼 있습니다.\n\n근거: 판교지사 고장이력 「급수펌프 #1 베어링 과열 트립」.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"keyword\":\"급수펌프\",\"limit\":10}"
+                }
+              ],
+              "ms": 6441,
+              "usage": {
+                "calls": 2,
+                "input": 9008,
+                "cached": 9002,
+                "output": 222,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "주변압기는?",
+              "ok": true,
+              "answer": "판교지사 1호 주변압기는 냉각팬 #2 정지로 유온이 상승했으나 조치 완료됐습니다.\n\n1. 발생 상황: 2026년 10월 21일 14:20, 상부 유온이 82℃까지 올라 고온 경보가 발생했습니다.\n2. 원인: 냉각팬 #2 전동기 베어링이 고착되고 MCCB가 트립됐습니다.\n3. 조치 결과: 부하를 낮추고 예비 냉각팬 #3을 수동 기동했습니다. 이후 #2 전동기를 교체하고 MCCB 동작시험을 거쳐 18:05에 정상 운전으로 복귀했습니다.\n4. 재발 방지: 냉각팬 전동기 베어링을 분기 점검 항목에 추가하고, 팬 운전 상태를 DCS 알람에 연동하도록 기록돼 있습니다.\n\n근거: 판교지사 고장이력 「1호 주변압기 냉각팬 정지로 유온 상승」.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"keyword\":\"주변압기\",\"limit\":10}"
+                }
+              ],
+              "ms": 11296,
+              "usage": {
+                "calls": 2,
+                "input": 9844,
+                "cached": 8998,
+                "output": 280,
+                "reasoning": 19
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model": "gpt-6.1-terra",
+      "reasoning": "high",
+      "scenarios": [
+        {
+          "scenario": "인사·소개",
+          "turns": [
+            {
+              "q": "안녕",
+              "ok": true,
+              "answer": "안녕하세요! 무엇을 도와드릴까요?",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 2698,
+              "usage": {
+                "calls": 1,
+                "input": 4329,
+                "cached": 4326,
+                "output": 15,
+                "reasoning": 0
+              },
+              "checks": []
+            },
+            {
+              "q": "너는 어떤 걸 조회할 수 있어?",
+              "ok": true,
+              "answer": "판교지사를 기준으로 다음 정보를 조회할 수 있어요.\n\n1. 오버홀 공정: 공정률, 작업 건수, 지연 위험 작업\n2. 고장이력: 고장 원인, 조치 내용, 재발방지 대책\n3. 매뉴얼·보고서: 문서 검색과 본문 내용\n4. 설비·기기: 설비 정보, 기기 태그와 사양\n5. 중장기보수계획: 점검주기, 보수년도와 등급 이력\n6. 설비 현황: 미완료·조치 중인 이슈\n\n조회만 가능하며, 등록이나 수정은 해당 화면에서 직접 해주셔야 합니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 5458,
+              "usage": {
+                "calls": 1,
+                "input": 4430,
+                "cached": 4427,
+                "output": 278,
+                "reasoning": 117
+              },
+              "checks": []
+            }
+          ]
+        },
+        {
+          "scenario": "고장이력 후속 질문",
+          "turns": [
+            {
+              "q": "판교지사 최근 고장이력 알려줘",
+              "ok": true,
+              "answer": "판교지사 최근 고장이력은 2건입니다.\n\n1. 2026-10-28 09:40, 급수펌프 #1 베어링 과열 트립\n상태: 조치중. 윤활유 열화와 커플링 정렬 불량이 원인으로 추정됩니다. 예비 펌프 #2를 운전 중이며 윤활유 분석 결과를 기다리고 있습니다.\n\n2. 2026-10-21 14:20, 1호 주변압기 냉각팬 정지 및 유온 상승\n상태: 조치완료. 냉각팬 #2 전동기 베어링 고착과 MCCB 트립이 원인이었으며, 전동기 교체 후 같은 날 18:05에 복구했습니다.\n\n근거: 판교지사 고장이력 조회 결과.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"limit\":5}"
+                }
+              ],
+              "ms": 6317,
+              "usage": {
+                "calls": 2,
+                "input": 9443,
+                "cached": 8650,
+                "output": 234,
+                "reasoning": 22
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                },
+                {
+                  "what": "범위 판교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "첫 번째 건 응급조치 내용 자세히 알려줘",
+              "ok": true,
+              "answer": "판교지사 급수펌프 #1 베어링 과열 트립 건의 응급조치는 다음과 같습니다.\n\n1. 자동 기동한 예비 급수펌프 #2의 운전 상태를 확인했습니다.\n2. 트립된 급수펌프 #1을 격리한 후 윤활유 샘플을 채취했습니다.\n\n현재 윤활유 분석 결과를 기다리고 있으며, 조치중 상태입니다.\n\n근거: 판교지사 「급수펌프 #1 베어링 과열 트립」 고장상보.",
+              "scope": "판교지사",
+              "tools": [
+                "read_failure_report"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_failure_report",
+                  "args": "{\"id\":\"2\"}"
+                }
+              ],
+              "ms": 6110,
+              "usage": {
+                "calls": 2,
+                "input": 9687,
+                "cached": 8995,
+                "output": 148,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 read_failure_report",
+                  "pass": true
+                },
+                {
+                  "what": "범위 판교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그 설비 점검주기나 보수계획도 있어?",
+              "ok": true,
+              "answer": "판교지사 중장기보수계획에 급수펌프 #1 관련 보수주기가 등록되어 있습니다.\n\n1. 고압 급수펌프 #1(P-101): O/H 주기 3년, 마지막 보수 2023년. 기록된 연도·등급은 2023년, 2026년, 2029년 모두 A등급입니다.\n2. 급수펌프 #1 전동기 분해점검(M-101): O/H 주기 4년, 마지막 보수 2022년. 기록된 연도·등급은 2022년, 2026년, 2030년 모두 A등급입니다.\n\n고장이력에는 설비명이 ‘급수펌프 #1’로만 기재되어 있으므로, 위 계획과 동일 설비인지는 태그 확인이 필요합니다. 다음 보수년도 판정은 ‘오버홀 공정관리 > 중장기보수계획’ 화면에서 확인해 주세요.\n\n근거: 판교지사 고장상보 및 중장기보수계획 조회 결과.",
+              "scope": "판교지사",
+              "tools": [
+                "search_longterm_plan",
+                "read_failure_report"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_longterm_plan",
+                  "args": "{\"keyword\":\"급수펌프\",\"limit\":10}"
+                },
+                {
+                  "tool": "read_failure_report",
+                  "args": "{\"id\":\"2\"}"
+                }
+              ],
+              "ms": 11842,
+              "usage": {
+                "calls": 3,
+                "input": 16738,
+                "cached": 14907,
+                "output": 494,
+                "reasoning": 196
+              },
+              "checks": [
+                {
+                  "what": "도구 search_longterm_plan",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "조회 범위 유지·전환",
+          "turns": [
+            {
+              "q": "광교지사 현황 이슈 알려줘",
+              "ok": true,
+              "answer": "광교지사 현황 이슈는 총 8건입니다. 미완료 2건, 조치중 1건, 추후 조치 예정 1건, 조치완료 4건입니다.\n\n미완료\n1. 탈기기 수위조절밸브: 수위 헌팅 발생, 유지보수 점검 요청.\n2. GT #1 윤활유 펌프: 기동 시 이상 소음 발생, 유지보수 점검 요청.\n\n조치중\n3. HRSG 급수펌프 B: 축봉부 누수로 메카니컬 씰 교체 예정이며, 부품 수배 중입니다.\n\n추후 조치 예정\n4. 6.9kV 차단기 #3: 투입 표시등 점멸 이상으로 2026년 11월 5일 오버홀 기간 중 점검 예정입니다.\n\n조치완료\n5. 순환수펌프 #2: 운전 중 이상 소음 이슈이며, 조치내용은 레벨 컨트롤러 재조정 완료로 등록되어 있습니다.\n6. 탈기기 수위조절밸브: 수위 헌팅 이슈 2건에 대해 각각 레벨 컨트롤러 재조정 완료로 등록되어 있습니다.\n7. 터빈건물 배수펌프: 레벨 스위치 교체 후 자동 기동을 확인했습니다.",
+              "scope": "광교지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"limit\":10}"
+                }
+              ],
+              "ms": 9510,
+              "usage": {
+                "calls": 2,
+                "input": 9476,
+                "cached": 8650,
+                "output": 523,
+                "reasoning": 191
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 광교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그 중 미완료는 몇 건이야?",
+              "ok": true,
+              "answer": "광교지사 현황 이슈 중 미완료는 2건입니다.",
+              "scope": "광교지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"status\":\"미완료\",\"limit\":10}"
+                }
+              ],
+              "ms": 4492,
+              "usage": {
+                "calls": 2,
+                "input": 9739,
+                "cached": 9066,
+                "output": 48,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 광교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그럼 전 지사 기준으로는 미완료가 몇 건이야?",
+              "ok": true,
+              "answer": "전 지사 기준 미완료 현황 이슈는 2건입니다.",
+              "scope": "전 지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"status\":\"미완료\",\"limit\":10}"
+                }
+              ],
+              "ms": 3688,
+              "usage": {
+                "calls": 2,
+                "input": 9859,
+                "cached": 9111,
+                "output": 47,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 전 지사",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "문서 근거 후속 질문",
+          "turns": [
+            {
+              "q": "윤활유 펌프 고장 보고서 찾아줘",
+              "ok": true,
+              "answer": "「GT1호기 윤활유 펌프 고장」 보고서 1건을 찾았습니다. GT #1 윤활유 펌프 관련 보고서입니다.\n\n매뉴얼관리 > 매뉴얼 조회에서 열 수 있습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_manuals"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_manuals",
+                  "args": "{\"keyword\":\"윤활유 펌프\",\"doc_type\":\"fault\",\"limit\":10}"
+                }
+              ],
+              "ms": 6725,
+              "usage": {
+                "calls": 2,
+                "input": 9597,
+                "cached": 4694,
+                "output": 269,
+                "reasoning": 170
+              },
+              "checks": []
+            },
+            {
+              "q": "아까 그 보고서에서 조치사항만 정리해줘",
+              "ok": true,
+              "answer": "「GT1호기 윤활유 펌프 고장」 보고서의 조치사항입니다.\n\n1. 예비 펌프로 절체하여 운전했습니다.\n2. 베어링 교체 예정입니다.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"08e32aef-6a73-4d89-bb12-24008afced53\"}"
+                }
+              ],
+              "ms": 4511,
+              "usage": {
+                "calls": 2,
+                "input": 9387,
+                "cached": 8878,
+                "output": 90,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 read_document",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "매뉴얼 근거 후속 질문",
+          "turns": [
+            {
+              "q": "6.9kV 차단기 점검 매뉴얼 있어?",
+              "ok": true,
+              "answer": "네, 「6.9kV 차단기 정밀점검 매뉴얼」이 있습니다. 매뉴얼관리 > 매뉴얼 조회에서 열 수 있습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_manuals"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_manuals",
+                  "args": "{\"keyword\":\"6.9kV 차단기\",\"doc_type\":\"manual\",\"limit\":5}"
+                }
+              ],
+              "ms": 4956,
+              "usage": {
+                "calls": 2,
+                "input": 9624,
+                "cached": 4711,
+                "output": 109,
+                "reasoning": 25
+              },
+              "checks": []
+            },
+            {
+              "q": "그 매뉴얼에서 점검 순서 알려줘",
+              "ok": true,
+              "answer": "「6.9kV 차단기 정밀점검 매뉴얼」에서 확인된 점검 순서는 다음과 같습니다.\n\n1. 인출 전 차단기 상태를 확인하고 조작전원을 차단합니다.\n2. 주접점의 마모 상태를 점검하고 접촉저항을 측정합니다.\n\n조회된 본문에는 이 두 단계가 기재되어 있습니다. 전체 절차는 매뉴얼관리 > 매뉴얼 조회에서 원문을 확인해 주세요.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"5b413fd8-a834-4d10-af1a-9347cb69d5c1\"}"
+                }
+              ],
+              "ms": 6976,
+              "usage": {
+                "calls": 2,
+                "input": 9309,
+                "cached": 8869,
+                "output": 258,
+                "reasoning": 106
+              },
+              "checks": [
+                {
+                  "what": "도구 read_document",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "공정률 이어 묻기",
+          "turns": [
+            {
+              "q": "전체 공정률 알려줘",
+              "ok": true,
+              "answer": "현재 저장된 실적 기준 전체 공정률은 50.6%입니다. 계획 공정률은 49.4%입니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 2273,
+              "usage": {
+                "calls": 1,
+                "input": 4333,
+                "cached": 4330,
+                "output": 34,
+                "reasoning": 0
+              },
+              "checks": []
+            },
+            {
+              "q": "그럼 전기 분야는?",
+              "ok": true,
+              "answer": "판교지사 전기 분야 공정률은 현재 저장된 실적 기준 66.9%입니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 2051,
+              "usage": {
+                "calls": 1,
+                "input": 4451,
+                "cached": 4448,
+                "output": 28,
+                "reasoning": 0
+              },
+              "checks": []
+            }
+          ]
+        },
+        {
+          "scenario": "대상 전환",
+          "turns": [
+            {
+              "q": "급수펌프 #1 고장 상황 알려줘",
+              "ok": true,
+              "answer": "급수펌프 #1은 구동측 베어링 과열로 보호 트립됐으며, 현재 기록상 조치중입니다.\n\n발생: 2026년 10월 28일 09:40\n고장 상황: 베어링 온도가 95℃에 도달해 트립됐고, 예비 급수펌프 #2가 자동 기동됐습니다.\n추정 원인: 윤활유 열화 및 커플링 정렬 불량입니다.\n조치 현황: #1을 격리하고 윤활유 샘플을 채취했습니다. 윤활유 분석 결과는 대기 중이며, 커플링 정렬 측정은 10월 30일 예정으로 기록돼 있습니다. 복구 완료 시각은 등록되지 않았습니다.\n\n근거: 판교지사 고장이력 「급수펌프 #1 베어링 과열 트립」.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"keyword\":\"급수펌프\",\"limit\":10}"
+                }
+              ],
+              "ms": 7820,
+              "usage": {
+                "calls": 2,
+                "input": 9055,
+                "cached": 8672,
+                "output": 322,
+                "reasoning": 89
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "주변압기는?",
+              "ok": true,
+              "answer": "판교지사 1호 주변압기는 냉각팬 #2 정지로 유온이 상승했으나, 현재 기록상 조치완료입니다.\n\n발생: 2026년 10월 21일 14:20\n고장 상황: 상부 유온이 82℃까지 올라 고온 경보가 발생했습니다.\n원인: 냉각팬 #2 전동기 베어링이 고착되고 MCCB가 트립됐습니다.\n조치: 부하를 낮추고 예비 냉각팬 #3을 기동한 뒤, #2 전동기를 예비품으로 교체했습니다.\n복구: 2026년 10월 21일 18:05 정상 운전으로 복귀했습니다.\n\n근거: 판교지사 고장이력 「1호 주변압기 냉각팬 정지로 유온 상승」.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"keyword\":\"주변압기\",\"limit\":10}"
+                }
+              ],
+              "ms": 6373,
+              "usage": {
+                "calls": 2,
+                "input": 9865,
+                "cached": 9005,
+                "output": 250,
+                "reasoning": 26
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model": "gpt-6-luna",
+      "reasoning": "medium",
+      "scenarios": [
+        {
+          "scenario": "인사·소개",
+          "turns": [
+            {
+              "q": "안녕",
+              "ok": true,
+              "answer": "안녕하세요. 무엇을 도와드릴까요?",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 9058,
+              "usage": {
+                "calls": 1,
+                "input": 4329,
+                "cached": 4326,
+                "output": 15,
+                "reasoning": 0
+              },
+              "checks": []
+            },
+            {
+              "q": "너는 어떤 걸 조회할 수 있어?",
+              "ok": true,
+              "answer": "오버홀 공정 실적과 설비·기기 태그, 고장이력, 매뉴얼·고장 보고서·사진대장, 중장기보수계획, 설비 현황과 조치 필요 이슈를 조회할 수 있어요. 현재는 판교지사 기준이며, 등록·수정·삭제는 할 수 없습니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 10882,
+              "usage": {
+                "calls": 1,
+                "input": 4430,
+                "cached": 4427,
+                "output": 160,
+                "reasoning": 76
+              },
+              "checks": []
+            }
+          ]
+        },
+        {
+          "scenario": "고장이력 후속 질문",
+          "turns": [
+            {
+              "q": "판교지사 최근 고장이력 알려줘",
+              "ok": true,
+              "answer": "판교지사 최근 고장이력은 2건입니다.\n\n1. 2026년 10월 28일 급수펌프 #1 구동측 베어링 과열 트립 — 조치중입니다. 베어링 온도가 95℃에 도달해 보호 트립됐고, 예비펌프 #2가 기동했습니다. 윤활유 열화와 커플링 정렬 불량이 원인으로 추정되며, 정렬 측정과 윤활유 분석을 진행할 예정입니다.\n2. 2026년 10월 21일 1호 주변압기 냉각팬 #2 정지로 유온 상승 — 조치완료입니다. 전동기 베어링 고착과 MCCB 트립이 원인이었으며, 전동기 교체 후 정상 운전으로 복귀했습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"limit\":5}"
+                }
+              ],
+              "ms": 6136,
+              "usage": {
+                "calls": 2,
+                "input": 9419,
+                "cached": 9413,
+                "output": 271,
+                "reasoning": 60
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                },
+                {
+                  "what": "범위 판교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "첫 번째 건 응급조치 내용 자세히 알려줘",
+              "ok": true,
+              "answer": "판교지사 급수펌프 #1 고장상보에 기록된 응급조치는 예비 펌프 #2의 운전 상태를 확인하고, #1을 격리한 뒤 윤활유 샘플을 채취한 것입니다.\n\n근거: 「급수펌프 #1 베어링 과열 트립」 고장상보.",
+              "scope": "판교지사",
+              "tools": [
+                "read_failure_report"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_failure_report",
+                  "args": "{\"id\":\"2\"}"
+                }
+              ],
+              "ms": 4968,
+              "usage": {
+                "calls": 2,
+                "input": 9685,
+                "cached": 8994,
+                "output": 104,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 read_failure_report",
+                  "pass": true
+                },
+                {
+                  "what": "범위 판교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그 설비 점검주기나 보수계획도 있어?",
+              "ok": true,
+              "answer": "판교지사 기준으로 점검주기와 보수계획이 등록돼 있습니다.\n\n1. 고압 급수펌프 #1(P-101): 기계 분야, 분해정비(O/H) 주기 3년, 마지막 보수년도 2023년입니다. 등급 이력은 2023년·2026년·2029년 모두 A입니다.\n2. 급수펌프 #1 전동기 분해점검(M-101): 전기 분야, 분해정비(O/H) 주기 4년, 마지막 보수년도 2022년입니다. 등급 이력은 2022년·2026년·2030년 모두 A입니다.\n\n다음 보수년도는 화면의 판정 로직으로 확인해야 하므로 여기서 별도로 산정하지 않았습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_longterm_plan"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_longterm_plan",
+                  "args": "{\"keyword\":\"급수펌프 #1\",\"limit\":5}"
+                }
+              ],
+              "ms": 6335,
+              "usage": {
+                "calls": 2,
+                "input": 9906,
+                "cached": 9109,
+                "output": 295,
+                "reasoning": 81
+              },
+              "checks": [
+                {
+                  "what": "도구 search_longterm_plan",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "조회 범위 유지·전환",
+          "turns": [
+            {
+              "q": "광교지사 현황 이슈 알려줘",
+              "ok": true,
+              "answer": "광교지사 현황 이슈는 총 8건입니다. 미완료 2건, 조치중 1건, 추후 조치 예정 1건, 조치완료 4건입니다.\n\n1. 미완료 — 탈기기 수위조절밸브: 수위 헌팅 발생, 유지보수 점검 요청.\n2. 미완료 — GT #1 윤활유 펌프: 기동 시 이상 소음 발생, 유지보수 점검 요청.\n3. 조치중 — HRSG 급수펌프 B: 축봉부 누수. 메카니컬 씰 교체 예정이며 부품을 수배 중입니다.\n4. 추후 조치 예정 — 6.9kV 차단기 #3: 투입 표시등 점멸 이상. 오버홀 기간 중 점검 예정이며 일정은 2026-11-05입니다.\n5. 조치완료 — 순환수펌프 #2: 운전 중 이상 소음 이슈. 레벨 컨트롤러 재조정 완료.\n6. 조치완료 — 탈기기 수위조절밸브: 수위 헌팅 이슈. 레벨 컨트롤러 재조정 완료 2건으로 등록되어 있습니다.\n7. 조치완료 — 터빈건물 배수펌프: 자동 기동 불가 이슈. 레벨 스위치 교체 후 자동 기동을 확인했습니다.",
+              "scope": "광교지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"limit\":10}"
+                }
+              ],
+              "ms": 9179,
+              "usage": {
+                "calls": 2,
+                "input": 9476,
+                "cached": 9470,
+                "output": 421,
+                "reasoning": 78
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 광교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그 중 미완료는 몇 건이야?",
+              "ok": true,
+              "answer": "광교지사 미완료 현황 이슈는 2건입니다.",
+              "scope": "광교지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"status\":\"미완료\",\"limit\":10}"
+                }
+              ],
+              "ms": 4485,
+              "usage": {
+                "calls": 2,
+                "input": 9761,
+                "cached": 9077,
+                "output": 47,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 광교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그럼 전 지사 기준으로는 미완료가 몇 건이야?",
+              "ok": true,
+              "answer": "전 지사 기준 미완료 현황 이슈는 2건입니다. 조회된 두 건은 모두 광교지사에 등록되어 있습니다.",
+              "scope": "전 지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"status\":\"미완료\",\"limit\":10}"
+                }
+              ],
+              "ms": 10013,
+              "usage": {
+                "calls": 2,
+                "input": 9961,
+                "cached": 9121,
+                "output": 258,
+                "reasoning": 192
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 전 지사",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "문서 근거 후속 질문",
+          "turns": [
+            {
+              "q": "윤활유 펌프 고장 보고서 찾아줘",
+              "ok": true,
+              "answer": "GT1호기 윤활유 펌프 고장 보고서를 찾았습니다. 대상은 GT #1 윤활유 펌프입니다. 보고서 카드를 확인해 주세요.",
+              "scope": "판교지사",
+              "tools": [
+                "search_manuals"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_manuals",
+                  "args": "{\"keyword\":\"윤활유 펌프\",\"doc_type\":\"fault\",\"limit\":5}"
+                }
+              ],
+              "ms": 8094,
+              "usage": {
+                "calls": 2,
+                "input": 9549,
+                "cached": 4694,
+                "output": 228,
+                "reasoning": 144
+              },
+              "checks": []
+            },
+            {
+              "q": "아까 그 보고서에서 조치사항만 정리해줘",
+              "ok": true,
+              "answer": "보고서의 조치사항은 다음과 같습니다.\n\n1. 예비 펌프로 절체해 운전했습니다.\n2. 베어링은 교체 예정입니다.\n\n근거: 「GT1호기 윤활유 펌프 고장」 보고서의 조치사항입니다.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"08e32aef-6a73-4d89-bb12-24008afced53\"}"
+                }
+              ],
+              "ms": 22223,
+              "usage": {
+                "calls": 2,
+                "input": 9361,
+                "cached": 8865,
+                "output": 105,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 read_document",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "매뉴얼 근거 후속 질문",
+          "turns": [
+            {
+              "q": "6.9kV 차단기 점검 매뉴얼 있어?",
+              "ok": true,
+              "answer": "6.9kV 차단기 정밀점검 매뉴얼이 있습니다. 매뉴얼에는 인출 전 차단기 상태 확인 및 조작전원 차단, 주접점 마모 상태 점검 및 접촉저항 측정이 안내되어 있습니다. 매뉴얼관리 > 매뉴얼 조회에서 확인하실 수 있어요.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"5b413fd8-a834-4d10-af1a-9347cb69d5c1\"}"
+                }
+              ],
+              "ms": 6764,
+              "usage": {
+                "calls": 2,
+                "input": 9633,
+                "cached": 4711,
+                "output": 127,
+                "reasoning": 0
+              },
+              "checks": []
+            },
+            {
+              "q": "그 매뉴얼에서 점검 순서 알려줘",
+              "ok": true,
+              "answer": "「6.9kV 차단기 정밀점검 매뉴얼」의 점검 순서는 다음과 같습니다.\n\n1. 인출 전에 차단기 상태를 확인하고 조작전원을 차단합니다.\n2. 주접점의 마모 상태를 점검하고 접촉저항을 측정합니다.\n\n근거: 「6.9kV 차단기 정밀점검 매뉴얼」의 본문입니다. 매뉴얼관리 > 매뉴얼 조회에서 확인하실 수 있어요.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"5b413fd8-a834-4d10-af1a-9347cb69d5c1\"}"
+                }
+              ],
+              "ms": 23610,
+              "usage": {
+                "calls": 2,
+                "input": 9399,
+                "cached": 8914,
+                "output": 155,
+                "reasoning": 0
+              },
+              "checks": [
+                {
+                  "what": "도구 read_document",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "공정률 이어 묻기",
+          "turns": [
+            {
+              "q": "전체 공정률 알려줘",
+              "ok": true,
+              "answer": "현재 저장된 실적 기준 전체 공정률은 50.6%입니다. 계획 공정률은 49.4%입니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 9353,
+              "usage": {
+                "calls": 1,
+                "input": 4333,
+                "cached": 4330,
+                "output": 34,
+                "reasoning": 0
+              },
+              "checks": []
+            },
+            {
+              "q": "그럼 전기 분야는?",
+              "ok": true,
+              "answer": "현재 저장된 실적 기준 전기 분야 공정률은 66.9%입니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 14667,
+              "usage": {
+                "calls": 1,
+                "input": 4451,
+                "cached": 4448,
+                "output": 45,
+                "reasoning": 19
+              },
+              "checks": []
+            }
+          ]
+        },
+        {
+          "scenario": "대상 전환",
+          "turns": [
+            {
+              "q": "급수펌프 #1 고장 상황 알려줘",
+              "ok": true,
+              "answer": "급수펌프 #1은 2026년 10월 28일 구동측 베어링 온도가 95℃에 도달해 보호 트립됐고, 예비 급수펌프 #2가 자동 기동했습니다. 현재 조치중이며, 윤활유 열화와 커플링 정렬 불량이 원인으로 추정됩니다. #1은 격리 후 윤활유 샘플을 채취했고, 커플링 정렬 측정과 윤활유 분석 결과를 기다리는 상태입니다.\n\n근거: 판교지사 고장이력 「급수펌프 #1 베어링 과열 트립」.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"keyword\":\"급수펌프 #1\",\"limit\":5}"
+                }
+              ],
+              "ms": 24035,
+              "usage": {
+                "calls": 2,
+                "input": 9010,
+                "cached": 9004,
+                "output": 248,
+                "reasoning": 68
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "주변압기는?",
+              "ok": true,
+              "answer": "판교지사 1호 주변압기는 2026년 10월 21일 냉각팬 #2가 정지해 상부 유온이 82℃까지 올라가고 고온 경보가 발생했습니다. 원인은 냉각팬 전동기 베어링 고착과 MCCB 트립이었으며, 예비 냉각팬을 기동하고 부하를 낮춘 뒤 전동기를 교체해 당일 18:05 정상 운전으로 복귀했습니다. 현재 조치완료입니다.\n\n근거: 고장이력 「1호 주변압기 냉각팬 정지로 유온 상승」.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"keyword\":\"주변압기\",\"limit\":5}"
+                }
+              ],
+              "ms": 24123,
+              "usage": {
+                "calls": 2,
+                "input": 9735,
+                "cached": 8954,
+                "output": 237,
+                "reasoning": 65
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model": "gpt-6-luna",
+      "reasoning": "high",
+      "scenarios": [
+        {
+          "scenario": "인사·소개",
+          "turns": [
+            {
+              "q": "안녕",
+              "ok": true,
+              "answer": "안녕하세요. 무엇을 도와드릴까요?",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 3082,
+              "usage": {
+                "calls": 1,
+                "input": 4329,
+                "cached": 4326,
+                "output": 15,
+                "reasoning": 0
+              },
+              "checks": []
+            },
+            {
+              "q": "너는 어떤 걸 조회할 수 있어?",
+              "ok": true,
+              "answer": "오버홀 공정률·작업 건수·지연 위험, 고장이력, 매뉴얼·고장 보고서·사진대장, 설비와 기기 태그 정보, 중장기보수계획, 조치 필요 현황을 조회할 수 있어요. 현재는 판교지사 기준이며, 다른 지사를 지정해 주시면 해당 지사 범위로 확인합니다. 조회만 가능해서 등록·수정·삭제는 해당 화면에서 직접 하셔야 해요.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 6376,
+              "usage": {
+                "calls": 1,
+                "input": 4430,
+                "cached": 4326,
+                "output": 314,
+                "reasoning": 200
+              },
+              "checks": []
+            }
+          ]
+        },
+        {
+          "scenario": "고장이력 후속 질문",
+          "turns": [
+            {
+              "q": "판교지사 최근 고장이력 알려줘",
+              "ok": true,
+              "answer": "판교지사 기준 최근 고장이력은 2건입니다.\n\n1. 2026-10-28 09:40 — 급수펌프 #1 구동측 베어링 과열 트립. 베어링 온도 95℃로 보호 트립됐고, 예비펌프 #2가 자동 기동했습니다. 윤활유 열화와 커플링 정렬 불량이 원인으로 추정되며, 현재 조치중입니다.\n2. 2026-10-21 14:20 — 1호 주변압기 냉각팬 #2 정지로 유온 상승. 전동기 베어링 고착 및 MCCB 트립이 원인이었으며, 전동기 교체 후 18:05에 복구되어 조치완료됐습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"limit\":10}"
+                }
+              ],
+              "ms": 6163,
+              "usage": {
+                "calls": 2,
+                "input": 9419,
+                "cached": 8650,
+                "output": 284,
+                "reasoning": 83
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                },
+                {
+                  "what": "범위 판교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "첫 번째 건 응급조치 내용 자세히 알려줘",
+              "ok": true,
+              "answer": "판교지사 고장이력의 첫 번째 건(급수펌프 #1 베어링 과열 트립) 응급조치는 예비 펌프 #2의 운전 상태를 확인하고, 급수펌프 #1을 격리한 뒤 윤활유 샘플을 채취한 것입니다. 보고서에는 이 외의 응급조치 내용은 기재되어 있지 않습니다.\n\n근거: 「급수펌프 #1 베어링 과열 트립」 고장상보.",
+              "scope": "판교지사",
+              "tools": [
+                "read_failure_report"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_failure_report",
+                  "args": "{\"id\":\"2\"}"
+                }
+              ],
+              "ms": 6331,
+              "usage": {
+                "calls": 2,
+                "input": 9665,
+                "cached": 8984,
+                "output": 239,
+                "reasoning": 100
+              },
+              "checks": [
+                {
+                  "what": "도구 read_failure_report",
+                  "pass": true
+                },
+                {
+                  "what": "범위 판교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그 설비 점검주기나 보수계획도 있어?",
+              "ok": true,
+              "answer": "판교지사 기준으로 조회했습니다. 급수펌프 #1의 보수계획이 등록되어 있으며, 관련 전동기 계획도 확인됩니다.\n\n1. 고압 급수펌프 #1(P-101): 기계 분야, 점검주기 3년, 보수방법 O/H, 마지막 보수년도 2023년입니다. 등급 이력은 2023년 A, 2026년 A, 2029년 A로 등록되어 있습니다.\n2. 급수펌프 #1 전동기 분해점검(M-101): 전기 분야, 점검주기 4년, 보수방법 O/H, 마지막 보수년도 2022년입니다. 등급 이력은 2022년 A, 2026년 A, 2030년 A로 등록되어 있습니다.\n\n등급 이력은 조회된 원본이며, 다음 보수년도 판정은 화면의 판정 로직을 확인해 주세요.",
+              "scope": "판교지사",
+              "tools": [
+                "search_longterm_plan"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_longterm_plan",
+                  "args": "{\"keyword\":\"급수펌프 #1\",\"limit\":5}"
+                }
+              ],
+              "ms": 8842,
+              "usage": {
+                "calls": 2,
+                "input": 9986,
+                "cached": 9132,
+                "output": 450,
+                "reasoning": 203
+              },
+              "checks": [
+                {
+                  "what": "도구 search_longterm_plan",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "조회 범위 유지·전환",
+          "turns": [
+            {
+              "q": "광교지사 현황 이슈 알려줘",
+              "ok": true,
+              "answer": "광교지사 현황 이슈입니다. 총 8건이며, 미완료 2건·조치중 1건·추후 조치 예정 1건·조치완료 4건입니다.\n\n1. 미완료 — 탈기기 수위조절밸브: 수위 헌팅 발생, 유지보수 점검 요청.\n2. 미완료 — GT #1 윤활유 펌프: 기동 시 이상 소음 발생, 유지보수 점검 요청.\n3. 조치중 — HRSG 급수펌프 B: 축봉부 누수. 메카니컬 씰 교체 예정이며 부품을 수배 중입니다.\n4. 추후 조치 예정 — 6.9kV 차단기 #3: 투입 표시등 점멸 이상. 오버홀 기간 중 점검 예정일은 2026-11-05입니다.\n5. 조치완료 — 순환수펌프 #2: 운전 중 이상 소음 건, 레벨 컨트롤러 재조정 완료.\n6. 조치완료 — 탈기기 수위조절밸브: 수위 헌팅 건 2건, 레벨 컨트롤러 재조정 완료.\n7. 조치완료 — 터빈건물 배수펌프: 자동 기동 불가 건, 레벨 스위치 교체 및 자동 기동 확인 완료.",
+              "scope": "광교지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"limit\":10}"
+                }
+              ],
+              "ms": 8799,
+              "usage": {
+                "calls": 2,
+                "input": 9476,
+                "cached": 9470,
+                "output": 457,
+                "reasoning": 122
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 광교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그 중 미완료는 몇 건이야?",
+              "ok": true,
+              "answer": "광교지사 현황 기준 미완료 이슈는 2건입니다.",
+              "scope": "광교지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"status\":\"미완료\",\"keyword\":\"광교지사\",\"limit\":10}"
+                }
+              ],
+              "ms": 4449,
+              "usage": {
+                "calls": 2,
+                "input": 9789,
+                "cached": 9069,
+                "output": 92,
+                "reasoning": 35
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 광교지사",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "그럼 전 지사 기준으로는 미완료가 몇 건이야?",
+              "ok": true,
+              "answer": "전 지사 기준 미완료 현황 이슈는 2건입니다. 조회된 두 건은 모두 광교지사입니다.",
+              "scope": "전 지사",
+              "tools": [
+                "list_status_issues"
+              ],
+              "lookups": [
+                {
+                  "tool": "list_status_issues",
+                  "args": "{\"status\":\"미완료\",\"limit\":10}"
+                }
+              ],
+              "ms": 6592,
+              "usage": {
+                "calls": 2,
+                "input": 10013,
+                "cached": 9121,
+                "output": 297,
+                "reasoning": 234
+              },
+              "checks": [
+                {
+                  "what": "도구 list_status_issues",
+                  "pass": true
+                },
+                {
+                  "what": "범위 전 지사",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "문서 근거 후속 질문",
+          "turns": [
+            {
+              "q": "윤활유 펌프 고장 보고서 찾아줘",
+              "ok": true,
+              "answer": "GT1호기 윤활유 펌프 고장 보고서를 찾았습니다. 매뉴얼관리 > 매뉴얼 조회에서 확인하실 수 있습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_manuals"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_manuals",
+                  "args": "{\"keyword\":\"윤활유 펌프\",\"doc_type\":\"fault\",\"limit\":5}"
+                }
+              ],
+              "ms": 20373,
+              "usage": {
+                "calls": 2,
+                "input": 9549,
+                "cached": 4694,
+                "output": 184,
+                "reasoning": 105
+              },
+              "checks": []
+            },
+            {
+              "q": "아까 그 보고서에서 조치사항만 정리해줘",
+              "ok": true,
+              "answer": "GT1호기 윤활유 펌프 고장 보고서의 조치사항은 예비 펌프로 절체 운전하고, 베어링은 교체 예정입니다.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"08e32aef-6a73-4d89-bb12-24008afced53\"}"
+                }
+              ],
+              "ms": 6457,
+              "usage": {
+                "calls": 2,
+                "input": 9351,
+                "cached": 8860,
+                "output": 178,
+                "reasoning": 93
+              },
+              "checks": [
+                {
+                  "what": "도구 read_document",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "매뉴얼 근거 후속 질문",
+          "turns": [
+            {
+              "q": "6.9kV 차단기 점검 매뉴얼 있어?",
+              "ok": true,
+              "answer": "6.9kV 차단기 정밀점검 매뉴얼이 있습니다. 매뉴얼관리 > 매뉴얼 조회에서 확인하실 수 있어요.",
+              "scope": "판교지사",
+              "tools": [
+                "search_manuals"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_manuals",
+                  "args": "{\"keyword\":\"6.9kV 차단기\",\"doc_type\":\"manual\",\"limit\":5}"
+                }
+              ],
+              "ms": 9311,
+              "usage": {
+                "calls": 2,
+                "input": 9597,
+                "cached": 4711,
+                "output": 173,
+                "reasoning": 90
+              },
+              "checks": []
+            },
+            {
+              "q": "그 매뉴얼에서 점검 순서 알려줘",
+              "ok": true,
+              "answer": "「6.9kV 차단기 정밀점검 매뉴얼」에서 확인되는 순서는 다음과 같습니다.\n\n1. 인출 전 차단기 상태를 확인하고 조작전원을 차단합니다.\n2. 주접점 마모 상태를 점검하고 접촉저항을 측정합니다.\n\n근거: 해당 매뉴얼의 색인 원문에 기재된 두 단계입니다. 매뉴얼관리 > 매뉴얼 조회에서 확인하실 수 있습니다.",
+              "scope": "판교지사",
+              "tools": [
+                "read_document"
+              ],
+              "lookups": [
+                {
+                  "tool": "read_document",
+                  "args": "{\"document_id\":\"5b413fd8-a834-4d10-af1a-9347cb69d5c1\"}"
+                }
+              ],
+              "ms": 10144,
+              "usage": {
+                "calls": 2,
+                "input": 9307,
+                "cached": 8868,
+                "output": 266,
+                "reasoning": 116
+              },
+              "checks": [
+                {
+                  "what": "도구 read_document",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "공정률 이어 묻기",
+          "turns": [
+            {
+              "q": "전체 공정률 알려줘",
+              "ok": true,
+              "answer": "현재 저장된 실적 기준 전체 공정률은 50.6%입니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 4575,
+              "usage": {
+                "calls": 1,
+                "input": 4333,
+                "cached": 4330,
+                "output": 75,
+                "reasoning": 51
+              },
+              "checks": []
+            },
+            {
+              "q": "그럼 전기 분야는?",
+              "ok": true,
+              "answer": "현재 저장된 실적 기준 전기 분야 공정률은 66.9%입니다.",
+              "scope": "판교지사",
+              "tools": [],
+              "lookups": [],
+              "ms": 5226,
+              "usage": {
+                "calls": 1,
+                "input": 4439,
+                "cached": 4436,
+                "output": 59,
+                "reasoning": 33
+              },
+              "checks": []
+            }
+          ]
+        },
+        {
+          "scenario": "대상 전환",
+          "turns": [
+            {
+              "q": "급수펌프 #1 고장 상황 알려줘",
+              "ok": true,
+              "answer": "고장이력 ‘급수펌프 #1 베어링 과열 트립’ 기준으로 현재 조치중입니다.\n\n2026년 10월 28일 구동측 베어링 온도가 95℃에 도달해 보호 트립됐고, 예비 급수펌프 #2가 자동 기동했습니다. #1은 격리한 뒤 윤활유 샘플을 채취했으며, 원인은 윤활유 열화와 커플링 정렬 불량으로 추정 중입니다. 이력에는 커플링 정렬 측정 예정 및 윤활유 분석 대기로 기록돼 있어, 조치 결과는 추가 확인이 필요합니다.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"keyword\":\"급수펌프 #1\",\"limit\":5}"
+                }
+              ],
+              "ms": 13628,
+              "usage": {
+                "calls": 2,
+                "input": 9010,
+                "cached": 8672,
+                "output": 450,
+                "reasoning": 270
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "q": "주변압기는?",
+              "ok": true,
+              "answer": "판교지사 1호 주변압기는 냉각팬 #2 정지로 유온이 82℃까지 올라 고온 경보가 발생했으며, 현재는 조치완료 상태입니다. 원인은 냉각팬 전동기 베어링 고착과 MCCB 트립으로 기록돼 있습니다.\n\n예비 냉각팬 #3을 기동하고 부하를 낮춘 뒤, 불량 전동기를 교체하고 MCCB 동작시험을 마쳐 2026년 10월 21일 18:05에 정상 운전으로 복귀했습니다. 근거: 고장이력 ‘1호 주변압기 냉각팬 정지로 유온 상승’.",
+              "scope": "판교지사",
+              "tools": [
+                "search_failure_history"
+              ],
+              "lookups": [
+                {
+                  "tool": "search_failure_history",
+                  "args": "{\"keyword\":\"주변압기\",\"limit\":5}"
+                }
+              ],
+              "ms": 13270,
+              "usage": {
+                "calls": 2,
+                "input": 9797,
+                "cached": 8954,
+                "output": 409,
+                "reasoning": 225
+              },
+              "checks": [
+                {
+                  "what": "도구 search_failure_history",
+                  "pass": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
