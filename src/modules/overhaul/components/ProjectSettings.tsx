@@ -7,7 +7,7 @@ import type { OverhaulProject } from "../lib/repo";
 /**
  * 오버홀 회차 관리 — 만들고, 고치고, 바꿔 보고, 지운다.
  *
- * 회차는 여러 개다. 2026년 1호기와 2027년 1호기는 계약도 내역서도 실적도 다른
+ * 회차는 여러 개다. 2026년과 2027년 오버홀은 계약도 내역서도 실적도 다른
  * 별개의 일이므로, 한 회차에 덮어쓰지 않고 나란히 남긴다. 지금 보고 있는 회차는
  * 서버가 쿠키로 기억한다(activeProject.ts).
  *
@@ -15,12 +15,10 @@ import type { OverhaulProject } from "../lib/repo";
  * 비어 있으면 그 회차의 지표가 전부 0으로 나오므로 눈에 띄게 표시한다.
  */
 
-type Draft = Pick<OverhaulProject, "name" | "plant" | "unit" | "start_date" | "end_date">;
+type Draft = Pick<OverhaulProject, "name" | "start_date" | "end_date">;
 
 const EMPTY_DRAFT: Draft = {
   name: "",
-  plant: "",
-  unit: "",
   start_date: "",
   end_date: "",
 };
@@ -33,7 +31,7 @@ function FieldRow({
   onChange: (patch: Partial<Draft>) => void;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-3">
       <label className="flex flex-col gap-1">
         <span className="text-label-caps uppercase text-on-surface-variant">회차명</span>
         <input aria-label="2026년 정기 오버홀"
@@ -41,22 +39,6 @@ function FieldRow({
           placeholder="2026년 정기 오버홀"
           value={draft.name ?? ""}
           onChange={(e) => onChange({ name: e.target.value })}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-label-caps uppercase text-on-surface-variant">발전소</span>
-        <input
-          className="input"
-          value={draft.plant ?? ""}
-          onChange={(e) => onChange({ plant: e.target.value })}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-label-caps uppercase text-on-surface-variant">호기</span>
-        <input
-          className="input"
-          value={draft.unit ?? ""}
-          onChange={(e) => onChange({ unit: e.target.value })}
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -106,8 +88,6 @@ export default function ProjectSettings() {
   const draftOf = (p: OverhaulProject): Draft =>
     editing[p.id] ?? {
       name: p.name,
-      plant: p.plant ?? "",
-      unit: p.unit ?? "",
       start_date: p.start_date ?? "",
       end_date: p.end_date ?? "",
     };

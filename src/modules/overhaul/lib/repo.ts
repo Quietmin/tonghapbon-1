@@ -148,8 +148,8 @@ export async function getOrCreateProject(branch?: string | null): Promise<Overha
   if (found) return found;
 
   const created = await queryOne<OverhaulProject>(
-    `insert into overhaul_project (name, plant, unit, branch)
-     values ('정기 오버홀', '발전본부', '1호기', $1)
+    `insert into overhaul_project (name, branch)
+     values ('정기 오버홀', $1)
      returning ${PROJECT_COLUMNS}`,
     [branch ?? null],
   );
