@@ -11,7 +11,8 @@ import type { ParsedTask } from "../lib/excelParser";
  * 엑셀 원본은 서버에 저장하지 않는다. 파싱한 작업항목과 파일명만 남는다.
  */
 
-const FIELD_OPTIONS = ["자동", "기계", "전기", "제어"] as const;
+// 전체 = 작업명·규격·시트명으로 분야를 자동 판별 (보수계획 화면의 "분야 보기"와 같은 말로 맞췄다)
+const FIELD_OPTIONS = ["전체", "기계", "전기", "제어"] as const;
 
 interface AnalysisResult {
   sourceId: string | null;
@@ -39,7 +40,7 @@ interface Source {
 }
 
 export default function UploadAnalysis() {
-  const [fieldHint, setFieldHint] = useState<string>("자동");
+  const [fieldHint, setFieldHint] = useState<string>("전체");
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -224,8 +225,8 @@ export default function UploadAnalysis() {
             ))}
           </div>
           <span className="text-xs text-on-surface-variant">
-            {fieldHint === "자동"
-              ? "작업명·규격·시트명으로 분야를 자동 판별합니다."
+            {fieldHint === "전체"
+              ? "작업명·규격·시트명으로 분야를 자동 판별합니다 — 한 파일에 분야별 시트로 나뉘어 있어도 됩니다."
               : `추출된 모든 항목을 '${fieldHint}'로 지정합니다.`}
           </span>
         </div>
