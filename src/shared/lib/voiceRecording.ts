@@ -92,6 +92,8 @@ export interface TranscribeFieldContext {
   label: string;
   kind: "short" | "long";
   options?: readonly string[];
+  /** 자리가 좁은 칸(예: 사진 설명)이면 대략 이 글자 수를 넘지 않게 짧게 정리해 달라고 알려 준다 */
+  maxChars?: number;
 }
 
 export interface TranscribeResult {
@@ -113,6 +115,7 @@ export async function transcribeAudio(
     form.append("fieldLabel", field.label);
     form.append("fieldKind", field.kind);
     if (field.options?.length) form.append("options", JSON.stringify(field.options));
+    if (field.maxChars) form.append("maxChars", String(field.maxChars));
     const res = await fetch("/api/voice/transcribe", { method: "POST", body: form });
     if (!res.ok) return null;
     const data = await res.json();

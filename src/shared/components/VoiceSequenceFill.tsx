@@ -95,19 +95,29 @@ export default function VoiceSequenceFill({
     highlightedRef.current = null;
   }, []);
 
-  const scrollToField = useCallback(
-    (field: VoiceField | undefined) => {
+  /** 테두리만 옮긴다(스크롤·포커스는 건드리지 않는다) — 사용자가 직접 다른 칸을
+   *  눌러서 이미 그쪽에 포커스·스크롤이 가 있는 경우(아래 focusin 감지)에 쓴다. */
+  const highlightElement = useCallback(
+    (el: HTMLElement | null) => {
+      if (highlightedRef.current === el) return;
       clearHighlight();
-      const el = field?.getElement?.();
       if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      if (el instanceof HTMLElement) {
-        el.focus?.({ preventScroll: true });
-        el.classList.add(...HIGHLIGHT_CLASSES);
-        highlightedRef.current = el;
-      }
+      el.classList.add(...HIGHLIGHT_CLASSES);
+      highlightedRef.current = el;
     },
     [clearHighlight],
+  );
+
+  const scrollToField = useCallback(
+    (field: VoiceField | undefined) => {
+      const el = field?.getElement?.() ?? null;
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus?.({ preventScroll: true });
+      }
+      highlightElement(el instanceof HTMLElement ? el : null);
+    },
+    [highlightElement],
   );
 
   const begin = useCallback(() => {
@@ -202,6 +212,25 @@ export default function VoiceSequenceFill({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 음성으로 채우는 중에도 "다음/이전" 대신 사용자가 다른 칸을 직접 눌러서 고칠 때가
+  // 있다 — 그러면 입력단계 표시·빨간 테두리가 실제로 누른 칸과 다르게 남아 혼란스럽다.
+  // 포커스가 어느 칸으로 가는지 감시하다가, fields 목록에 있는 칸이면 그 칸으로
+  // 입력단계를 그대로 옮긴다(녹음 중이어도 다음에 멈추면 이 새 칸에 채워진다).
+  useEffect(() => {
+    if (phase !== "active") return;
+    function onFocusIn(e: FocusEvent) {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      const idx = fieldsRef.current.findIndex((f) => f.getElement?.() === target);
+      if (idx === -1 || idx === activeIndexRef.current) return;
+      setNotice(null);
+      setActiveIndex(idx);
+      highlightElement(target);
+    }
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, [phase, highlightElement]);
 
   const activeField = fields[activeIndex];
   const isLast = activeIndex >= fields.length - 1;

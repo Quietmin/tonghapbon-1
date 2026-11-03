@@ -45,7 +45,9 @@ export default function VoiceDictationButton({
       const blob = await recorder.stop();
       if (!blob) return;
       setProcessing(true);
-      const result = await transcribeAudio(blob, { label: "사진 설명", kind: "long" });
+      // 사진 설명은 격자 안 좁은 칸에 들어가므로, 정리 단계에서 개조식으로 짧게
+      // 추려 달라고 미리 알려 둔다(그래도 길면 서버에서 한 번 더 잘라 준다).
+      const result = await transcribeAudio(blob, { label: "사진 설명", kind: "long", maxChars: 60 });
       setProcessing(false);
       if (!result) {
         setError("음성을 텍스트로 바꾸지 못했어요. 다시 시도해 주세요.");

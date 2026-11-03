@@ -22,6 +22,8 @@ const CLEAN_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
 const MAX_FIELD_LABEL_LEN = 60;
 const MAX_OPTIONS = 30;
+/** 호출부가 보낸 maxChars 가 너무 크거나 이상해도 이 선을 넘지 않게 묶어 둔다 */
+const MAX_CHARS_CAP = 300;
 
 function fail(status: number, reason: string) {
   return NextResponse.json({ ok: false, reason }, { status });
@@ -59,24 +61,35 @@ function upstreamReason(err: unknown): string {
  * 문제. 그래서 "지어내지 마라"와 "말이 안 되면 맥락으로 바로잡아라"를 규칙에서
  * 분명히 나눴다: 아예 없던 내용을 보태는 건 금지하지만, 있던 말을 더 말이 되는
  * 쪽으로 고치는 교정은 허용·권장한다.
+ *
+ * 여러 문장이 들어가는 자유 서술 칸(kind: "long")은 "-습니다"체 완성 문장 대신
+ * 개조식(현장 보고서·점검표에서 쓰는, 핵심만 "-함/-됨/-확인/-완료" 식으로 끝맺는
+ * 간결한 표기)으로 출력한다 — 자연스러운 문장으로 다듬으라고만 했더니 오히려
+ * 더 길고 수식어 많은 문장이 나와, 사진 설명처럼 자리가 좁은 칸에서 잘려 보이는
+ * 문제가 있었다(실제로 겪음). maxChars 가 주어지면(사진 설명처럼 격자 칸에
+ * 들어가는 경우) 그 글자 수 안으로 더 추리라고 덧붙인다.
  */
-function buildCleanupPrompt(fieldLabel: string, kind: "short" | "long", raw: string): string {
+function buildCleanupPrompt(fieldLabel: string, kind: "short" | "long", raw: string, maxChars?: number): string {
   const kindLine =
     kind === "long"
-      ? "이 칸은 여러 문장이 들어갈 수 있는 자유 서술 칸이다. 문장을 자연스럽게 다듬어서 출력해라."
+      ? `이 칸은 완성된 문장이 아니라 개조식으로 적는 칸이다. "-습니다/-했습니다" 같은 문장체 종결어미는 쓰지 말고, 명사형이나 "-함/-됨/-확인/-완료"처럼 핵심만 간결하게 끝맺어라. 여러 사실은 쉼표로 나열한다.`
       : "이 칸은 한 줄짜리 짧은 값이 들어가는 칸이다. 핵심 값만 출력해라.";
+  const lengthLine = maxChars
+    ? `\n이 칸은 자리가 좁다 — 공백 포함 ${maxChars}자를 넘지 않게, 꼭 필요한 말만 남겨서 더 짧게 줄여라.`
+    : "";
 
   return `너는 한국어 음성 받아쓰기 결과를 양식 입력칸에 바로 넣을 수 있게 정리하는 도우미다. 입력을 그대로 돌려주는 것은 "정리"가 아니다 — 아래 규칙대로 반드시 다듬어서 출력해라.
 
 지금 채우려는 칸: "${fieldLabel}"
-${kindLine}
+${kindLine}${lengthLine}
 
 예시(다른 칸 기준 — 방식만 참고):
 칸: "작성자" / 원문: "어 작성자는 음 홍길동입니다" → 출력: 홍길동
-칸: "내용" / 원문: "그러니까 방음벽 음 철거 범위를 사진으로 확인합니다" → 출력: 방음벽 철거 범위를 사진으로 확인합니다.
+칸: "내용" / 원문: "그러니까 방음벽 음 철거 범위를 사진으로 확인합니다" → 출력: 방음벽 철거 범위 사진으로 확인 (개조식 — "-합니다" 종결어미를 빼고 핵심만 남김)
 칸: "설비명" / 원문: "설비명은 1호기 순환수 펌프 순환수 펌프요" → 출력: 1호기 순환수 펌프
 칸: "설비명" / 원문: "일호기 순한수 펌프" → 출력: 1호기 순환수 펌프 (발음이 비슷해 잘못 받아적힌 "순한수"를 현장 설비 용어로 말이 되는 "순환수"로 바로잡음)
-칸: "내용" / 원문: "배관에서 어 누수 같은 소음이 들려서 정기 점검 대상입니다" → 출력: 배관에서 누수로 추정되는 소음이 들려 정기 점검 대상입니다. (음성 인식 상 어색한 "누수 같은 소음"을 맥락상 더 말이 되는 표현으로 다듬음 — 새 사실을 보탠 건 아님)
+칸: "내용" / 원문: "배관에서 어 누수 같은 소음이 들려서 정기 점검 대상입니다" → 출력: 배관 누수 추정 소음 발생, 정기 점검 대상 (개조식 — 새 사실을 보탠 건 아님)
+칸: "사진 설명"(자리 좁음, 30자 제한) / 원문: "음 이 사진은 1호기 순환수 펌프 베어링 부위에서 기름이 새는 걸 확인한 사진이에요" → 출력: 1호기 순환수 펌프 베어링 유출 확인 (개조식 + 글자 수 제한에 맞춰 짧게)
 
 사용자가 음성으로 말한 원문(받아쓰기 결과 — 인식 오류나 더듬거림이 섞여 있을 수 있다):
 "${raw}"
@@ -86,7 +99,7 @@ ${kindLine}
 2. "음", "어", "그러니까" 같은 군더더기 말과 더듬거나 같은 말 반복은 반드시 지운다.
 3. 단어나 구절이 뜻이 안 통하거나 이 칸(${fieldLabel})의 맥락과 안 맞으면, 발음이 비슷해 잘못 받아적혔을 가능성을 추론해서 가장 말이 되는 표현으로 바로잡는다 — 이건 지어내는 게 아니라 교정이다.
 4. 다만 원문에 아예 등장하지 않은 새로운 사실·수치·이름을 보태지는 않는다(교정은 "있던 말을 더 말이 되게" 고치는 것까지만, 없던 정보를 만들어 내는 게 아니다).
-5. 출력은 그 칸에 바로 들어갈 내용만 적는다 — 설명, 따옴표, 접두사 없이 결과 텍스트만. 원문에 쓸 만한 내용이 전혀 없으면 빈 문자열만 출력한다.`;
+5. 출력은 그 칸에 바로 들어갈 내용만 적는다 — 설명, 따옴표, 접두사 없이 결과 텍스트만.${maxChars ? ` 글자 수 제한(${maxChars}자)을 꼭 지켜라.` : ""} 원문에 쓸 만한 내용이 전혀 없으면 빈 문자열만 출력한다.`;
 }
 
 /**
@@ -236,6 +249,10 @@ export async function POST(req: Request) {
     }
   }
 
+  const maxCharsRaw = form.get("maxChars");
+  const maxCharsNum = typeof maxCharsRaw === "string" ? parseInt(maxCharsRaw, 10) : NaN;
+  const maxChars = Number.isFinite(maxCharsNum) && maxCharsNum > 0 ? Math.min(maxCharsNum, MAX_CHARS_CAP) : undefined;
+
   try {
     const raw = await transcribeWithOpenAI(audio, apiKey, fieldLabel, options);
     if (!raw) return NextResponse.json({ ok: true, raw: "", text: "" });
@@ -252,13 +269,17 @@ export async function POST(req: Request) {
 
     // 자유 서술·짧은 값 칸 — 정리 단계가 실패해도(네트워크 오류 등) 받아쓴 원문은
     // 살려서 돌려준다. 빈 손으로 돌아가는 것보다 원문이라도 칸에 들어가는 편이 낫다.
-    const prompt = buildCleanupPrompt(fieldLabel, fieldKind, raw);
+    const prompt = buildCleanupPrompt(fieldLabel, fieldKind, raw, maxChars);
     let cleaned = await cleanWithOpenAI(prompt, apiKey).catch(() => null);
     // 드물게 망가진 응답(멀티바이트 글자가 중간에 끊겨 U+FFFD로 치환된 경우)이
     // 들어올 때가 있다(실제로 관찰됨 — 네트워크/레이트리밋 경계에서 발생하는 듯).
     // 이런 깨진 글자를 그대로 칸에 채우면 사용자가 못 알아보니, 원문으로 대체한다.
     if (cleaned?.includes("�")) cleaned = null;
-    return NextResponse.json({ ok: true, raw, text: cleaned ?? raw });
+    let text = cleaned ?? raw;
+    // 프롬프트로 글자 수를 부탁해도 모델이 가끔 넘길 수 있다 — 자리가 좁은 칸(사진
+    // 설명 등)이 레이아웃을 깨지 않도록 마지막 안전망으로 한 번 더 자른다.
+    if (maxChars && text.length > maxChars) text = text.slice(0, maxChars).trim();
+    return NextResponse.json({ ok: true, raw, text });
   } catch (err) {
     const status = err instanceof UpstreamError ? err.status : undefined;
     console.error("[api/voice/transcribe] 실패:", { status, message: err instanceof Error ? err.message : String(err) });
