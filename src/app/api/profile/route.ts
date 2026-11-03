@@ -24,7 +24,7 @@ export async function GET() {
 
 /**
  * POST { branch, department } — 내 지사·부서를 정한다. 로그인이 붙기 전까지의 임시 대용이라
- * 쿠키에만 담는다. 지사는 설비관리가 읽는 oh_branch 와 같은 쿠키라 어느 화면에서 골라도 이어진다.
+ * 쿠키에만 담는다. 지사는 오버홀 공정관리가 읽는 oh_branch 와 같은 쿠키라 어느 화면에서 골라도 이어진다.
  */
 export async function POST(req: Request) {
   try {

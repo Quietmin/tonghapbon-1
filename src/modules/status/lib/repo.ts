@@ -2,7 +2,7 @@ import { execute, query, queryOne } from "@/shared/lib/db";
 import { MAX_ISSUE_PHOTOS, type IssueStatus } from "./constants";
 
 /**
- * 현황관리 DB 계층 — SQL 은 여기에만 둔다 (다른 모듈 repo.ts 와 같은 규칙).
+ * 설비 현황 관리 DB 계층 — SQL 은 여기에만 둔다 (다른 모듈 repo.ts 와 같은 규칙).
  * 테이블 정의는 db/schema.sql 의 status_issue.
  */
 

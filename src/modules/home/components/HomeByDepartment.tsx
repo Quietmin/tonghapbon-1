@@ -16,8 +16,8 @@ import StatusCountCards from "./StatusCountCards";
  *
  * - 운영부: 현황 작성 바로가기 + 내 지사의 현황 상태별 건수 + 최근 등록한 현황
  * - 유지보수(계전부·기계부·공무부): 같은 구성에 자기 부서 데이터만 — 조치 필요 건수·목록,
- *   추후 조치 예정 일정, 그 아래 설비관리 공정 현황
- * - 부서를 아직 안 골랐으면(팝업이 뜨는 상태) 예전 설비관리 대시보드를 그대로 보여 준다
+ *   추후 조치 예정 일정, 그 아래 오버홀 공정 현황
+ * - 부서를 아직 안 골랐으면(팝업이 뜨는 상태) 예전 오버홀 공정관리 대시보드를 그대로 보여 준다
  *
  * 부서는 getCurrentUser() 로 읽는다 — 지금은 쿠키, 로그인이 붙으면 세션이다.
  */
@@ -146,7 +146,7 @@ async function MaintenanceHome({
       )}
 
       <section className="space-y-gutter">
-        <h2 className="text-headline-md text-on-surface pt-2">설비관리 공정 현황</h2>
+        <h2 className="text-headline-md text-on-surface pt-2">오버홀 공정 현황</h2>
         <EquipmentSection />
       </section>
     </div>

@@ -95,7 +95,7 @@ export default function Sidebar() {
       {/* 메인 메뉴 3개 — 화살표를 눌러 각각 펼치고 접는다 */}
       <nav className="flex-1 flex flex-col gap-1">
         {NAV_GROUPS.map((group) => {
-          // 대표 경로 밖의 하위 메뉴도 있다 (설비관리 챕터의 /overhaul 화면들) —
+          // 대표 경로 밖의 하위 메뉴도 있다 (오버홀 공정관리 챕터의 /overhaul 화면들) —
           // root 접두사만 보면 그 화면에서 챕터가 꺼져 보이므로 항목까지 본다.
           const groupActive =
             pathname === group.root ||

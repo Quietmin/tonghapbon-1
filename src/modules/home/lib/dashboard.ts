@@ -15,7 +15,7 @@ import {
 /**
  * 처음 화면 대시보드 데이터 — 선택한 지사의 가장 최근(또는 선택한) 회차 한 곳을 읽는다.
  *
- * 숫자는 설비관리 대시보드(/api/overhaul/dashboard)와 같은 함수(progress.ts · schedule.ts)로
+ * 숫자는 오버홀 공정관리 대시보드(/api/overhaul/dashboard)와 같은 함수(progress.ts · schedule.ts)로
  * 계산한다. 같은 회차를 두 화면이 서로 다른 숫자로 보여 주면 안 되기 때문이다.
  *
  * 오버홀 화면과 달리 getOrCreateProject 를 쓰지 않는다 — 첫 화면을 열었다고 회차 행이
@@ -72,7 +72,7 @@ export type HomeDashboard =
       recent: RecentEntry[];
     };
 
-// 설비관리 대시보드 API 와 같은 기준일(UTC 날짜)을 쓴다 — 숫자가 어긋나지 않게
+// 오버홀 공정관리 대시보드 API 와 같은 기준일(UTC 날짜)을 쓴다 — 숫자가 어긋나지 않게
 const today = () => new Date().toISOString().slice(0, 10);
 
 const num = (v: unknown) => Number(v) || 0;

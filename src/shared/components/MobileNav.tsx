@@ -11,12 +11,12 @@ const TABS = [
   { href: "/", label: "홈", accent: "primary" as const, items: [] as NavItem[] },
   ...NAV_GROUPS.map((g) => ({
     href: g.root,
-    // 아이콘을 없애고 글자만 쓰므로 줄인 이름(short) 대신 온전한 이름을 쓴다 —
-    // "설비"보다 "설비관리"가 한눈에 또렷하다.
-    label: g.label,
+    // 아이콘을 없애고 글자만 쓰므로 되도록 온전한 이름을 쓴다.
+    // 다만 "오버홀 공정관리"처럼 한 칸에 안 들어가는 이름은 줄인 이름(short)을 쓴다.
+    label: g.short ?? g.label,
     // 켜진 탭을 챕터 색으로 — 데스크톱 사이드바와 같은 색이라 기기를 옮겨도 같게 읽힌다
     accent: g.accent,
-    // 대표 경로 밖의 하위 메뉴(설비관리의 /overhaul 화면들)에서도 탭이 켜지도록
+    // 대표 경로 밖의 하위 메뉴(오버홀 공정관리의 /overhaul 화면들)에서도 탭이 켜지도록
     items: g.items,
   })),
 ];

@@ -6,8 +6,8 @@ import { BRANCHES } from "@/shared/lib/branches";
 import { Icon } from "@/shared/components/ui";
 
 /**
- * 처음 화면의 지사 선택 — 설비관리의 BranchGate 와 같은 쿠키(oh_branch)를 같은 API 로 바꾼다.
- * 어느 쪽에서 골라도 설비관리·처음 화면 모두에 이어진다. 바꾼 뒤에는 서버 컴포넌트가 새 쿠키로
+ * 처음 화면의 지사 선택 — 오버홀 공정관리의 BranchGate 와 같은 쿠키(oh_branch)를 같은 API 로 바꾼다.
+ * 어느 쪽에서 골라도 오버홀 공정관리·처음 화면 모두에 이어진다. 바꾼 뒤에는 서버 컴포넌트가 새 쿠키로
  * 다시 그려지도록 router.refresh() 만 부른다(전체 새로고침 불필요).
  */
 const SORTED = [...BRANCHES].sort((a, b) => a.localeCompare(b, "ko"));

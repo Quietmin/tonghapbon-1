@@ -201,13 +201,13 @@ async function searchLongtermPlan(args: Record<string, unknown>, branch: string 
   );
   return {
     shown: rows.length,
-    note: "grade_history는 '연도:등급'(A=강, C=약) 원본 이력이고, 다음 보수년도 판정은 화면(설비관리 > 중장기보수계획)의 판정 로직을 따른다 — 여기 값으로 새 판정을 만들지 말 것.",
+    note: "grade_history는 '연도:등급'(A=강, C=약) 원본 이력이고, 다음 보수년도 판정은 화면(오버홀 공정관리 > 중장기보수계획)의 판정 로직을 따른다 — 여기 값으로 새 판정을 만들지 말 것.",
     items: rows,
   };
 }
 
 // ---------------------------------------------------------------------------
-// 5) 현황관리 이슈 (status_issue — 메인 DB)
+// 5) 설비 현황 관리 이슈 (status_issue — 메인 DB)
 // ---------------------------------------------------------------------------
 
 async function listStatusIssuesTool(args: Record<string, unknown>, branch: string | null) {
@@ -306,7 +306,7 @@ export const CHATBOT_TOOL_DEFS: OpenAI.Responses.Tool[] = [
     type: "function" as const,
     strict: false,
     name: "list_status_issues",
-    description: "현황관리의 조치 필요 이슈를 본다. '조치할 거 있어?', '미완료 현황' 같은 질문에 사용. 미조치 우선으로 정렬된다.",
+    description: "설비 현황 관리의 조치 필요 이슈를 본다. '조치할 거 있어?', '미완료 현황' 같은 질문에 사용. 미조치 우선으로 정렬된다.",
     parameters: {
       type: "object",
       properties: {
