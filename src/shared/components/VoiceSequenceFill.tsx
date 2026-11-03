@@ -193,7 +193,7 @@ export default function VoiceSequenceFill({
         <button
           type="button"
           onClick={begin}
-          className="h-10 px-3.5 rounded-full border border-border-subtle bg-surface-container-lowest text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors inline-flex items-center gap-1.5"
+          className="h-10 px-3.5 rounded-full border border-border-subtle bg-surface-container-lowest text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap"
         >
           <Icon name="mic" className="text-base text-red-500" />
           음성 입력

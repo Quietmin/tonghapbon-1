@@ -136,10 +136,13 @@ export default function ManualEditor() {
       allowTextItems
       // 작성 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 작성 버튼과
       // 같은 색으로 둬서, 두 화면을 오갈 때 같은 자리의 같은 버튼으로 읽히게 한다.
+      // 폰처럼 폭이 좁으면 flex-wrap 으로 버튼을 아래 줄로 내린다 — wrap 이 없으면
+      // flex 가 두 버튼을 억지로 한 줄에 욱여넣으면서 한글이 글자 하나씩 세로로
+      // 쪼개져 보이는 문제가 있었다(실제로 겪음).
       headingAction={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <VoiceSequenceFill fields={voiceFields} title="음성으로 매뉴얼 머리말 입력하기" />
-          <ButtonLink href="/manual">
+          <ButtonLink href="/manual" className="whitespace-nowrap">
             <Icon name="inventory_2" className="text-lg" />
             매뉴얼 조회
           </ButtonLink>
