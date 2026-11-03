@@ -5,18 +5,21 @@ import Dialog, { DialogHeader } from "./Dialog";
 import { Icon, RequiredMark, InlineError } from "./ui";
 
 /**
- * 내 정보(지사·부서) 선택 — 로그인이 없는 동안의 임시 대용.
+ * 로그인 화면 + 내 정보(지사·부서) 선택 — 실제 로그인이 붙기 전까지의 임시 대용.
  *
- * 처음 접속하면(또는 지사·부서 중 하나라도 비어 있으면) PIMS 마크와 함께 계정 설정 화면이 전체 화면으로
- * 뜨고, 고르고 [시작하기]를 누르면 홈 화면(/)으로 이동한다 — 어느 주소로 처음 들어왔든 같다. 고르기
- * 전에는 다른 화면을 쓸 수 없다. 선택은 쿠키에 담기고(/api/profile), 서버가 getCurrentUser() 로 읽어 현황 등록의
- * 기본 지사·부서와 현황 조회의 기본 필터에 쓴다. 이후에는 헤더의 "강남지사 · 계전부" 칩을 눌러
- * 다시 바꿀 수 있다(그때는 작은 창이고 닫기 가능).
+ * 이 브라우저 세션에서 로그인하지 않았으면(주소로 새로 들어왔거나 로그아웃했으면) 어느 주소로 들어와도 전체
+ * 화면 로그인 화면이 먼저 뜬다. 왼쪽 브랜드 영역(폰에서는 위쪽 로고·제목)과 오른쪽 폼(지사·부서 선택)으로
+ * 이루어진 좌우 분할형이고, 마지막에 고른 지사·부서가 미리 채워져 있어 [로그인]만 누르면 된다. 로그인하면
+ * 들어온 주소 그대로 화면이 열린다(루트로 들어왔으면 홈). 고르기 전에는 다른 화면을 쓸 수 없다.
+ *
+ * 선택은 쿠키에 담기고(/api/profile), 서버가 getCurrentUser() 로 읽어 현황 등록의 기본 지사·부서와 현황
+ * 조회의 기본 필터에 쓴다. 로그인했다는 표시는 브라우저를 닫으면 사라지는 세션 쿠키(oh_session)다. 헤더의
+ * "강남지사 · 계전부" 칩을 누르면 지사·부서를 바꾸거나 로그아웃할 수 있다(그때는 작은 창이고 닫기 가능).
  *
  * 업무망에서 실제 로그인이 붙으면 이 창은 필요 없어진다 — 서버의 getCurrentUser() 만 세션으로
  * 바꾸면 되고, 이 컴포넌트는 Shell 에서 떼어 내면 그만이다.
  *
- * ⚠️ 쿠키라서 누구나 바꿀 수 있다 — 보안이 아니라 "내 기준으로 먼저 보여 주기" 위한 편의다.
+ * ⚠️ 비밀번호가 없고 쿠키라서 누구나 바꿀 수 있다 — 보안이 아니라 "내 기준으로 먼저 보여 주기" 위한 편의다.
  */
 
 interface Profile {
@@ -50,11 +53,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 지사·부서 쿠키가 없으면 첫 접속이다 — 서버 응답(/api/profile)을 기다리지 않고 바로 화면을 띄워
-    // 뒤의 일반 화면이 잠깐 비치지 않게 한다. 쿠키가 있어도 값이 틀렸을 수 있으니 아래 응답이 최종이다.
+    // 이 세션에서 로그인한 표시(oh_session)가 없으면 로그인 화면이다 — 서버 응답(/api/profile)을 기다리지 않고
+    // 바로 띄워 뒤의 일반 화면이 잠깐 비치지 않게 한다. 표시가 있어도 아래 응답이 최종이다.
     const hasCookie = (name: string) =>
       document.cookie.split("; ").some((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
-    if (!hasCookie("oh_branch") || !hasCookie("oh_dept")) {
+    if (!hasCookie("oh_session")) {
       setProfile(null);
       setOpen(true);
     }
@@ -66,7 +69,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setDepartments(json.departments);
         setDraftBranch(json.branch ?? "");
         setDraftDept(json.department ?? "");
-        if (json.branch && json.department) {
+        if (json.loggedIn && json.branch && json.department) {
           setProfile({ branch: json.branch, department: json.department });
         } else {
           setProfile(null);
@@ -104,12 +107,22 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       ).json();
       if (!json.ok) throw new Error(json.error || "저장하지 못했습니다.");
       // 지사·부서에 매인 화면이 많다 — 서버 데이터와 화면 기본값을 통째로 다시 읽는다.
-      // 처음 고른 것이면(= 첫 접속 화면) 어느 주소로 들어왔든 홈 화면으로 보낸다.
-      if (forced) window.location.assign("/");
-      else window.location.reload();
+      // 로그인이면 들어온 주소 그대로 열린다(루트로 들어왔으면 홈).
+      window.location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장하지 못했습니다.");
       setSaving(false);
+    }
+  }
+
+  async function logout() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await fetch("/api/profile", { method: "DELETE" });
+    } finally {
+      // 로그인 표시가 없어진 채로 다시 읽으면 로그인 화면이 뜬다
+      window.location.assign("/");
     }
   }
 
@@ -187,50 +200,77 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         {children}
       </div>
       {open && forced && (
-        // 첫 접속 — PIMS 마크와 계정 설정을 전체 화면으로. 뒤의 화면은 완전히 가려 쓸 수 없다.
+        // 로그인 — 전체 화면 좌우 분할형. 뒤의 화면은 완전히 가려 쓸 수 없다.
         <div
           className="fixed inset-0 z-[500] overflow-y-auto bg-surface print:hidden"
           role="dialog"
           aria-modal="true"
           aria-labelledby="profileDlgTitle"
         >
-          <div className="min-h-full flex flex-col items-center justify-center gap-8 px-6 py-10">
-            <div className="flex flex-col items-center text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
-              <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-40 md:h-48 w-auto" />
-              <h1 className="mt-5 text-[26px] md:text-4xl font-black text-on-surface tracking-tight">
-                플랜트 지능형 관리시스템
-              </h1>
-              <p className="mt-1.5 text-xs md:text-sm font-semibold text-on-surface-variant tracking-wide">
-                Plant Inteligence Management System
-              </p>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void save();
-              }}
-              className="w-full max-w-md rounded-2xl bg-surface-container-lowest p-6 shadow-xl border border-border-subtle flex flex-col gap-4"
-            >
+          <div className="min-h-full grid md:grid-cols-2">
+            {/* 왼쪽 브랜드 영역 — 폰에서는 접고 아래 폼 위에 로고·제목만 둔다 */}
+            <aside className="hidden md:flex flex-col justify-between gap-10 bg-primary text-on-primary p-10 lg:p-14">
               <div>
-                <h2 id="profileDlgTitle" className="text-title-sm text-on-surface flex items-center gap-2">
-                  <Icon name="manage_accounts" className="text-primary" /> 계정 설정
-                </h2>
-                <p className="text-sm text-on-surface-variant mt-1 break-keep">
-                  지사와 부서를 선택해 주세요. 고른 지사·부서 기준으로 현황이 먼저 보이고, 현황 등록에도
-                  자동으로 채워집니다. (업무망 로그인이 연결되기 전까지 임시로 쓰는 선택입니다.)
-                </p>
+                <div className="inline-flex rounded-2xl bg-white p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+                  <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-20 w-auto" />
+                </div>
+                <h1 className="mt-6 text-4xl lg:text-[40px] leading-tight font-bold tracking-tight">
+                  플랜트 지능형
+                  <br />
+                  관리시스템
+                </h1>
+                <p className="mt-2 text-sm text-primary-fixed tracking-wide">Plant Intelligence Management System</p>
               </div>
-              {fields}
-              <button
-                type="submit"
-                disabled={saving || !draftBranch || !draftDept}
-                className="mt-1 px-5 py-3 rounded-sm font-bold text-sm bg-primary text-on-primary hover:opacity-90 disabled:opacity-40"
+              <ul className="flex flex-col gap-4">
+                {[
+                  ["build", "설비·보수계획 통합 관리"],
+                  ["timeline", "오버홀 공정표와 실적"],
+                  ["report", "현황·고장 이슈 조회"],
+                ].map(([icon, text]) => (
+                  <li key={text} className="flex items-center gap-3 text-base">
+                    <Icon name={icon} className="text-primary-fixed-dim" />
+                    {text}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm text-primary-fixed-dim">깨끗한 에너지로 세상을 따뜻하게 · 한국지역난방공사</p>
+            </aside>
+
+            <div className="flex flex-col items-center justify-center gap-6 px-6 py-10 md:py-14">
+              <div className="md:hidden flex flex-col items-center text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element -- public/ 정적 파일이라 최적화 대상이 아니다 */}
+                <img src="/pims-icon.png" alt="PIMS" width={239} height={240} className="h-28 w-auto" />
+                <h1 className="mt-4 text-2xl font-bold text-on-surface tracking-tight">플랜트 지능형 관리시스템</h1>
+                <p className="mt-1 text-sm text-on-surface-variant tracking-wide">Plant Intelligence Management System</p>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void save();
+                }}
+                className="w-full max-w-sm flex flex-col gap-4 rounded-2xl border border-border-subtle bg-surface-container-lowest p-6 md:border-0 md:bg-transparent md:p-0"
               >
-                {saving ? "저장 중…" : "시작하기"}
-              </button>
-            </form>
+                <div>
+                  <h2 id="profileDlgTitle" className="text-headline-md text-on-surface">
+                    로그인
+                  </h2>
+                  <p className="text-sm text-on-surface-variant mt-1 break-keep">
+                    지사와 부서를 선택하면 해당 지사 기준으로 현황을 보여드립니다.
+                  </p>
+                </div>
+                {fields}
+                <button
+                  type="submit"
+                  disabled={saving || !draftBranch || !draftDept}
+                  className="mt-1 min-h-11 px-5 py-3 rounded-sm font-bold text-sm bg-primary text-on-primary hover:opacity-90 disabled:opacity-40"
+                >
+                  {saving ? "로그인 중…" : "로그인"}
+                </button>
+                <p className="text-xs text-on-surface-variant text-center">임시 로그인 — 비밀번호 없음</p>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -246,13 +286,21 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           >
             <DialogHeader id="profileDlgTitle" title="계정 설정 — 내 지사·부서" onClose={() => setOpen(false)} />
             <p className="text-sm text-on-surface-variant break-keep">
-              업무망 로그인이 연결되기 전까지 임시로 쓰는 선택입니다. 고른 지사·부서 기준으로 현황이 먼저
-              보이고, 현황 등록에도 자동으로 채워집니다.
+              고른 지사·부서 기준으로 현황이 먼저 보이고, 현황 등록에도 자동으로 채워집니다. 업무망 로그인이
+              연결되기 전까지 임시로 쓰는 선택입니다.
             </p>
 
             {fields}
 
             <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => void logout()}
+                disabled={saving}
+                className="mr-auto min-h-10 px-4 py-2.5 rounded-sm font-bold text-sm text-status-error-text hover:bg-status-error/10"
+              >
+                로그아웃
+              </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}

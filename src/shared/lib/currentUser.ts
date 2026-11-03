@@ -19,6 +19,13 @@ import { isDepartment, type Department } from "./departments";
 export const DEPT_COOKIE = "oh_dept";
 export const DEPT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
+/**
+ * 로그인했다는 표시 — 수명(maxAge)을 주지 않은 세션 쿠키라 브라우저를 닫으면 사라진다. 그래서 주소로
+ * 새로 들어오면 늘 로그인 화면이 먼저 뜬다. 지사·부서 쿠키(1년)는 지우지 않아 로그인 화면에 미리 채워진다.
+ * 이것도 보안이 아니라 "로그인 화면을 거치게 하는" 표시일 뿐이다.
+ */
+export const SESSION_COOKIE = "oh_session";
+
 export interface CurrentUser {
   branch: string | null;
   department: Department | null;
