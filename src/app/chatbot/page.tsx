@@ -1,11 +1,10 @@
-import ModuleStub from "@/shared/components/ModuleStub";
+import { redirect } from "next/navigation";
 
+/**
+ * 챗봇은 전용 화면이 아니라 모든 화면 우하단에 떠 있는 도크다
+ * (shared/components/ChatbotDock.tsx — GPT tool-calling + 문서 RAG 검색).
+ * 옛 주소로 들어와도 길을 잃지 않게 홈으로 보낸다 — 도크는 홈에도 떠 있다.
+ */
 export default function ChatbotPage() {
-  return (
-    <ModuleStub
-      title="정비 챗봇"
-      from="legacy/CheonJae-DDasomi/frontend/app/page.tsx"
-      note="FastAPI + ChromaDB 검색을 Next API Route + Postgres(태그 정확일치 + pg_trgm 유사도)로 대체합니다. LLM·외부 API는 사용하지 않습니다."
-    />
-  );
+  redirect("/");
 }

@@ -1,84 +1,88 @@
-# Plant Ops Hub — 공정·고장이력·정비문서 통합 웹앱
+# PIMS — 플랜트 지능형 관리시스템 (Plant Intelligence Management System)
 
-기존에 따로 개발되던 3개 프로그램을 **하나의 단일 앱**으로 합친 것입니다.
+지역난방 플랜트 유지보수 업무를 하나로 묶은 통합 웹 시스템입니다. 따로 개발되던
+3개 프로그램(공정관리 · 문서검색 챗봇 · 고장이력)을 단일 Next.js 앱으로 통합했고,
+지금은 **설비관리 · 매뉴얼관리 · 고장관리 · 현황관리** 4개 챕터와 모든 화면에 떠 있는
+**정비 챗봇 "따소미"** 로 구성됩니다. 모든 데이터는 **지사 단위로 분리**되어
+19개 지사가 독립적으로 운영합니다.
 
-| 메인 메뉴 | 하는 일 | 원본 |
+- 운영 배포: https://plant-ops-hub.vercel.app (Vercel · Supabase)
+
+## 주요 기능 (구현 완료)
+
+| 챕터 | 화면 | 내용 |
 |---|---|---|
-| **오버홀 공정관리** | 설계내역서 엑셀 업로드 → 작업항목 자동 추출, 물량 기준 공정률·지연 위험·공정표·보고서 | PlantSync Pro (Vite SPA) |
-| **고장이력 관리** | 열원설비 고장 이력 등록·검색·통계, 고장상보 일괄 업로드 | 열원설비 고장이력 관리 (Next 16 + SQLite) |
-| **정비 챗봇** | 태그명·고장 증상으로 준공도서/벤더프린트 검색, 근거 문서와 원문 발췌 제시 | 천재따소미 (FastAPI + ChromaDB) |
+| 설비관리 | 설비 마스터 `/equipment` | 전 지사 개요 → 지사별 장기 유지보수 계획(과거 2년~향후 2년, 행을 펼치면 태그번호·제작사·규격·주기·연도별 등급) + 설비·기기 2단 기준정보 |
+| 설비관리 | 오버홀 수량산출 `/overhaul/plan` | 중장기 보수계획 엑셀 업로드 → 주기·이력 기반 연도별 도래 판정 → 수량산출서 확정 → 준공 후 이력 반영 |
+| 설비관리 | 공정관리 `/overhaul/*` | 설계내역서 엑셀 → 작업항목 자동 추출, 날짜별 실적·분해 전후 사진, 간트 공정표, 지연 위험 판정, 대시보드·보고서(엑셀/PDF) |
+| 매뉴얼관리 | `/manual` | 사진+설명 → A4 매뉴얼 자동 구성(PDF), 보관함 검색 |
+| 고장관리 | `/failure` | 고장 보고서 작성·보관함, 고장상보 PDF 일괄 업로드·항목 자동 추출 |
+| 현황관리 | `/status` | 운영부 발견사항 등록 → 유지보수 부서 조치 상태 순환 |
+| 챗봇 따소미 | 전 화면 도크 | GPT **tool-calling**으로 전 모듈(보수계획·공정·고장·현황) 읽기 전용 조회 + 문서 내용은 **임베딩 RAG 검색**으로 근거 문서 카드 제시. API 키가 없으면 키워드 검색으로 폴백 |
 
-세 모듈은 **공통 설비 마스터**(설비 → 기기·태그)를 함께 참조합니다. 설비 하나를 열면 진행 중인
-오버홀 작업, 과거 고장 이력, 관련 준공도서가 한 화면에 모입니다.
+## 아키텍처
+
+```
+src/
+├─ app/                Next.js App Router — 화면과 /api 라우트 (얇게 유지)
+├─ modules/            도메인 모듈 — overhaul · equipment · failure · manual
+│                      · status · docgen · home (로직/컴포넌트는 모듈 안에만)
+└─ shared/             공통 — 레이아웃·UI 토큰·설비 마스터·지사/부서·DB 접근
+```
+
+- **저장소**: PostgreSQL 하나의 스키마(`db/schema.sql`). `DATABASE_URL`이 있으면
+  Supabase(운영), 없으면 **PGlite**가 앱 안에서 돌아 설치 없이 로컬 개발
+  ([src/shared/lib/db.ts](src/shared/lib/db.ts) — 두 백엔드가 같은 SQL을 씀).
+- **지사 분리**: 오버홀·설비·현황 데이터가 전부 지사 컬럼으로 스코핑되고,
+  선택한 지사는 쿠키로 서버까지 이어진다 (BranchGate · activeBranch).
+- **화면-서버 분리**: 집계·판정(공정률, 지연 위험, 연도 도래)은 전부 서버 레포지토리
+  계층에서 계산하고 화면은 그리기만 한다.
+
+## 데이터 전처리 · AI 활용
+
+- **엑셀 전처리**: 설계내역서·중장기계획을 SheetJS로 파싱해 작업항목/계획 행으로
+  정규화 — 분야 자동 분류, 보수주기 문자열 해석(`maintenancePlanParser`),
+  과거 등급 반복 패턴 감지로 미래 등급 추정(`gradePattern`), 대분류 → 설비 마스터
+  자동 등록, 태그번호 → 기기·태그 자동 등록.
+- **판정 엔진**: 엑셀의 등급을 그대로 읽지 않고 `마지막 보수연도 + 주기`로 도래를
+  계산해, 이력 반영이 끝나면 다음 해 판정이 자동으로 달라진다 (`maintenanceJudge`).
+- **챗봇**: OpenAI tool-calling(읽기 전용 도구만, 쓰기 도구 없음) + 문서 검색은
+  `text-embedding-3-small` 임베딩을 pgvector 코사인 유사도로 매칭하는 RAG.
+- **문서 생성**: 사진·설명을 A4 레이아웃으로 자동 조판해 PDF 생성, 임베딩 색인까지
+  저장해 챗봇 검색 대상으로 편입.
 
 ## 실행 방법
 
 ```bash
 npm install
-npm run dev
+npm run dev          # DATABASE_URL 없으면 .data/ 아래 PGlite 자동 생성
 ```
 
-DB는 첫 실행 때 `.data/` 아래에 자동으로 만들어진다. 따로 설치할 것이 없다.
+여러 사람이 같은 데이터를 봐야 하면 `.env.local`에 `DATABASE_URL`을 채우고
+`npm run db:migrate`(최초 1회) 후 실행한다. Vercel 배포도 같은 변수만 넣으면 된다.
 
-### 여러 사람이 같은 데이터를 봐야 할 때 (Supabase 등)
+## 구현 범위와 확대 방안
 
-`.env.local.example`을 복사해 `.env.local`을 만들고 `DATABASE_URL`을 채우면, 그 순간부터
-로컬도 그 Postgres를 그대로 쓴다. 처음 한 번은 스키마를 적용해야 한다.
+데모 범위를 명확히 하기 위해 의도적으로 뒤로 미룬 것들입니다.
+숨은 미완성이 아니라 **다음 단계 로드맵**입니다.
 
-```bash
-cp .env.local.example .env.local   # DATABASE_URL 채운 뒤
-npm run db:migrate                 # db/schema.sql 적용 (최초 1회, 또는 스키마 수정 시)
-npm run dev
-```
-
-Vercel에 배포할 때도 프로젝트 환경변수에 같은 `DATABASE_URL`을 넣으면 된다 — 코드는 그대로다.
-
-## 기술 스택
-
-Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PostgreSQL
-
-- **저장소**: PostgreSQL. `DATABASE_URL`이 없으면 PGlite로 앱 안에서 돌고(계정·서버·Docker
-  불필요), 있으면 그 Postgres에 그대로 연결한다 ([src/shared/lib/db.ts](src/shared/lib/db.ts)).
-  둘 다 같은 SQL을 쓰므로 호출하는 코드는 바뀌지 않는다
-- **인증**: 없음 (개발 단계 결정)
-- **챗봇 검색**: 태그 정확일치 + `pg_trgm` 유사도. **LLM·외부 API를 사용하지 않습니다.**
-- **디자인**: PlantSync Pro의 Stitch "Lumina Overhaul Director" 토큰을 Tailwind 4 `@theme`으로 이식
-  ([src/app/globals.css](src/app/globals.css))
-
-## 폴더 구조 — 담당자별 작업 영역
-
-메인 메뉴 3개가 그대로 모듈 경계이며, 담당자끼리 건드리는 폴더가 겹치지 않습니다.
-
-```
-src/
-├─ app/
-│   ├─ overhaul/     ← 오버홀 공정관리 담당
-│   ├─ failure/      ← 고장이력 관리 담당
-│   ├─ chatbot/      ← 정비 챗봇 담당
-│   ├─ equipment/    ← 설비 마스터 (공통)
-│   └─ api/{overhaul,failure,chatbot}/
-├─ modules/{overhaul,failure,chatbot}/   각 모듈의 로직·컴포넌트
-└─ shared/                               공통 — 레이아웃·UI·설비 마스터·DB 접근
-                                         (여기를 고칠 때만 담당자 간 협의 필요)
-```
+1. **현장 QR 코드 기기 열람 (확대 방안)** — 각 기기에 QR 스티커를 붙이고 찍으면
+   P&ID 도면과 vendor print(명판·제원)·보수이력이 바로 열리는 기능.
+   **기반은 구현 완료**: 중장기 보수계획의 태그번호가 기기·태그 기준정보로 자동
+   등록되어(설비 마스터 2단, 챗봇 태그 검색에 사용) QR이 연결될 데이터가 이미 쌓인다.
+2. **업무망 계정 연동** — 현재는 지사·부서 선택(임시 프로필)로 운영하며, 사내
+   로그인·권한 체계로 대체 예정. 인증 백엔드만 바꾸면 되도록 프로필 조회를
+   한 곳(`getCurrentUser`)에 모아 두었다.
+3. **고장이력 목록·대시보드 포팅** — 원본(legacy)의 조회·통계 화면을 통합 스키마로
+   이식하는 단계. 데이터(`failure_history`)와 등록·일괄 업로드 경로는 이미 통합되어
+   있고, 해당 경로는 메뉴에서 숨긴 채 안내 화면(ModuleStub)으로 범위를 명시했다.
 
 ## `legacy/` 폴더
 
-통합 전 원본 3개가 **참고용으로 동결**되어 있습니다.
-
-```
-legacy/
-├─ plantsync/          PlantSync Pro 원본 (Vite)
-├─ 고장이력(7.21)/      열원설비 고장이력 원본 (Next 16 + better-sqlite3)
-└─ CheonJae-DDasomi/   천재따소미 원본 (FastAPI + Next 14)
-```
-
-> **여기서 개발하지 마세요.** 저장소가 IndexedDB / SQLite / ChromaDB 세 갈래에서 하나의
-> PostgreSQL로 합쳐졌기 때문에, legacy 코드의 변경분은 통합 앱으로 그대로 옮겨지지 않습니다.
-> 로직을 참고할 때만 열어보세요.
+통합 전 원본 3개(PlantSync Pro · 고장이력 · 천재따소미)가 **참고용으로 동결**되어
+있습니다. 현재 앱의 코드가 아니며, 로직 출처를 추적할 때만 열어봅니다.
 
 ## 문서
 
 - [docs/OH WEB APP PRD.md](docs/OH%20WEB%20APP%20PRD.md) — 오버홀 공정관리 PRD
-- [legacy/고장이력(7.21)/docs/PRD.md](legacy/고장이력\(7.21\)/docs/PRD.md) — 고장이력 PRD
 - [db/schema.sql](db/schema.sql) — 통합 DB 스키마
