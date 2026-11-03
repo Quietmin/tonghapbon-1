@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button, Card, Icon, RequiredMark, InlineError } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
+import VoiceSequenceFill, { type VoiceField } from "@/shared/components/VoiceSequenceFill";
 import { DEPARTMENTS } from "../lib/constants";
 import { PhotoPicker, type PickedPhoto } from "./StatusPhotos";
 
@@ -108,6 +109,48 @@ export default function StatusRegisterForm({
     }
   }
 
+  /** 음성으로 한 번에 채울 칸 순서 — 화면에 보이는 순서(지사 → 담당부서 → 설비명 →
+   * 작성자 → 이슈 내용)와 같다(매뉴얼 작성 쪽과 같은 방식·같은 부품을 쓴다). */
+  const voiceFields: VoiceField[] = [
+    {
+      key: "branch",
+      label: "지사",
+      kind: "short",
+      options: SORTED_BRANCHES,
+      setValue: (v) => set("branch", v),
+      getElement: () => document.getElementById("statusBranch"),
+    },
+    {
+      key: "department",
+      label: "담당부서",
+      kind: "short",
+      options: DEPARTMENTS,
+      setValue: (v) => set("department", v),
+      getElement: () => document.getElementById("statusDepartment"),
+    },
+    {
+      key: "equipmentName",
+      label: "설비명",
+      kind: "short",
+      setValue: (v) => set("equipmentName", v),
+      getElement: () => document.getElementById("statusEquipmentName"),
+    },
+    {
+      key: "reporter",
+      label: "작성자",
+      kind: "short",
+      setValue: (v) => set("reporter", v),
+      getElement: () => document.getElementById("statusReporter"),
+    },
+    {
+      key: "content",
+      label: "이슈 내용",
+      kind: "long",
+      setValue: (v) => set("content", v),
+      getElement: () => document.getElementById("statusContent"),
+    },
+  ];
+
   if (done) {
     return (
       <Card lift={false} className="p-8 flex flex-col items-center text-center gap-3">
@@ -155,6 +198,9 @@ export default function StatusRegisterForm({
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       <Card lift={false} className="p-6 flex flex-col gap-4">
+        <div className="flex justify-end">
+          <VoiceSequenceFill fields={voiceFields} title="음성으로 현황 등록하기" />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-bold text-on-surface-variant">
@@ -162,6 +208,7 @@ export default function StatusRegisterForm({
               <RequiredMark />
             </span>
             <select
+              id="statusBranch"
               value={form.branch}
               onChange={(e) => set("branch", e.target.value)}
               className="input"
@@ -182,6 +229,7 @@ export default function StatusRegisterForm({
               <RequiredMark />
             </span>
             <select
+              id="statusDepartment"
               value={form.department}
               onChange={(e) => set("department", e.target.value)}
               className="input"
@@ -202,6 +250,7 @@ export default function StatusRegisterForm({
               <RequiredMark />
             </span>
             <input aria-label="예: 1호기 순환펌프"
+              id="statusEquipmentName"
               value={form.equipmentName}
               onChange={(e) => set("equipmentName", e.target.value)}
               placeholder="예: 1호기 순환펌프"
@@ -216,6 +265,7 @@ export default function StatusRegisterForm({
               <RequiredMark />
             </span>
             <input aria-label="이름을 입력하세요."
+              id="statusReporter"
               value={form.reporter}
               onChange={(e) => set("reporter", e.target.value)}
               placeholder="이름을 입력하세요."
@@ -232,6 +282,7 @@ export default function StatusRegisterForm({
               <RequiredMark />
             </span>
           <textarea
+            id="statusContent"
             value={form.content}
             onChange={(e) => set("content", e.target.value)}
             rows={5}

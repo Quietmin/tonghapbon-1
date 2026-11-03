@@ -33,6 +33,7 @@ import { A4Page, FaultA4Page, chunkFaultPages, chunkPages } from "./A4Preview";
 import { PageBanner } from "./Letterhead";
 import PhotoEditorModal, { type PhotoEditorResult } from "./PhotoEditorModal";
 import AutoTextarea from "./AutoTextarea";
+import VoiceDictationButton from "@/shared/components/VoiceDictationButton";
 
 /**
  * 3개 모드(사진대장·매뉴얼·고장 보고서)가 공유하는 편집기.
@@ -1284,13 +1285,24 @@ export default function DocEditor({
                             }}
                           />
                         </div>
-                        <AutoTextarea
-                          value={item.desc}
-                          onChange={(v) => updateDesc(item.id, v)}
-                          minRows={1}
-                          placeholder="사진 설명"
-                          className="w-full px-3 py-2 bg-surface-container text-sm text-on-surface outline-none"
-                        />
+                        <div className="flex items-start gap-1.5 px-1 pt-1">
+                          <VoiceDictationButton
+                            label="사진 설명 음성 입력"
+                            className="mt-1"
+                            onResult={(text) => {
+                              const prev = item.desc;
+                              const sep = prev && !/\s$/.test(prev) ? " " : "";
+                              updateDesc(item.id, prev + sep + text);
+                            }}
+                          />
+                          <AutoTextarea
+                            value={item.desc}
+                            onChange={(v) => updateDesc(item.id, v)}
+                            minRows={1}
+                            placeholder="사진 설명"
+                            className="w-full px-2 py-2 bg-surface-container text-sm text-on-surface outline-none"
+                          />
+                        </div>
                       </>
                     )}
                   </li>

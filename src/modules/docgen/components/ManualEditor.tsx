@@ -5,6 +5,8 @@ import DocEditor from "./DocEditor";
 import SortedSelect, { PlainSelect, TextField } from "./SortedSelect";
 import { ManualHeader } from "./Letterhead";
 import { ButtonLink, Icon } from "@/shared/components/ui";
+import VoiceSequenceFill, { type VoiceField } from "@/shared/components/VoiceSequenceFill";
+import { setNativeInputValue } from "@/shared/lib/domInput";
 import {
   ManualSectionsFields,
   ManualSectionsPrint,
@@ -13,6 +15,16 @@ import {
   type ManualSectionsValue,
 } from "./ManualSections";
 import { BRANCHES, MANUAL_FIELDS, MANUAL_TYPES } from "../lib/constants";
+
+/** DOM id 로 그 칸을 찾아 입력한다 — 파일명·작성자는 DocEditor 안쪽 state 라 여기서
+ * 바로 set 할 수 없다(SortedSelect/PlainSelect 로 만든 매뉴얼 종류·분야·지사 등은
+ * 이 컴포넌트가 직접 들고 있는 state 라 리액트 setter 를 바로 쓴다). */
+function fillById(id: string, value: string) {
+  const el = document.getElementById(id);
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+    setNativeInputValue(el, value);
+  }
+}
 
 /** 개정번호 — 1~10번 중에서 고른다 (원본은 자유 입력이었지만, 값이 흩어지지 않도록 묶었다) */
 const REVISIONS = Array.from({ length: 10 }, (_, i) => String(i + 1));
@@ -40,6 +52,83 @@ export default function ManualEditor() {
   // 1~4번 항목(목적·준비물·주의 사항·내용)
   const [sections, setSections] = useState<ManualSectionsValue>(EMPTY_MANUAL_SECTIONS);
 
+  /** 음성으로 한 번에 채울 칸 순서 — 화면에 보이는 순서(종류·분야·지사 → 파일명 →
+   * 작성자·개정번호 → 목적·준비물·주의사항)와 같게 둔다("화면을 내리면서 말한다"는
+   * 느낌을 그대로 맞추려고). */
+  const voiceFields: VoiceField[] = [
+    {
+      key: "manualType",
+      label: "매뉴얼 종류",
+      kind: "short",
+      options: MANUAL_TYPES,
+      setValue: setManualType,
+      getElement: () => document.getElementById("manualType"),
+    },
+    {
+      key: "manualField",
+      label: "분야",
+      kind: "short",
+      options: MANUAL_FIELDS,
+      setValue: setField,
+      getElement: () => document.getElementById("manualField"),
+    },
+    {
+      key: "manualBranch",
+      label: "지사",
+      kind: "short",
+      options: BRANCHES,
+      setValue: setBranch,
+      getElement: () => document.getElementById("manualBranch"),
+    },
+    {
+      key: "fileName",
+      label: "파일명",
+      kind: "short",
+      setValue: (v) => fillById("docFileName", v),
+      getElement: () => document.getElementById("docFileName"),
+    },
+    {
+      key: "author",
+      label: "작성자",
+      kind: "short",
+      setValue: (v) => fillById("docAuthor", v),
+      getElement: () => document.getElementById("docAuthor"),
+    },
+    {
+      key: "revision",
+      label: "개정번호",
+      kind: "short",
+      setValue: (v) => {
+        const digits = v.replace(/[^0-9]/g, "");
+        if (!digits) return;
+        setRevision(digits);
+        setRevisionCustom(!REVISIONS.includes(digits));
+      },
+      getElement: () => document.getElementById("manualRevision"),
+    },
+    {
+      key: "purpose",
+      label: "목적",
+      kind: "long",
+      setValue: (v) => setSections((prev) => ({ ...prev, purpose: v })),
+      getElement: () => document.querySelector('textarea[placeholder="문서의 목적을 입력하세요."]'),
+    },
+    {
+      key: "prep",
+      label: "준비물",
+      kind: "long",
+      setValue: (v) => setSections((prev) => ({ ...prev, prep: v })),
+      getElement: () => document.querySelector('textarea[placeholder="준비물을 입력하세요."]'),
+    },
+    {
+      key: "caution",
+      label: "주의 사항",
+      kind: "long",
+      setValue: (v) => setSections((prev) => ({ ...prev, caution: v })),
+      getElement: () => document.querySelector('textarea[placeholder="주의 사항을 입력하세요."]'),
+    },
+  ];
+
   return (
     <DocEditor
       mode="manual"
@@ -48,10 +137,13 @@ export default function ManualEditor() {
       // 작성 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 작성 버튼과
       // 같은 색으로 둬서, 두 화면을 오갈 때 같은 자리의 같은 버튼으로 읽히게 한다.
       headingAction={
-        <ButtonLink href="/manual">
-          <Icon name="inventory_2" className="text-lg" />
-          매뉴얼 조회
-        </ButtonLink>
+        <div className="flex items-center gap-2">
+          <VoiceSequenceFill fields={voiceFields} title="음성으로 매뉴얼 머리말 입력하기" />
+          <ButtonLink href="/manual">
+            <Icon name="inventory_2" className="text-lg" />
+            매뉴얼 조회
+          </ButtonLink>
+        </div>
       }
       // 표제부는 장마다 다시 그린다 — "페이지 n/N"이 들어가기 때문
       renderLetterhead={(pageNo, pageCount, title) => (

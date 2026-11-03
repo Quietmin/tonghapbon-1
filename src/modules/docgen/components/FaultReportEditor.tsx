@@ -14,6 +14,8 @@ import SortedSelect, {
 } from "./SortedSelect";
 import { BRANCHES, FAULT_FIELDS } from "../lib/constants";
 import { ButtonLink, Icon } from "@/shared/components/ui";
+import VoiceSequenceFill, { type VoiceField } from "@/shared/components/VoiceSequenceFill";
+import { setNativeInputValue } from "@/shared/lib/domInput";
 import {
   formatDateTime,
   minutesText,
@@ -45,6 +47,14 @@ export interface FaultReportInitial {
   faultContent?: string;
   /** 발생일시(ISO). 브라우저 시간대의 입력값으로 바꿔 채운다 */
   occurredAt?: string;
+}
+
+/** DOM id 로 그 칸을 찾아 입력한다 — 파일명·작성자는 DocEditor 안쪽 state 라 여기서 바로 set 할 수 없다 */
+function fillById(id: string, value: string) {
+  const el = document.getElementById(id);
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+    setNativeInputValue(el, value);
+  }
 }
 
 /** ISO 시각 → datetime-local 입력값(브라우저 시간대, YYYY-MM-DDTHH:mm). 해석할 수 없으면 "" */
@@ -220,6 +230,83 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
     </table>
   );
 
+  /** 음성으로 한 번에 채울 칸 순서 — 날짜/시각 선택기와 열공급 중단 세부 칸(APT·건물
+   * 등)은 숫자·날짜라 잘못 알아들으면 바로잡기 번거로워 빼고, 문장으로 말하는 칸만
+   * 묶는다(매뉴얼과 같은 패턴 — 설명 팝업·"녹음 중" 표시·다음 칸 넘기기 전부 동일). */
+  const voiceFields: VoiceField[] = [
+    {
+      key: "fileName",
+      label: "파일명",
+      kind: "short",
+      setValue: (v) => fillById("docFileName", v),
+      getElement: () => document.getElementById("docFileName"),
+    },
+    {
+      key: "author",
+      label: "작성자",
+      kind: "short",
+      setValue: (v) => fillById("docAuthor", v),
+      getElement: () => document.getElementById("docAuthor"),
+    },
+    {
+      key: "faultField",
+      label: "고장분야",
+      kind: "short",
+      options: FAULT_FIELDS,
+      setValue: setField,
+      getElement: () => document.getElementById("faultField"),
+    },
+    {
+      key: "faultBranch",
+      label: "지사",
+      kind: "short",
+      options: BRANCHES,
+      setValue: setBranch,
+      getElement: () => document.getElementById("faultBranch"),
+    },
+    {
+      key: "faultFacility",
+      label: "설비명",
+      kind: "short",
+      setValue: setFacility,
+      getElement: () => document.getElementById("faultFacility"),
+    },
+    {
+      key: "faultDevice",
+      label: "기기명(고장위치)",
+      kind: "short",
+      setValue: setDevice,
+      getElement: () => document.getElementById("faultDevice"),
+    },
+    {
+      key: "faultContent",
+      label: "고장내용(추정 원인)",
+      kind: "long",
+      setValue: setFaultContent,
+      getElement: () => document.getElementById("faultContent"),
+    },
+    {
+      key: "faultSituation",
+      label: "상황",
+      kind: "long",
+      setValue: (v) => {
+        setSituationNone(false);
+        setSituation(v);
+      },
+      getElement: () => document.getElementById("faultSituation"),
+    },
+    {
+      key: "faultAction",
+      label: "조치사항",
+      kind: "long",
+      setValue: (v) => {
+        setActionNone(false);
+        setActionTaken(v);
+      },
+      getElement: () => document.getElementById("faultAction"),
+    },
+  ];
+
   return (
     <DocEditor
       mode="fault"
@@ -228,10 +315,13 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
       // 등록 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 등록 버튼과
       // 같은 색으로 둬서, 두 화면을 오갈 때 같은 자리의 같은 버튼으로 읽히게 한다.
       headingAction={
-        <ButtonLink href="/failure" variant="primary">
-          <Icon name="inventory_2" className="text-lg" />
-          고장보고서 조회
-        </ButtonLink>
+        <div className="flex items-center gap-2">
+          <VoiceSequenceFill fields={voiceFields} title="음성으로 고장보고서 입력하기" />
+          <ButtonLink href="/failure" variant="primary">
+            <Icon name="inventory_2" className="text-lg" />
+            고장보고서 조회
+          </ButtonLink>
+        </div>
       }
       saveMeta={{
         branch,
