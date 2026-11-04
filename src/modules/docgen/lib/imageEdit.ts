@@ -174,22 +174,50 @@ export function drawStrokes(
  * 목록 썸네일·A4 미리보기에 실제로 보여줄 이미지 — 기준 이미지 위에 strokes 를
  * 구워 하나의 래스터로 합친다. strokes 가 없으면 원본 url 을 그대로 돌려줘
  * 불필요한 캔버스 작업을 건너뛴다. (원본 composeSketchedCache)
+ *
+ * maxEdge 를 주면 긴 변을 그 크기로 줄여 그린다 — 폰 사진(1200만 화소)을 원래 크기로 굽는 데 1초 넘게
+ * 걸려, 편집기에서 [저장]을 눌러도 표시가 한참 뒤에 보였다. 줄인 판은 수십 ms 라 먼저 보여 주고,
+ * 원래 크기 판은 뒤에서 만들어 바꿔 끼운다(DocEditor 재합성 이펙트). 스트로크 좌표는 0~1 로 정규화돼
+ * 있고 선 굵기도 그리는 크기에 맞춰 drawStrokes 가 비례 조정하므로 줄여 그려도 모양이 같다.
  */
+/** [저장] 직후 먼저 보여 줄 마킹 합성본의 긴 변(px) — 썸네일·미리보기에 충분하고 금방 구워진다 */
+export const QUICK_PREVIEW_EDGE = 1000;
+
+/**
+ * 이미 디코드된 이미지로 줄인 합성본을 곧바로(동기) 만든다 — 사진 편집기가 [저장]할 때 쓴다.
+ * 편집기는 기준 이미지를 이미 화면에 띄워 두고 있어 다시 디코드할 필요가 없으므로, 수십 ms 안에
+ * 마킹이 얹힌 썸네일을 넘겨줄 수 있다(원래 크기 판은 DocEditor 가 뒤에서 굽는다).
+ */
+export function quickComposeFromImage(img: CanvasImageSource, width: number, height: number, strokes: Stroke[]): string {
+  const scale = Math.min(1, QUICK_PREVIEW_EDGE / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  drawStrokes(ctx, strokes, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.88);
+}
+
 export async function composePreview(
   url: string,
   width: number,
   height: number,
   strokes: Stroke[],
+  maxEdge?: number,
 ): Promise<string> {
   if (strokes.length === 0) return url;
 
   const img = await loadImage(url);
+  const scale = maxEdge ? Math.min(1, maxEdge / Math.max(width, height)) : 1;
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, 0, 0, width, height);
-  drawStrokes(ctx, strokes, width, height);
+  ctx.drawImage(img, 0, 0, w, h);
+  drawStrokes(ctx, strokes, w, h);
   return canvasToObjectUrl(canvas, 0.9);
 }
 

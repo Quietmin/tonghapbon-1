@@ -12,7 +12,7 @@ import {
   type DocMode,
 } from "../lib/constants";
 import { fitFaultPageLayout, fitReportPageLayout } from "../lib/fitPageLayout";
-import { composePreview, readImageFile } from "../lib/imageEdit";
+import { composePreview, QUICK_PREVIEW_EDGE, readImageFile } from "../lib/imageEdit";
 import { isDocgenSupabaseConfigured } from "../lib/supabase";
 import { saveToArchive, type SaveMeta } from "../lib/archive";
 import { loadDocumentSource, saveDocumentSource } from "../lib/source";
@@ -243,6 +243,9 @@ export default function DocEditor({
   const [fileName, setFileName] = useState("");
   const [author, setAuthor] = useState("");
   const [items, setItems] = useState<DocItem[]>([]);
+  /** 최신 items — 출력이 마킹 합성 완료를 기다릴 때 비동기 루프 안에서 읽는다 */
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** 출력을 한 번이라도 시도했는지 — 비어 있는 필수 칸(파일명·사진)을 붉게 표시하는 기준 */
@@ -696,11 +699,15 @@ export default function DocEditor({
           height: result.height,
           strokes: result.strokes,
           rotation: 0,
-          // previewUrl 을 비워 재합성 이펙트가 새로 만들게 한다
-          previewUrl: null,
+          // 편집기가 마킹 얹은 줄인 판을 주면 그걸 바로 보여 주고(원래 크기 판은 아래에서 뒤에 굽는다),
+          // 없으면 previewUrl 을 비워 재합성 이펙트가 새로 만들게 한다
+          previewUrl: result.quickPreviewUrl ?? null,
         };
       }),
     );
+    if (result.quickPreviewUrl) {
+      startCompose(id, { url: result.url, strokes: result.strokes }, result.width, result.height, false);
+    }
     setEditingId(null);
   }
 
@@ -708,33 +715,74 @@ export default function DocEditor({
     (it): it is PhotoItem => it.id === editingId && !isTextItem(it),
   );
 
-  // url·strokes 가 바뀐(= previewUrl 이 비워진) 사진만 새로 합성한다. 마킹이 없으면
-  // 굳이 캔버스를 돌리지 않고 url 을 그대로 previewUrl 로 채운다.
-  useEffect(() => {
-    const stale = items.filter(
-      (it): it is PhotoItem => !isTextItem(it) && it.previewUrl === null,
-    );
-    if (stale.length === 0) return;
+  /*
+   * url·strokes 가 바뀐(= previewUrl 이 비워진) 사진만 새로 합성한다. 마킹이 없으면 굳이 캔버스를 돌리지 않고
+   * url 을 그대로 previewUrl 로 채운다.
+   *
+   * 두 단계로 굽는다 — 먼저 줄인 판(긴 변 QUICK_PREVIEW_EDGE)을 보여 주고, 원래 크기 판(A4 미리보기·PDF 화질용)은
+   * 뒤에서 만들어 바꿔 끼운다. 편집기 [저장]은 이미 디코드된 이미지로 줄인 판을 직접 만들어 넘기므로(quickPreviewUrl)
+   * 마킹이 즉시 보인다. 예전에는 원래 크기만 구워서 폰 사진은 [저장] 뒤 1초 넘게 마킹 없는 사진이 보였고, 그 사이
+   * 다른 칸을 만지면(items 변경) 진행 중이던 합성을 버리고 처음부터 다시 굽느라 "다른 걸 눌러야 적용되는" 것처럼
+   * 보였다. 지금은 결과를 버리지 않는다 — 그 사진의 url·strokes 가 합성을 시작할 때와 같으면(그 사이 다시 편집하지
+   * 않았으면) 그대로 반영한다.
+   */
+  const composingRef = useRef(new Map<string, { url: string; strokes: PhotoItem["strokes"] }>());
 
-    let cancelled = false;
-    Promise.all(
-      stale.map(async (it) => {
-        const previewUrl =
-          it.strokes.length === 0 ? it.url : await composePreview(it.url, it.width, it.height, it.strokes);
-        return { id: it.id, previewUrl };
-      }),
-    ).then((results) => {
-      if (cancelled) return;
-      setItems((prev) => {
-        const byId = new Map(results.map((r) => [r.id, r.previewUrl]));
-        return prev.map((it) =>
-          !isTextItem(it) && byId.has(it.id) ? { ...it, previewUrl: byId.get(it.id)! } : it,
-        );
+  /** 합성본을 그 사진에 반영한다 — 합성을 시작할 때의 url·strokes 가 그대로일 때만(그 사이 다시 편집했으면 버린다) */
+  function applyPreview(id: string, job: { url: string; strokes: PhotoItem["strokes"] }, previewUrl: string) {
+    setItems((prev) => {
+      let used = false;
+      const next = prev.map((p) => {
+        if (p.id !== id || isTextItem(p) || p.url !== job.url || p.strokes !== job.strokes) return p;
+        used = true;
+        if (p.previewUrl && p.previewUrl !== p.url && p.previewUrl !== previewUrl) URL.revokeObjectURL(p.previewUrl);
+        return { ...p, previewUrl };
       });
+      // 그 사이 다시 편집돼 쓸 곳이 없어진 합성본은 놓아준다
+      if (!used && previewUrl !== job.url) URL.revokeObjectURL(previewUrl);
+      return next;
     });
-    return () => {
-      cancelled = true;
-    };
+  }
+
+  /**
+   * 한 사진의 마킹 합성 — quick 이면 줄인 판을 먼저 굽고, 그다음 원래 크기 판(A4 미리보기·PDF 화질용)을 굽는다.
+   * 편집기 [저장]은 줄인 판을 직접 넘겨주므로 quick=false 로 원래 크기 판만 굽는다.
+   */
+  function startCompose(
+    id: string,
+    job: { url: string; strokes: PhotoItem["strokes"] },
+    width: number,
+    height: number,
+    quick: boolean,
+  ) {
+    const running = composingRef.current.get(id);
+    if (running && running.url === job.url && running.strokes === job.strokes) return; // 이미 굽는 중
+    composingRef.current.set(id, job);
+    void (async () => {
+      try {
+        if (job.strokes.length === 0) {
+          applyPreview(id, job, job.url);
+          return;
+        }
+        if (quick) applyPreview(id, job, await composePreview(job.url, width, height, job.strokes, QUICK_PREVIEW_EDGE));
+        if (!quick || Math.max(width, height) > QUICK_PREVIEW_EDGE) {
+          applyPreview(id, job, await composePreview(job.url, width, height, job.strokes));
+        }
+      } catch {
+        /* 합성 실패 — 썸네일은 이미 보이는 판(또는 마킹 없는 원본)으로 남는다 */
+      } finally {
+        if (composingRef.current.get(id) === job) composingRef.current.delete(id);
+      }
+    })();
+  }
+
+  // 임시저장·보관함 불러오기처럼 previewUrl 이 비워진 사진을 굽는다
+  useEffect(() => {
+    for (const it of items) {
+      if (isTextItem(it) || it.previewUrl !== null) continue;
+      startCompose(it.id, { url: it.url, strokes: it.strokes }, it.width, it.height, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- startCompose 는 ref·setItems 만 쓴다
   }, [items]);
 
   // 설명이 아무리 길어져도 페이지가 297mm 를 넘지 않도록, 렌더될 때마다 실제 DOM 을
@@ -814,6 +862,15 @@ export default function DocEditor({
   ) {
     const { mailWindow, download, saveArchive } = opts;
     setBusy(true);
+    // 마킹 합성(원래 크기 판)이 끝나기 전에 찍으면 PDF 에 마킹이 빠지거나 줄인 판이 들어간다 — 끝날 때까지
+    // 기다린다(최대 15초, 보통 1~2초). 편집기 [저장] 직후 바로 [PDF 출력]을 누르는 경우다.
+    const waitUntil = Date.now() + 15_000;
+    while (
+      (composingRef.current.size > 0 || itemsRef.current.some((p) => !isTextItem(p) && p.previewUrl === null)) &&
+      Date.now() < waitUntil
+    ) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
     // busy=true 가 되면 미리보기가 축소를 풀고 실제 크기로 돌아간다(아래 effectiveScale
     // 참고) — html2canvas 가 축소된 채로 캡처해 버리기 때문이다. setBusy 는 비동기라
     // 다음 두 번의 화면 그리기(rAF)를 기다려 그 변화가 실제로 반영된 뒤에 캡처를
