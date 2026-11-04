@@ -277,18 +277,22 @@ export async function saveAnalysis(params: {
   const branch = project?.branch ?? null;
   const equipmentIds = branch ? await resolveTaskEquipment(branch, tasks) : new Map<ParsedTask, string>();
 
-  for (const t of tasks) {
-    const equipmentId = equipmentIds.get(t) ?? null;
-    await execute(
-      `insert into overhaul_task
-         (project_id, source_id, equipment_id, name, spec, unit, plan_qty,
-          field, equipment_type, tag, plan_start, plan_end, needs_review, sheet_name, row_index,
-          statement_item_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-      [
+  // 한 건씩 넣으면 운영(Vercel↔Supabase) 왕복이 쌓여 171건에 30초가 넘게 걸리고,
+  // 아래 일정 되돌려 적기까지 합치면 함수 제한(60초)에 걸려 중간에 끊긴다.
+  // 200건씩 한 문장으로 넣는다 (maintenanceRepo의 createDesignStatement와 같은 방식).
+  const COLS = 16;
+  const CHUNK = 200;
+  for (let start = 0; start < tasks.length; start += CHUNK) {
+    const chunk = tasks.slice(start, start + CHUNK);
+    const values: unknown[] = [];
+    const ph: string[] = [];
+    chunk.forEach((t, i) => {
+      const base = i * COLS;
+      ph.push(`(${Array.from({ length: COLS }, (_, k) => `$${base + k + 1}`).join(",")})`);
+      values.push(
         projectId,
         source.id,
-        equipmentId,
+        equipmentIds.get(t) ?? null,
         t.name,
         t.spec || null,
         t.unit || null,
@@ -302,7 +306,15 @@ export async function saveAnalysis(params: {
         t.sheetName,
         t.sourceRow,
         t.statementItemId ?? null,
-      ],
+      );
+    });
+    await execute(
+      `insert into overhaul_task
+         (project_id, source_id, equipment_id, name, spec, unit, plan_qty,
+          field, equipment_type, tag, plan_start, plan_end, needs_review, sheet_name, row_index,
+          statement_item_id)
+       values ${ph.join(",")}`,
+      values,
     );
   }
 
@@ -321,17 +333,21 @@ async function backfillStatementSchedule(tasks: ParsedTask[]): Promise<number> {
   const dated = tasks.filter((t) => t.statementItemId != null && (t.planStart || t.planEnd));
   if (!dated.length) return 0;
 
-  let n = 0;
-  for (const t of dated) {
-    n += await execute(
-      `update design_statement_item
-          set plan_start = coalesce($2, plan_start),
-              plan_end   = coalesce($3, plan_end)
-        where id = $1`,
-      [t.statementItemId, t.planStart, t.planEnd],
-    );
-  }
-  return n;
+  // 한 문장으로 묶는다 — 한 건씩 보내면 위 insert와 같은 이유로 시간 제한에 걸린다
+  const values: unknown[] = [];
+  const ph: string[] = [];
+  dated.forEach((t, i) => {
+    ph.push(`($${i * 3 + 1}::bigint, $${i * 3 + 2}::date, $${i * 3 + 3}::date)`);
+    values.push(t.statementItemId, t.planStart, t.planEnd);
+  });
+  return execute(
+    `update design_statement_item t
+        set plan_start = coalesce(v.ps, t.plan_start),
+            plan_end   = coalesce(v.pe, t.plan_end)
+       from (values ${ph.join(",")}) as v(id, ps, pe)
+      where t.id = v.id`,
+    values,
+  );
 }
 
 export async function listSources(projectId: string): Promise<OverhaulSource[]> {
