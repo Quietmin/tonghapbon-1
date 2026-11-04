@@ -4,7 +4,6 @@ import { useState } from "react";
 import DocEditor from "./DocEditor";
 import SortedSelect, { PlainSelect, TextField } from "./SortedSelect";
 import { ManualHeader } from "./Letterhead";
-import { ButtonLink, Icon } from "@/shared/components/ui";
 import {
   ManualSectionsFields,
   ManualSectionsPrint,
@@ -45,19 +44,7 @@ export default function ManualEditor() {
       mode="manual"
       numbered
       allowTextItems
-      // 작성 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 작성 버튼과
-      // 같은 색으로 둬서, 두 화면을 오갈 때 같은 자리의 같은 버튼으로 읽히게 한다.
-      // 폰처럼 폭이 좁으면 flex-wrap 으로 버튼을 아래 줄로 내린다 — wrap 이 없으면
-      // flex 가 두 버튼을 억지로 한 줄에 욱여넣으면서 한글이 글자 하나씩 세로로
-      // 쪼개져 보이는 문제가 있었다(실제로 겪음).
-      // (예전 "음성으로 매뉴얼 머리말 입력하기" 버튼은 칸마다 음성 버튼이 붙으면서 뺐다 —
-      //  파일명·작성자는 DocEditor, 목적·준비물·주의 사항은 ManualSectionsFields 에 붙어 있다)
-      headingAction={
-        <ButtonLink href="/manual" className="whitespace-nowrap">
-          <Icon name="inventory_2" className="text-lg" />
-          매뉴얼 조회
-        </ButtonLink>
-      }
+      // 제목 줄의 "매뉴얼 조회" 버튼은 뺐다 — 화면 위쪽 챕터 메뉴(조회·작성)와 겹쳐서.
       // 표제부는 장마다 다시 그린다 — "페이지 n/N"이 들어가기 때문
       renderLetterhead={(pageNo, pageCount, title) => (
         <ManualHeader

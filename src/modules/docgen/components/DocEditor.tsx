@@ -1100,8 +1100,7 @@ export default function DocEditor({
         // 꽉 찬 칩 = 작성. 같은 챕터의 조회 화면은 같은 색 연한 칩이다
         tone="solid"
         action={headingAction}
-        // headingAction 에 음성 입력 버튼이 들어 있는 모드(매뉴얼·고장보고서)라
-        // 폰에서도 꼭 보여야 한다 — 기본값 false 로 두면 데스크톱에만 뜬다
+        // headingAction 을 넘긴 화면은 폰에서도 보이게 한다(넘기지 않으면 아무것도 그리지 않는다)
         actionOnMobile
       />
 
