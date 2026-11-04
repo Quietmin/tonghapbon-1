@@ -25,7 +25,9 @@ export default function IssueDetailDialog({
   /** 창 아래의 "현황 조회에서 보기" 이동 경로 */
   moreHref?: string;
 }) {
-  const hasAction = Boolean(row.action_note || row.scheduled_date || row.handled_by);
+  const hasAction = Boolean(
+    row.action_note || row.scheduled_date || row.handled_by || row.status === "추후 조치 예정",
+  );
 
   return (
     <Dialog onClose={onClose} labelledBy="issueDetailTitle">
@@ -55,10 +57,11 @@ export default function IssueDetailDialog({
                 <dd className="text-on-surface whitespace-pre-wrap break-keep">{row.action_note}</dd>
               </>
             )}
-            {row.scheduled_date && (
+            {/* 추후 조치 예정인데 날짜가 없으면 조회 팝업에서 [미정]을 고른 것 — "미정"으로 보여 준다 */}
+            {(row.scheduled_date || row.status === "추후 조치 예정") && (
               <>
                 <dt className="text-on-surface-variant">조치 예정일</dt>
-                <dd className="text-on-surface">{formatDate(row.scheduled_date)}</dd>
+                <dd className="text-on-surface">{row.scheduled_date ? formatDate(row.scheduled_date) : "미정"}</dd>
               </>
             )}
             {row.handled_by && (

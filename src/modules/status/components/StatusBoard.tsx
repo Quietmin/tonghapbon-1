@@ -305,7 +305,9 @@ export default function StatusBoard({
                   <p className="text-sm text-on-surface-variant line-clamp-2 break-keep">{r.content}</p>
                   <p className="text-xs text-on-surface-variant">
                     {[r.branch, r.department, r.reporter].filter(Boolean).join(" · ")}
-                    {r.scheduled_date && ` · 예정 ${formatDate(r.scheduled_date)}`}
+                    {r.scheduled_date
+                      ? ` · 예정 ${formatDate(r.scheduled_date)}`
+                      : r.status === "추후 조치 예정" && " · 예정 미정"}
                   </p>
                 </button>
                 <div className="flex border-t border-border-subtle/60 px-2 py-1">
@@ -364,9 +366,10 @@ export default function StatusBoard({
                   >
                     <td className={`${TD_Y} px-3 align-top text-center`}>
                       <StatusChip status={r.status} label={STATUS_LABELS[r.status]} />
-                      {r.scheduled_date && (
+                      {/* 추후 조치 예정인데 날짜가 없으면 팝업에서 [미정]을 고른 것 */}
+                      {(r.scheduled_date || r.status === "추후 조치 예정") && (
                         <span className="block text-xs text-on-surface-variant mt-1">
-                          예정 {formatDate(r.scheduled_date)}
+                          예정 {r.scheduled_date ? formatDate(r.scheduled_date) : "미정"}
                         </span>
                       )}
                     </td>
@@ -595,12 +598,35 @@ export function UpdateDialog({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">
+          {/* 예정일이 아직 정해지지 않았으면 [미정]을 고른다 — 브라우저 달력에는 항목을 더 넣을 수 없어 달력 옆에 둔다.
+              미정은 날짜를 비워 저장한다(홈 현황 목록도 날짜가 없으면 "미정"으로 보여 준다). 달력에서 날짜를 고르면 풀린다 */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="statusScheduledDate" className="text-xs font-bold text-on-surface-variant">
               조치 예정일{status === "추후 조치 예정" ? " (조치 예정일 때 입력)" : ""}
-            </span>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
-          </label>
+            </label>
+            <div className="flex items-center gap-1.5">
+              <input
+                id="statusScheduledDate"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={`input flex-1 min-w-0 ${date ? "" : "text-on-surface-variant"}`}
+              />
+              <button
+                type="button"
+                onClick={() => setDate("")}
+                aria-pressed={!date}
+                title="예정일이 아직 정해지지 않았을 때"
+                className={`shrink-0 px-3 py-2 rounded-lg text-sm font-bold border transition-colors ${
+                  !date
+                    ? "bg-primary text-on-primary border-primary"
+                    : "bg-surface-container-low text-on-surface-variant border-border-subtle hover:border-primary hover:text-primary"
+                }`}
+              >
+                미정
+              </button>
+            </div>
+          </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="statusHandledBy" className="text-xs font-bold text-on-surface-variant">
               조치자
