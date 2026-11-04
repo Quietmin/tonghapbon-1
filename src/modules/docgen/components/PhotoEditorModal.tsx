@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Stroke } from "../lib/types";
-import { cropImage, drawStrokes, flattenRotation, loadImage } from "../lib/imageEdit";
+import { cropImage, drawStrokes, flattenRotation, loadImage, quickComposeFromImage } from "../lib/imageEdit";
 import VoiceDictationButton from "@/shared/components/VoiceDictationButton";
 
 /**
@@ -86,6 +86,8 @@ export interface PhotoEditorResult {
   width: number;
   height: number;
   strokes: Stroke[];
+  /** 마킹을 얹은 줄인 미리보기(data URL) — 받는 쪽이 원래 크기 판을 굽는 동안 바로 보여 준다. 마킹이 없으면 없다 */
+  quickPreviewUrl?: string;
 }
 
 export interface PhotoEditorModalProps {
@@ -578,6 +580,16 @@ export default function PhotoEditorModal({
       height: baseRef.current.height,
       strokes: strokesRef.current,
     };
+    // 화면에 띄워 둔(이미 디코드된) 기준 이미지로 마킹 얹은 썸네일을 바로 만든다 — 목록·미리보기에 [저장] 즉시
+    // 표시가 보이게. 원래 크기 판을 다시 디코드해 굽는 건 1초 넘게 걸려 그 사이 마킹 없는 사진이 보였다.
+    const img = baseImgRef.current;
+    if (img && result.strokes.length > 0) {
+      try {
+        result.quickPreviewUrl = quickComposeFromImage(img, result.width, result.height, result.strokes);
+      } catch {
+        /* 못 만들면 받는 쪽이 평소대로 굽는다 */
+      }
+    }
     cleanupUnsaved(result.url);
     onSave(result);
   }
