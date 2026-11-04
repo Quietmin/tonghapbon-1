@@ -40,17 +40,9 @@ export async function GET(req: Request) {
     const equipment = sp.get("equipment") ?? "";
     const q = sp.get("q") ?? "";
     const needsReview = sp.get("needsReview") === "1";
+    const onlyRisk = sp.get("onlyRisk") === "1";
 
     const project = await resolveProjectFromRequest(req);
-
-    const { rows, total } = await listTasks(project.id, {
-      field: field && field !== "전체" ? field : undefined,
-      equipmentType: equipment && equipment !== "전체" ? equipment : undefined,
-      q: q.trim() || undefined,
-      needsReview: needsReview || undefined,
-      limit: PAGE_SIZE,
-      offset: (page - 1) * PAGE_SIZE,
-    });
 
     const all = await listAllTasks(project.id);
     const sched = scheduleInfo(project);
@@ -58,6 +50,18 @@ export async function GET(req: Request) {
     // 기간 경과 비율이 아니라 엑셀 예정일/자동배치 기준으로 뒤처짐을 본다.
     const risk = scheduleDelayTasks(all, project, today());
     const riskIds = new Set(risk.map((t) => t.id));
+
+    // "지연 위험만 보기"는 SQL 조건으로 못 쓴다(위 판정이 자바스크립트다). 대신 추려낸
+    // id 를 넘겨 목록 쿼리가 거르게 한다 — 정렬·페이지 나누기를 그대로 쓰기 위해서다.
+    const { rows, total } = await listTasks(project.id, {
+      field: field && field !== "전체" ? field : undefined,
+      equipmentType: equipment && equipment !== "전체" ? equipment : undefined,
+      q: q.trim() || undefined,
+      needsReview: needsReview || undefined,
+      ids: onlyRisk ? [...riskIds] : undefined,
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+    });
 
     return NextResponse.json({
       ok: true,

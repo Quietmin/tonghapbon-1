@@ -56,6 +56,8 @@ export default function TaskManagement() {
   const [field, setField] = useState("전체");
   const [equipment, setEquipment] = useState("전체");
   const [onlyReview, setOnlyReview] = useState(false);
+  /** 지연 위험으로 잡힌 작업만 보기 — 판정은 서버(schedule.ts)가 한다 */
+  const [onlyRisk, setOnlyRisk] = useState(false);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,11 +71,12 @@ export default function TaskManagement() {
     setLoading(true);
     const sp = new URLSearchParams({ page: String(page), field, equipment, q });
     if (onlyReview) sp.set("needsReview", "1");
+    if (onlyRisk) sp.set("onlyRisk", "1");
     const res = await fetch(`/api/overhaul/tasks?${sp}`);
     const json = await res.json();
     if (json.ok) setData(json);
     setLoading(false);
-  }, [page, field, equipment, q, onlyReview]);
+  }, [page, field, equipment, q, onlyReview, onlyRisk]);
 
   // 검색어는 타이핑이 멈춘 뒤에 보낸다
   useEffect(() => {
@@ -187,6 +190,20 @@ export default function TaskManagement() {
             <Icon name={onlyReview ? "filter_alt" : "filter_alt_off"} className="text-base" />
             확인 필요
             {(s?.reviewCount ?? 0) > 0 && <span className="tabular-nums">{s?.reviewCount}</span>}
+          </button>
+          {/* 아래 요약 카드의 "지연 위험"과 같은 판정이다 — 거기 적힌 수가 그대로 걸러진다 */}
+          <button
+            onClick={() => reset(setOnlyRisk)(!onlyRisk)}
+            title="계획 일정보다 뒤처진 작업만 봅니다"
+            className={`h-11 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 whitespace-nowrap transition-colors border ${
+              onlyRisk
+                ? "bg-status-error/15 text-status-error-text border-status-error/40"
+                : "bg-surface-container-low text-on-surface-variant border-border-subtle hover:bg-surface-container-high"
+            }`}
+          >
+            <Icon name={onlyRisk ? "filter_alt" : "filter_alt_off"} className="text-base" />
+            지연 위험
+            {(s?.riskCount ?? 0) > 0 && <span className="tabular-nums">{s?.riskCount}</span>}
           </button>
         </div>
 
