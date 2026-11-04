@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, Icon, Button, EmptyState, ScreenHeader, LoadingState, ErrorState } from "@/shared/components/ui";
-import { exportDesignStatement } from "../lib/statementExporter";
+import { exportDesignStatement, statementFields } from "../lib/statementExporter";
 import StatementArchive from "./StatementArchive";
 
 /**
@@ -85,6 +85,8 @@ interface Payload {
 interface SavedStatementItem {
   id: number;
   category: string | null;
+  /** 기계 / 전기 / 제어 — 엑셀 시트를 가르는 기준 (서버가 보수계획에서 가져다 붙인다) */
+  field: string | null;
   name: string;
   spec: string | null;
   qty: number;
@@ -133,23 +135,26 @@ export default function MaintenancePlan() {
   /** 확정 저장 결과 안내 */
   const [confirmed, setConfirmed] = useState<{ count: number; year: number } | null>(null);
 
-  const load = useCallback(
-    async (year?: number, viewField?: string) => {
-      setLoading(true);
-      const sp = new URLSearchParams();
-      if (year) sp.set("year", String(year));
-      sp.set("field", viewField ?? field);
-      const json = await (await fetch(`/api/overhaul/plan?${sp}`)).json();
-      if (json.ok) setData(json);
-      else setError(json.error);
-      setLoading(false);
-    },
-    [field],
-  );
+  /**
+   * 목록은 늘 전 분야를 받아 온다. 분야 필터는 화면에서만 거른다(visible).
+   *
+   * 예전에는 분야를 서버 조회까지 넘겼는데, 그러면 분야를 한 번이라도 바꾼 순간
+   * 다른 분야 행이 rows 에서 사라져 선택(selected)에서도 빠졌다. 그 상태로 확정하면
+   * 기계만 담긴 수량산출서가 나왔다. 전 분야를 들고 있으면 어느 분야를 보고 있든
+   * 선택은 그대로 남는다.
+   */
+  const load = useCallback(async (year?: number) => {
+    setLoading(true);
+    const sp = new URLSearchParams();
+    if (year) sp.set("year", String(year));
+    const json = await (await fetch(`/api/overhaul/plan?${sp}`)).json();
+    if (json.ok) setData(json);
+    else setError(json.error);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     void load();
-    // load는 field가 바뀔 때마다 새로 만들어지므로, 분야를 바꾸면 목록이 다시 온다
   }, [load]);
 
   // 연도가 바뀌면 필수 항목을 기본 선택으로 채운다 (O/H만)
@@ -279,8 +284,36 @@ export default function MaintenancePlan() {
     });
   };
 
-  /** 선택된 항목을 원본 순서대로 — 엑셀 출력·저장에 함께 쓴다 */
+  /**
+   * 선택된 항목을 원본 순서대로 — 엑셀 출력·저장에 함께 쓴다.
+   * rows 는 전 분야라서, 지금 기계만 보고 있어도 전기·제어 선택이 함께 담긴다.
+   */
   const chosen = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);
+
+  /** 지금 고른 분야의 행들 — 요약·탭 건수의 모집단 (탭 조건은 빼고 분야만 적용) */
+  const fieldSummary = useMemo(() => {
+    const empty = () => ({ 필수: 0, 선택: 0, 불필요: 0 }) as Record<string, number>;
+    const sum = {
+      total: 0,
+      byClassification: empty(),
+      overhaulByClassification: empty(),
+      nonOverhaulByMethod: {} as Record<string, number>,
+      needsDecisionCount: 0,
+    };
+    for (const r of rows) {
+      if (field !== "전체" && r.field !== field) continue;
+      sum.total++;
+      sum.byClassification[r.judge.classification]++;
+      if (r.isOverhaul) {
+        sum.overhaulByClassification[r.judge.classification]++;
+        if (r.judge.needsDecision) sum.needsDecisionCount++;
+      } else {
+        const m = r.method || "(미지정)";
+        sum.nonOverhaulByMethod[m] = (sum.nonOverhaulByMethod[m] ?? 0) + 1;
+      }
+    }
+    return sum;
+  }, [rows, field]);
 
   /**
    * 수량산출서 확정 — 저장하고, 저장된 항목으로 엑셀을 뽑는다.
@@ -291,7 +324,11 @@ export default function MaintenancePlan() {
    */
   const confirmAndExport = useCallback(async () => {
     if (!data || !chosen.length) return;
-    const statementField = field !== "전체" ? field : (chosen[0].field ?? null);
+    // 내역서에 적어 둘 분야. 고른 항목이 한 분야뿐일 때만 그 이름을 쓰고, 섞여 있으면
+    // 비워 둔다 — 예전에는 첫 항목의 분야(대개 기계)를 적어, 기계·전기·제어가 다 담긴
+    // 내역서가 보관함에 "기계"로 보이고 파일명도 기계로 나갔다.
+    const chosenFields = [...new Set(chosen.map((r) => r.field).filter(Boolean))];
+    const statementField = chosenFields.length === 1 ? chosenFields[0]! : null;
     // 공사명에 지사를 넣는다 — 실제 계약 공사명 양식("2026년도 양산지사 정기점검보수공사")
     const title = `${data.targetYear}년도 ${data.branch ? `${data.branch} ` : ""}정기점검보수공사`;
 
@@ -324,19 +361,23 @@ export default function MaintenancePlan() {
       if (!json.ok) throw new Error(json.error ?? "저장에 실패했습니다.");
 
       const saved: SavedStatementItem[] = json.items ?? [];
+      const exportItems = saved.map((it) => ({
+        category: it.category,
+        field: it.field,
+        name: it.name,
+        spec: it.spec,
+        qty: it.qty,
+        unit: it.unit,
+        grade: it.grade,
+        note: it.note,
+        itemId: it.id,
+      }));
+      // 파일명은 실제로 담긴 분야를 그대로 적는다 — 셋 다면 "기계·전기·제어"
+      const fields = statementFields(exportItems);
       exportDesignStatement({
         title,
-        items: saved.map((it) => ({
-          category: it.category,
-          name: it.name,
-          spec: it.spec,
-          qty: it.qty,
-          unit: it.unit,
-          grade: it.grade,
-          note: it.note,
-          itemId: it.id,
-        })),
-        fileName: `수량산출서_${data.targetYear}_${statementField ?? "전체"}.xlsx`,
+        items: exportItems,
+        fileName: `수량산출서_${data.targetYear}_${fields.join("·") || "전체"}.xlsx`,
       });
       setConfirmed({ count: saved.length, year: data.targetYear });
     } catch (e) {
@@ -350,7 +391,9 @@ export default function MaintenancePlan() {
     return <LoadingState />;
   }
 
-  const s = data?.summary;
+  // 요약·탭 건수는 지금 보고 있는 분야 기준이다. 목록은 전 분야를 받아 오므로
+  // 서버 요약(전 분야)을 그대로 쓰면 분야를 골라도 숫자가 안 바뀌어 어긋난다.
+  const s = fieldSummary;
   const hasPlan = (data?.sources.length ?? 0) > 0;
 
   return (
