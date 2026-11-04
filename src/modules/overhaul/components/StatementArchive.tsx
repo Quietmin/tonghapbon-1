@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, Icon, Button, EmptyState, LoadingState, ErrorState } from "@/shared/components/ui";
-import { exportDesignStatement } from "../lib/statementExporter";
+import { exportDesignStatement, statementFields } from "../lib/statementExporter";
 import StatementReconcile from "./StatementReconcile";
 
 /**
@@ -24,6 +24,8 @@ interface Statement {
 interface SavedItem {
   id: number;
   category: string | null;
+  /** 기계 / 전기 / 제어 — 엑셀 시트를 가르는 기준 */
+  field: string | null;
   name: string;
   spec: string | null;
   qty: number;
@@ -63,19 +65,23 @@ export default function StatementArchive() {
       if (!json.ok) throw new Error(json.error ?? "불러오지 못했습니다.");
       const items: SavedItem[] = json.items ?? [];
       const title = s.title ?? `${s.target_year}년도 정기점검보수공사`;
+      const exportItems = items.map((it) => ({
+        category: it.category,
+        field: it.field,
+        name: it.name,
+        spec: it.spec,
+        qty: it.qty,
+        unit: it.unit,
+        grade: it.grade,
+        note: it.note,
+        itemId: it.id,
+      }));
+      // 파일명은 내역서에 적힌 분야가 아니라 실제로 담긴 분야를 따른다
+      const fields = statementFields(exportItems);
       exportDesignStatement({
         title,
-        items: items.map((it) => ({
-          category: it.category,
-          name: it.name,
-          spec: it.spec,
-          qty: it.qty,
-          unit: it.unit,
-          grade: it.grade,
-          note: it.note,
-          itemId: it.id,
-        })),
-        fileName: `수량산출서_${s.target_year}_${s.field ?? "전체"}.xlsx`,
+        items: exportItems,
+        fileName: `수량산출서_${s.target_year}_${fields.join("·") || "전체"}.xlsx`,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

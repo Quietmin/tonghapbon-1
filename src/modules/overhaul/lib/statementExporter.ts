@@ -21,6 +21,11 @@ import * as XLSX from "xlsx";
 export interface StatementExportItem {
   /** 대분류 (중장기계획의 "1. 발전설비" 등) — 그룹 머리글이 된다 */
   category: string | null;
+  /**
+   * 기계 / 전기 / 제어 — 시트를 가르는 기준. 분야가 둘 이상이면 시트를 나눠 담고,
+   * 하나뿐이거나 전부 비어 있으면 예전처럼 "수량산출서" 시트 하나로 낸다.
+   */
+  field?: string | null;
   name: string;
   spec: string | null;
   qty: number;
@@ -55,13 +60,8 @@ function stripLeadingNumber(s: string): string {
   return s.replace(/^\s*\d+\.\s*/, "").trim();
 }
 
-export function exportDesignStatement(params: {
-  title: string;
-  items: StatementExportItem[];
-  fileName?: string;
-}): void {
-  const { title, items } = params;
-
+/** 시트 하나를 만든다 — 머리글 3줄 + 대분류별 묶음 */
+function buildSheet(title: string, items: StatementExportItem[]): XLSX.WorkSheet {
   const aoa: (string | number)[][] = [
     [`공사명 : ${title}`],
     ["수 량 산 출 서"],
@@ -112,9 +112,51 @@ export function exportDesignStatement(params: {
     { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
   ];
+  return ws;
+}
 
+/** 시트 순서는 늘 기계 → 전기 → 제어 → 그 밖(기타) */
+const FIELD_ORDER = ["기계", "전기", "제어"];
+const OTHER_SHEET = "기타";
+
+function fieldKey(v: string | null | undefined): string {
+  const s = v?.trim();
+  return s && FIELD_ORDER.includes(s) ? s : OTHER_SHEET;
+}
+
+/** 이 항목들에 들어 있는 분야를 기계·전기·제어 순으로 (파일명에도 쓴다) */
+export function statementFields(items: StatementExportItem[]): string[] {
+  const seen = new Set(items.map((it) => fieldKey(it.field)));
+  return [...FIELD_ORDER.filter((f) => seen.has(f)), ...(seen.has(OTHER_SHEET) ? [OTHER_SHEET] : [])];
+}
+
+/**
+ * 수량산출서를 엑셀로 내보낸다.
+ *
+ * 기계·전기·제어가 섞여 있으면 분야마다 시트를 따로 만든다 — 시공사도 분야별로
+ * 나뉘어 발주·시공하므로 한 시트에 섞여 있으면 그쪽에서 다시 갈라야 한다.
+ * 분야가 하나뿐이면 예전처럼 "수량산출서" 시트 하나로 낸다.
+ */
+export function exportDesignStatement(params: {
+  title: string;
+  items: StatementExportItem[];
+  fileName?: string;
+}): void {
+  const { title, items } = params;
+
+  const fields = statementFields(items);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "수량산출서");
+
+  if (fields.length <= 1) {
+    XLSX.utils.book_append_sheet(wb, buildSheet(title, items), "수량산출서");
+  } else {
+    for (const f of fields) {
+      const part = items.filter((it) => fieldKey(it.field) === f);
+      if (!part.length) continue;
+      // 시트마다 공사명 뒤에 분야를 붙여, 한 장만 인쇄해도 무엇인지 알 수 있게 한다
+      XLSX.utils.book_append_sheet(wb, buildSheet(`${title} (${f})`, part), f);
+    }
+  }
 
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   XLSX.writeFile(wb, params.fileName ?? `수량산출서_${stamp}.xlsx`);

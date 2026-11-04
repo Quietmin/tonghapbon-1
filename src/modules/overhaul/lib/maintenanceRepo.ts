@@ -840,6 +840,12 @@ export async function listDesignStatements(branch?: string | null): Promise<Desi
 export interface DesignStatementItemRow {
   id: number;
   plan_id: string | null;
+  /**
+   * 기계 / 전기 / 제어 — 항목 자체에는 없고 연결된 보수계획(maintenance_plan)에서 가져온다.
+   * 엑셀로 뽑을 때 분야별 시트로 나누는 기준이다. 계획이 지워졌으면 null 이 되고, 그때는
+   * "기타" 시트로 모인다.
+   */
+  field: string | null;
   category: string | null;
   seq: number;
   name: string;
@@ -862,12 +868,17 @@ export async function getDesignStatement(statementId: string): Promise<{
        from design_statement where id = $1`,
     [statementId],
   );
+  // 분야는 항목에 없고 연결된 보수계획에 있다 — 엑셀을 분야별 시트로 나누려면 필요하다.
+  // 정렬도 분야(기계→전기→제어) 먼저로 둬서 시트 순서가 늘 같게 한다.
   const items = await query<DesignStatementItemRow>(
-    `select id, plan_id, category, seq, name, spec, qty::float8 as qty, unit,
-            plan_start::text, plan_end::text, grade, note, classification
-       from design_statement_item
-      where statement_id = $1
-      order by category nulls last, seq`,
+    `select t.id, t.plan_id, p.field, t.category, t.seq, t.name, t.spec,
+            t.qty::float8 as qty, t.unit,
+            t.plan_start::text, t.plan_end::text, t.grade, t.note, t.classification
+       from design_statement_item t
+       left join maintenance_plan p on p.id = t.plan_id
+      where t.statement_id = $1
+      order by case p.field when '기계' then 0 when '전기' then 1 when '제어' then 2 else 3 end,
+               t.category nulls last, t.seq`,
     [statementId],
   );
   return { statement, items };
