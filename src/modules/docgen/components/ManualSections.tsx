@@ -3,6 +3,7 @@
 import AutoTextarea from "./AutoTextarea";
 import { SectionHeading } from "./SortedSelect";
 import { Icon } from "@/shared/components/ui";
+import { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
 
 /**
  * 매뉴얼 1~4번 항목 — 목적 · 준비물 · 주의 사항 · 내용.
@@ -167,14 +168,22 @@ export function ManualSectionsFields({
         onToggleSkip={() => toggleSkip("purpose")}
       />
       <SectionBody skipped={value.skip.purpose}>
-        <AutoTextarea
-          value={value.purpose}
-          onChange={(v) => patch({ purpose: v })}
-          minRows={2}
+        {/* 음성 입력 — 사진 설명칸과 같은 방식. 다시 녹음하면 새로 받아쓴 글로 바꾼다 */}
+        <WithVoiceInput
+          field={{ label: "목적", kind: "long" }}
+          onResult={(text) => patch({ purpose: text })}
           disabled={value.skip.purpose}
-          placeholder="문서의 목적을 입력하세요."
-          className={TEXTAREA_CLASS}
-        />
+          multiline
+        >
+          <AutoTextarea
+            value={value.purpose}
+            onChange={(v) => patch({ purpose: v })}
+            minRows={2}
+            disabled={value.skip.purpose}
+            placeholder="문서의 목적을 입력하세요."
+            className={TEXTAREA_CLASS}
+          />
+        </WithVoiceInput>
       </SectionBody>
 
       <SectionHead
@@ -184,14 +193,22 @@ export function ManualSectionsFields({
         onToggleSkip={() => toggleSkip("prep")}
       />
       <SectionBody skipped={value.skip.prep}>
-        <AutoTextarea
-          value={value.prep}
-          onChange={(v) => patch({ prep: v })}
-          minRows={2}
+        {/* 음성 입력 — 사진 설명칸과 같은 방식. 다시 녹음하면 새로 받아쓴 글로 바꾼다 */}
+        <WithVoiceInput
+          field={{ label: "준비물", kind: "long" }}
+          onResult={(text) => patch({ prep: text })}
           disabled={value.skip.prep}
-          placeholder="준비물을 입력하세요."
-          className={TEXTAREA_CLASS}
-        />
+          multiline
+        >
+          <AutoTextarea
+            value={value.prep}
+            onChange={(v) => patch({ prep: v })}
+            minRows={2}
+            disabled={value.skip.prep}
+            placeholder="준비물을 입력하세요."
+            className={TEXTAREA_CLASS}
+          />
+        </WithVoiceInput>
 
         {table ? (
           <div className="mt-2.5">
@@ -296,14 +313,22 @@ export function ManualSectionsFields({
         onToggleSkip={() => toggleSkip("caution")}
       />
       <SectionBody skipped={value.skip.caution}>
-        <AutoTextarea
-          value={value.caution}
-          onChange={(v) => patch({ caution: v })}
-          minRows={2}
+        {/* 음성 입력 — 사진 설명칸과 같은 방식. 다시 녹음하면 새로 받아쓴 글로 바꾼다 */}
+        <WithVoiceInput
+          field={{ label: "주의 사항", kind: "long" }}
+          onResult={(text) => patch({ caution: text })}
           disabled={value.skip.caution}
-          placeholder="주의 사항을 입력하세요."
-          className={TEXTAREA_CLASS}
-        />
+          multiline
+        >
+          <AutoTextarea
+            value={value.caution}
+            onChange={(v) => patch({ caution: v })}
+            minRows={2}
+            disabled={value.skip.caution}
+            placeholder="주의 사항을 입력하세요."
+            className={TEXTAREA_CLASS}
+          />
+        </WithVoiceInput>
       </SectionBody>
 
       <SectionHead number={4} label="내용" />

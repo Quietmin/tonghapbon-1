@@ -4,6 +4,16 @@ import { sortKorean } from "../lib/constants";
 import { joinLocal, splitLocal } from "../lib/faultFormat";
 import AutoTextarea from "./AutoTextarea";
 import { ACCENT_STYLE, Icon, type Accent } from "@/shared/components/ui";
+import { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
+
+/**
+ * 글 입력칸의 음성 입력 — 주면 칸 왼쪽에 음성 버튼이 붙는다(사진 설명칸과 같은 방식).
+ * label 은 서버 정리 단계에 알려 줄 칸 이름, kind 는 short(한 줄 값)·long(개조식 서술).
+ */
+export interface FieldVoice {
+  label: string;
+  kind: "short" | "long";
+}
 
 /**
  * 가나다순 셀렉트. 원본 fillSortedSelect() 대응.
@@ -123,6 +133,7 @@ export function TextField({
   onChange,
   placeholder,
   type = "text",
+  voice,
 }: {
   id: string;
   label: string;
@@ -130,20 +141,30 @@ export function TextField({
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  voice?: FieldVoice;
 }) {
+  const input = (
+    <input
+      id={id}
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
+    />
+  );
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-xs font-bold text-on-surface-variant">
         {label}
       </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
-      />
+      {voice ? (
+        <WithVoiceInput field={voice} onResult={onChange}>
+          {input}
+        </WithVoiceInput>
+      ) : (
+        input
+      )}
     </div>
   );
 }
@@ -400,6 +421,7 @@ export function TextAreaField({
   placeholder,
   minRows = 2,
   disabled,
+  voice,
 }: {
   id: string;
   label?: string;
@@ -408,7 +430,19 @@ export function TextAreaField({
   placeholder?: string;
   minRows?: number;
   disabled?: boolean;
+  voice?: FieldVoice;
 }) {
+  const textarea = (
+    <AutoTextarea
+      id={id}
+      value={value}
+      onChange={onChange}
+      minRows={minRows}
+      disabled={disabled}
+      placeholder={placeholder}
+      className={`w-full ${BOX}`}
+    />
+  );
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
@@ -416,15 +450,13 @@ export function TextAreaField({
           {label}
         </label>
       )}
-      <AutoTextarea
-        id={id}
-        value={value}
-        onChange={onChange}
-        minRows={minRows}
-        disabled={disabled}
-        placeholder={placeholder}
-        className={`w-full ${BOX}`}
-      />
+      {voice ? (
+        <WithVoiceInput field={voice} onResult={onChange} disabled={disabled} multiline>
+          {textarea}
+        </WithVoiceInput>
+      ) : (
+        textarea
+      )}
     </div>
   );
 }

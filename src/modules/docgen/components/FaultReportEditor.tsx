@@ -14,8 +14,6 @@ import SortedSelect, {
 } from "./SortedSelect";
 import { BRANCHES, FAULT_FIELDS } from "../lib/constants";
 import { ButtonLink, Icon } from "@/shared/components/ui";
-import VoiceSequenceFill, { type VoiceField } from "@/shared/components/VoiceSequenceFill";
-import { setNativeInputValue } from "@/shared/lib/domInput";
 import {
   formatDateTime,
   minutesText,
@@ -39,22 +37,40 @@ import {
  * 입력 항목은 Supabase docgen_documents 의 고장 보고서 전용 컬럼에 맞췄다
  * (occurred_at / facility / device / fault_content / situation /
  *  recover_at / action_taken / outage_*).
+ *
+ * 음성 입력은 고르는 칸(지사·고장분야·날짜)을 뺀 글 입력칸마다 따로 붙는다 — 파일명·작성자(DocEditor),
+ * 설비명·기기명·고장내용·상황·복구 직접 입력·조치사항. 사진 설명칸과 같은 버튼·같은 받아쓰기다.
  */
 /** 다른 화면(현황 이슈)에서 넘어올 때 미리 채울 값 — 모두 선택 */
 export interface FaultReportInitial {
   branch?: string;
   facility?: string;
-  faultContent?: string;
+  /** 현황 이슈 내용 — 고장보고서의 "상황"으로 받는다(추정 원인이 아니라 현장에서 본 상황이라서) */
+  situation?: string;
   /** 발생일시(ISO). 브라우저 시간대의 입력값으로 바꿔 채운다 */
   occurredAt?: string;
+  /** 현황 이슈 id — 그 이슈의 현장 사진을 "2. 관련 사진"으로 가져온다 */
+  issueId?: string;
 }
 
-/** DOM id 로 그 칸을 찾아 입력한다 — 파일명·작성자는 DocEditor 안쪽 state 라 여기서 바로 set 할 수 없다 */
-function fillById(id: string, value: string) {
-  const el = document.getElementById(id);
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
-    setNativeInputValue(el, value);
-  }
+/** 현황 이슈의 현장 사진을 파일로 받아 온다 — 실패한 사진은 건너뛴다(사진 없이도 작성은 계속된다) */
+async function loadIssuePhotos(issueId: string): Promise<File[]> {
+  const json = await (await fetch(`/api/status/issues/${issueId}/photos`)).json();
+  const ids: number[] = json?.ok && Array.isArray(json.ids) ? json.ids : [];
+  const files = await Promise.all(
+    ids.map(async (id, i) => {
+      try {
+        const res = await fetch(`/api/status/photos/one?id=${id}`);
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        const ext = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
+        return new File([blob], `현황사진-${i + 1}.${ext}`, { type: blob.type || "image/jpeg" });
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return files.filter((f): f is File => f !== null);
 }
 
 /** ISO 시각 → datetime-local 입력값(브라우저 시간대, YYYY-MM-DDTHH:mm). 해석할 수 없으면 "" */
@@ -73,8 +89,30 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
   const [occurredAt, setOccurredAt] = useState("");
   const [facility, setFacility] = useState(initial?.facility ?? "");
   const [device, setDevice] = useState("");
-  const [faultContent, setFaultContent] = useState(initial?.faultContent ?? "");
-  const [situation, setSituation] = useState("");
+  const [faultContent, setFaultContent] = useState("");
+  const [situation, setSituation] = useState(initial?.situation ?? "");
+  /** 현황 이슈에서 넘어왔으면 그 이슈의 현장 사진 — DocEditor 가 사진 추가와 같은 절차로 넣는다 */
+  const [issuePhotos, setIssuePhotos] = useState<File[]>([]);
+  const [issuePhotoNote, setIssuePhotoNote] = useState<string | null>(null);
+  useEffect(() => {
+    const issueId = initial?.issueId;
+    if (!issueId) return;
+    let alive = true;
+    setIssuePhotoNote("현황 사진을 가져오는 중…");
+    loadIssuePhotos(issueId)
+      .then((files) => {
+        if (!alive) return;
+        setIssuePhotos(files);
+        setIssuePhotoNote(files.length ? `현황에서 올린 사진 ${files.length}장을 "2. 관련 사진"에 넣었습니다.` : null);
+      })
+      .catch(() => {
+        if (alive) setIssuePhotoNote("현황 사진을 가져오지 못했습니다. 필요하면 사진을 직접 추가해 주세요.");
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 때 한 번만 가져온다
+  }, []);
   const [recoverAt, setRecoverAt] = useState("");
   const [recoverNote, setRecoverNote] = useState("");
   const [actionTaken, setActionTaken] = useState("");
@@ -230,83 +268,6 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
     </table>
   );
 
-  /** 음성으로 한 번에 채울 칸 순서 — 날짜/시각 선택기와 열공급 중단 세부 칸(APT·건물
-   * 등)은 숫자·날짜라 잘못 알아들으면 바로잡기 번거로워 빼고, 문장으로 말하는 칸만
-   * 묶는다(매뉴얼과 같은 패턴 — 설명 팝업·"녹음 중" 표시·다음 칸 넘기기 전부 동일). */
-  const voiceFields: VoiceField[] = [
-    {
-      key: "fileName",
-      label: "파일명",
-      kind: "short",
-      setValue: (v) => fillById("docFileName", v),
-      getElement: () => document.getElementById("docFileName"),
-    },
-    {
-      key: "author",
-      label: "작성자",
-      kind: "short",
-      setValue: (v) => fillById("docAuthor", v),
-      getElement: () => document.getElementById("docAuthor"),
-    },
-    {
-      key: "faultField",
-      label: "고장분야",
-      kind: "short",
-      options: FAULT_FIELDS,
-      setValue: setField,
-      getElement: () => document.getElementById("faultField"),
-    },
-    {
-      key: "faultBranch",
-      label: "지사",
-      kind: "short",
-      options: BRANCHES,
-      setValue: setBranch,
-      getElement: () => document.getElementById("faultBranch"),
-    },
-    {
-      key: "faultFacility",
-      label: "설비명",
-      kind: "short",
-      setValue: setFacility,
-      getElement: () => document.getElementById("faultFacility"),
-    },
-    {
-      key: "faultDevice",
-      label: "기기명(고장위치)",
-      kind: "short",
-      setValue: setDevice,
-      getElement: () => document.getElementById("faultDevice"),
-    },
-    {
-      key: "faultContent",
-      label: "고장내용(추정 원인)",
-      kind: "long",
-      setValue: setFaultContent,
-      getElement: () => document.getElementById("faultContent"),
-    },
-    {
-      key: "faultSituation",
-      label: "상황",
-      kind: "long",
-      setValue: (v) => {
-        setSituationNone(false);
-        setSituation(v);
-      },
-      getElement: () => document.getElementById("faultSituation"),
-    },
-    {
-      key: "faultAction",
-      label: "조치사항",
-      kind: "long",
-      setValue: (v) => {
-        setActionNone(false);
-        setActionTaken(v);
-      },
-      getElement: () => document.getElementById("faultAction"),
-    },
-  ];
-
   return (
     <DocEditor
       mode="fault"
@@ -317,15 +278,14 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
       // 폰처럼 폭이 좁으면 flex-wrap 으로 버튼을 아래 줄로 내린다 — wrap 이 없으면
       // flex 가 두 버튼을 억지로 한 줄에 욱여넣으면서 한글이 글자 하나씩 세로로
       // 쪼개져 보이는 문제가 있었다(실제로 겪음).
+      // (예전 "음성으로 고장보고서 입력하기" 버튼은 칸마다 음성 버튼이 붙으면서 뺐다)
       headingAction={
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <VoiceSequenceFill fields={voiceFields} title="음성으로 고장보고서 입력하기" />
-          <ButtonLink href="/failure" variant="primary" className="whitespace-nowrap">
-            <Icon name="inventory_2" className="text-lg" />
-            고장보고서 조회
-          </ButtonLink>
-        </div>
+        <ButtonLink href="/failure" variant="primary" className="whitespace-nowrap">
+          <Icon name="inventory_2" className="text-lg" />
+          고장보고서 조회
+        </ButtonLink>
       }
+      initialFiles={issuePhotos}
       saveMeta={{
         branch,
         field,
@@ -420,6 +380,7 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
                 value={facility}
                 onChange={setFacility}
                 placeholder="예: ST 보조 변압기"
+                voice={{ label: "설비명", kind: "short" }}
               />
             </div>
 
@@ -429,6 +390,7 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
               value={device}
               onChange={setDevice}
               placeholder="예: ST 보조 변압기 방압변"
+              voice={{ label: "기기명(고장위치)", kind: "short" }}
             />
           </div>
 
@@ -496,6 +458,7 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
               value={faultContent}
               onChange={setFaultContent}
               placeholder="고장 내용을 입력하세요."
+              voice={{ label: "고장내용(추정 원인)", kind: "long" }}
             />
           </div>
 
@@ -522,6 +485,7 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
               minRows={3}
               disabled={situationNone}
               placeholder="상황을 입력하세요."
+              voice={{ label: "상황(운전자·목격자 진술)", kind: "long" }}
             />
           </div>
 
@@ -545,6 +509,7 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
                 value={recoverNote}
                 onChange={setRecoverNote}
                 placeholder="예: 미정 / 부품 수급 후"
+                voice={{ label: "복구일시 직접 입력", kind: "short" }}
               />
             </div>
             <ComputedField
@@ -575,6 +540,7 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
               minRows={3}
               disabled={actionNone}
               placeholder="조치 사항을 입력하세요."
+              voice={{ label: "조치사항", kind: "long" }}
             />
           </div>
 
@@ -582,6 +548,12 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
           <p className="text-xs text-on-surface-variant leading-relaxed">
             추가한 사진이 등록 순서대로 출력됩니다.
           </p>
+          {issuePhotoNote && (
+            <p className="mt-1.5 text-xs font-semibold text-primary flex items-center gap-1">
+              <Icon name="photo_library" className="text-sm" />
+              {issuePhotoNote}
+            </p>
+          )}
         </div>
       }
     />

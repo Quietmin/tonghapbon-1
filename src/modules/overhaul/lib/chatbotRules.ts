@@ -2,6 +2,7 @@
 //
 // 원본: AI-Do-Sample/src/lib/chatbotRules.js (로직 그대로, snapshot 타입만 이 저장소에 맞춤)
 import { FIELDS } from "./progress";
+import { isFaultSearchQuestion, isManualSearchQuestion } from "./chatbotGlossary";
 import type { ChatbotSnapshot, EquipmentSnapshot } from "./chatbotSnapshot";
 
 // excelParser.ts가 분류하는 설비 분류 기준 — 질문에 설비명이 "언급됐는지" 감지하는 용도로만 사용,
@@ -26,8 +27,9 @@ const MUTATION_RE = /(삭제|지워|수정|변경해|바꿔|등록해|입력해|
 // 오버홀 공정 "밖" 영역(고장이력·매뉴얼·설비 마스터·중장기보수계획·현황 이슈) 질문 감지 —
 // 이 영역은 로컬 규칙으로 답하지 못하고 서버 GPT(도구 호출)만 답할 수 있다.
 // ddasomiChat.ts가 이 판정으로 "공정 데이터 없음" 단락을 건너뛰고 AI에 보낸다.
+// 노하우·요령·방법·사례도 넣는다 — 서버의 [필수 검색 지침]대로 보관함을 먼저 찾게 하려면 도구 호출 경로로 보내야 한다.
 const CROSS_MODULE_RE =
-  /고장|장애|failure|매뉴얼|절차서|지침|보관함|보고서|문서|사진대장|현황|이슈|조치|기기|태그|보수\s*계획|중장기|점검\s*주기|설비\s*(마스터|목록|검색|정보)/i;
+  /고장|장애|트립|failure|매뉴얼|절차서|지침|노하우|요령|방법|사례|보관함|보고서|문서|사진대장|현황|이슈|조치|기기|태그|보수\s*계획|중장기|점검\s*주기|설비\s*(마스터|목록|검색|정보)/i;
 
 // 문서(PDF)가 아니라 DB 에 저장된 값을 묻는 질문 — 현황 이슈·설비·기기 태그·보수계획. 이런 질문은 문서 검색이
 // 아니라 서버 GPT 의 조회 도구(list_status_issues 등)가 답해야 한다. 문서 검색에 보내면 질문과 상관없는
@@ -43,9 +45,14 @@ export function isStructuredDataQuestion(question: string): boolean {
   return STRUCTURED_DATA_RE.test(q) && !DOCUMENT_WORD_RE.test(q);
 }
 
-/** 오버홀 공정 데이터만으로는 답할 수 없는(다른 모듈 조회가 필요한) 질문인가 */
+/**
+ * 오버홀 공정 데이터만으로는 답할 수 없는(다른 모듈 조회가 필요한) 질문인가.
+ * 유사 용어집(chatbotGlossary.ts)의 고장 찾기·매뉴얼 찾기 표현도 포함한다 — "BFP 누유 난 적 있어?",
+ * "메거 측정 하는 법"처럼 CROSS_MODULE_RE 낱말이 없어도 보관함부터 찾아야 하는 질문이 있다.
+ */
 export function isCrossModuleQuestion(question: string): boolean {
-  return CROSS_MODULE_RE.test(question || "");
+  const q = question || "";
+  return CROSS_MODULE_RE.test(q) || isFaultSearchQuestion(q) || isManualSearchQuestion(q);
 }
 const DELAY_LIST_RE = /지연.*(위험|작업|공정)|위험.*(작업|공정)/;
 const PLANNED_GAP_RE = /계획.*(얼마나|차이|보다|늦|빠르)/;

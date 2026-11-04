@@ -74,6 +74,8 @@ export interface DdasomiReply {
   scope?: string;
   /** AI 답변이 실제로 조회한 대상 — 화면이 보관했다가 다음 질문의 history 에 싣는다 */
   memory?: TurnMemory;
+  /** 인터넷 자료로 답했을 때의 출처 — 화면이 답변 아래 링크로 보여 준다 */
+  sources?: { title: string; url: string }[];
 }
 
 /**
@@ -155,13 +157,19 @@ export async function getDdasomiReply(
       });
       if (result && result.ok && typeof result.answer === "string" && result.answer.trim()) {
         // 모델이 실제로 근거로 쓴 문서만 카드로 남긴다("근거문서: 없음"이면 카드 없음). 번호 줄이 없으면 검색 결과 그대로.
-        const used = Array.isArray(result.usedDocs) ? result.usedDocs.map((i) => matches[i]).filter(Boolean) : matches;
+        // 서버가 도구(search_manuals·read_document)로 찾아 답에 쓴 문서도 미리보기 카드로 덧붙인다 — 같은 문서는 한 번만.
+        const picked = Array.isArray(result.usedDocs) ? result.usedDocs.map((i) => matches[i]).filter(Boolean) : matches;
+        const used = [...picked];
+        for (const d of Array.isArray(result.docs) ? result.docs : []) {
+          if (d && typeof d.id === "string" && typeof d.pdfPath === "string" && !used.some((u) => u.id === d.id)) used.push(d);
+        }
         return {
           text: result.answer.trim(),
           kind: "answer",
           matches: used.length ? used : undefined,
           scope: result.scope,
           memory: result.memory,
+          sources: Array.isArray(result.sources) && result.sources.length ? result.sources : undefined,
         };
       }
       if (result && result.ok === false) aiFailReason = result.reason;

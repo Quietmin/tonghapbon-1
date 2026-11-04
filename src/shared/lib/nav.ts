@@ -1,4 +1,5 @@
-// 통합 앱의 메인 메뉴 3개 + 각 하위 메뉴 정의.
+// 통합 앱의 메인 메뉴 4개 + 각 하위 메뉴 정의.
+// 순서: 오버홀 공정관리 → 설비 현황 관리 → 고장관리 → 매뉴얼관리 (배열 순서가 곧 화면 순서).
 //
 // 화면 구조를 여기 데이터 한 곳에만 적어 둔다. 사이드바(데스크톱)·하단탭(모바일)·
 // 헤더·홈 카드가 모두 이 배열을 읽으므로, 앱(PWA/네이티브) 탭바를 붙일 때도
@@ -77,15 +78,19 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    key: "manual",
-    label: "매뉴얼관리",
+    // 현황을 조회하고 등록하는 챕터 — 오버홀 공정관리 바로 다음(현장 이슈 → 고장 → 매뉴얼 순으로 이어진다).
+    // 현황을 조회하고 등록한다. 화면 내용은 아직 정해지는 중이라 지금은 뼈대만 있다
+    // (/status, /status/new). 챕터 첫 화면이 곧 조회다 — 매뉴얼관리·고장관리와 같은 구조.
+    key: "status",
+    label: "설비 현황 관리",
     accent: "primary",
-    icon: "menu_book",
-    root: "/manual",
-    desc: "보관된 매뉴얼을 지사·분야·작성자·파일명으로 찾아보고, 새 매뉴얼을 작성합니다.",
+    short: "설비현황",
+    icon: "assessment",
+    root: "/status",
+    desc: "현황을 조회하고, 새 현황을 등록합니다.",
     items: [
-      { href: "/manual", label: "매뉴얼 조회", icon: "inventory_2", exact: true },
-      { href: "/manual/new", label: "매뉴얼 작성", icon: "edit_note" },
+      { href: "/status", label: "현황 조회", icon: "monitoring", exact: true },
+      { href: "/status/new", label: "현황 작성", icon: "edit_note" },
     ],
   },
   {
@@ -108,18 +113,15 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    // 네 번째 챕터 — 현황을 조회하고 등록한다. 화면 내용은 아직 정해지는 중이라 지금은 뼈대만 있다
-    // (/status, /status/new). 챕터 첫 화면이 곧 조회다 — 매뉴얼관리·고장관리와 같은 구조.
-    key: "status",
-    label: "설비 현황 관리",
+    key: "manual",
+    label: "매뉴얼관리",
     accent: "primary",
-    short: "설비현황",
-    icon: "assessment",
-    root: "/status",
-    desc: "현황을 조회하고, 새 현황을 등록합니다.",
+    icon: "menu_book",
+    root: "/manual",
+    desc: "보관된 매뉴얼을 지사·분야·작성자·파일명으로 찾아보고, 새 매뉴얼을 작성합니다.",
     items: [
-      { href: "/status", label: "현황 조회", icon: "monitoring", exact: true },
-      { href: "/status/new", label: "현황 작성", icon: "edit_note" },
+      { href: "/manual", label: "매뉴얼 조회", icon: "inventory_2", exact: true },
+      { href: "/manual/new", label: "매뉴얼 작성", icon: "edit_note" },
     ],
   },
 ];

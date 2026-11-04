@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Dialog from "@/shared/components/Dialog";
+import { DELETE_PASSWORD } from "@/shared/lib/deletePassword";
 import {
   ACCENT_STYLE,
   Button,
@@ -42,7 +43,7 @@ import {
  * 수정은 제공하지 않는다. 삭제는 전체 조회 화면에서만 — 챕터 첫 화면의 "최근 문서"
  * 요약에는 두지 않는다. 지나가다 누르는 자리가 아니고, 확인창만으로는 되돌릴 수
  * 없는 작업을 받치기에 모자라기 때문이다. 삭제는 암호(DELETE_PASSWORD)를 한 번 더
- * 묻는다 — 보안이 아니라 실수 방지다(그 상수 주석 참고).
+ * 묻는다 — 보안이 아니라 실수 방지다(shared/lib/deletePassword.ts 주석 참고).
  */
 const DOC_TYPES: { value: DocMode | ""; label: string }[] = [
   { value: "", label: "전체" },
@@ -50,17 +51,6 @@ const DOC_TYPES: { value: DocMode | ""; label: string }[] = [
   { value: "manual", label: MODE_LABELS.manual },
   { value: "fault", label: MODE_LABELS.fault },
 ];
-
-/**
- * 삭제 암호.
- *
- * ⚠️ 이것은 보안 장치가 아니라 실수 방지 장치다. 브라우저로 내려가는 코드에 들어
- * 있으므로 개발자도구나 소스 보기로 누구나 읽을 수 있고, 화면을 거치지 않고
- * anon 키로 직접 요청하면 그냥 지나간다. 실제 권한은 서버의 RLS 정책이 쥔다
- * (supabase/docgen/02-docgen-delete.sql). 진짜로 막아야 한다면 로그인을 붙이고
- * 그 정책을 관리자에게만 열어야 한다.
- */
-const DELETE_PASSWORD = "2488";
 
 /** 표의 '종류' 배지 색 — 챕터 색과 같다 (사진대장은 챕터가 없어 회색) */
 const DOC_TYPE_BADGE: Record<DocMode, string> = {

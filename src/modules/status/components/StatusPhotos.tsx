@@ -186,12 +186,16 @@ export function IssuePhotos({ issueId }: { issueId: string }) {
   );
 }
 
-/** 현황 팝업의 "고장보고서 작성" 바로가기 — 설비·내용·지사·발생일시가 채워진 채 등록 화면이 열린다 */
+/**
+ * 현황 팝업의 "고장보고서 작성" 바로가기 — 설비·내용·지사·발생일시가 채워진 채 등록 화면이 열린다.
+ * 글자만 있으면 취소·저장 옆에서 버튼으로 보이지 않아, 연한 바탕·테두리를 둔 보조 버튼으로 그린다
+ * (주 동작인 [저장]의 꽉 찬 바탕보다는 한 단계 약하게).
+ */
 export function FaultReportLink({ row }: { row: StatusIssueRow }) {
   return (
     <Link
       href={faultReportHref(row)}
-      className="px-4 py-2.5 rounded-sm font-bold text-sm text-primary hover:bg-surface-container-high inline-flex items-center gap-1.5"
+      className="px-4 py-2.5 rounded-sm font-bold text-sm inline-flex items-center gap-1.5 border border-primary/50 bg-primary-fixed text-on-primary-fixed-variant hover:border-primary hover:brightness-95"
     >
       <Icon name="edit_note" className="text-base" />
       고장보고서 작성

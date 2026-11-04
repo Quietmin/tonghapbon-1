@@ -14,6 +14,7 @@ import {
   rowKeyHandler,
 } from "@/shared/lib/tableStyle";
 import { useToast } from "@/shared/components/Toast";
+import { DELETE_PASSWORD } from "@/shared/lib/deletePassword";
 import { DEPARTMENTS, STATUS_LABELS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { formatDate, formatDateTime } from "./badges";
@@ -40,6 +41,10 @@ const SELECT_CLASS =
  * 최근 등록순으로 정렬돼 온다(서버 정렬). 조치 상태가 표의 첫 열이다. 행을 누르면 갱신 창이 열려 상태·조치 내용·예정일을
  * 바꾼다. 위쪽 상태 칩은 건수를 보여 주며 누르면 그 상태만 걸러 본다.
  * 처음에는 내 지사로 걸러 두고(유지보수 부서는 내 담당부서까지), '전체 지사'·'전체 부서'로 넓힐 수 있다. 운영부는 담당부서로 걸러지지 않는다.
+ *
+ * 행마다 [수정]·[삭제]가 있다 — 매뉴얼·고장보고서 조회와 같은 방식이다. [수정]은 작성 화면(/status/new?edit=)을
+ * 저장된 내용으로 채워 열고, [삭제]는 삭제 암호를 한 번 더 묻는다(실수 방지일 뿐 보안이 아니다 —
+ * shared/lib/deletePassword.ts 참고).
  */
 export default function StatusBoard({
   initialBranch,
@@ -63,6 +68,38 @@ export default function StatusBoard({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<StatusIssueRow | null>(null);
   const reqSeq = useRef(0);
+  const toast = useToast();
+
+  /** 암호 확인창에 올라와 있는 행 — null 이면 창이 닫혀 있다 */
+  const [pendingRow, setPendingRow] = useState<StatusIssueRow | null>(null);
+  const [password, setPassword] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  function askPassword(row: StatusIssueRow) {
+    setPendingRow(row);
+    setPassword("");
+    setPwError(null);
+  }
+
+  function closeAsk() {
+    setPendingRow(null);
+    setPassword("");
+    setPwError(null);
+  }
+
+  function submitPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pendingRow) return;
+    if (password !== DELETE_PASSWORD) {
+      setPwError("암호가 맞지 않습니다.");
+      setPassword("");
+      return;
+    }
+    const row = pendingRow;
+    closeAsk();
+    void remove(row);
+  }
 
   const load = useCallback(async (f: Filters) => {
     const seq = ++reqSeq.current;
@@ -104,6 +141,22 @@ export default function StatusBoard({
       }
     })();
   }, [initialIssueId]);
+
+  async function remove(row: StatusIssueRow) {
+    setDeletingId(row.id);
+    setError(null);
+    try {
+      const json = await (await fetch(`/api/status/issues/${row.id}`, { method: "DELETE" })).json();
+      if (!json.ok) throw new Error(json.error || "삭제하지 못했습니다.");
+      toast(`"${row.equipment_name}" 현황을 삭제했습니다`);
+      // 상태 칩의 건수도 같이 맞아야 해서 목록만 빼지 않고 다시 조회한다
+      void load(filters);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "삭제하지 못했습니다.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((f) => ({ ...f, [key]: value }));
@@ -254,14 +307,32 @@ export default function StatusBoard({
                     {r.scheduled_date && ` · 예정 ${formatDate(r.scheduled_date)}`}
                   </p>
                 </button>
+                <div className="flex border-t border-border-subtle/60 px-2 py-1">
+                  <Link
+                    href={`/status/new?edit=${r.id}`}
+                    className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-on-surface-variant active:bg-surface-container-high"
+                  >
+                    <Icon name="edit" className="text-lg" />
+                    <span className="text-xs font-bold">수정</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => askPassword(r)}
+                    disabled={deletingId === r.id}
+                    className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-status-error-text active:bg-surface-container-high disabled:opacity-40"
+                  >
+                    <Icon name="delete" className="text-lg" />
+                    <span className="text-xs font-bold">{deletingId === r.id ? "지우는 중…" : "삭제"}</span>
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
 
           {/* PC — 표 */}
           <div className="hidden md:block overflow-x-auto">
-            {/* 고정 칸 합(712px)에 이슈 내용 칸이 쓸 폭을 더해 둔다 — 안 그러면 좁은 화면에서 이슈 내용 칸이 0px 로 사라진다 */}
-            <table className={`${TABLE} table-fixed min-w-[880px]`}>
+            {/* 고정 칸 합(862px)에 이슈 내용 칸이 쓸 폭을 더해 둔다 — 안 그러면 좁은 화면에서 이슈 내용 칸이 0px 로 사라진다 */}
+            <table className={`${TABLE} table-fixed min-w-[1030px]`}>
               <colgroup>
                 <col style={{ width: "130px" }} />
                 <col style={{ width: "170px" }} />
@@ -270,10 +341,11 @@ export default function StatusBoard({
                 <col style={{ width: "96px" }} />
                 <col style={{ width: "96px" }} />
                 <col style={{ width: "110px" }} />
+                <col style={{ width: "150px" }} />
               </colgroup>
               <thead>
                 <tr className={HEAD_ROW}>
-                  {["조치 상태", "설비명", "이슈 내용", "지사", "담당부서", "작성자", "등록"].map((h) => (
+                  {["조치 상태", "설비명", "이슈 내용", "지사", "담당부서", "작성자", "등록", "관리"].map((h) => (
                     <th key={h} className={`${TH_Y} px-3 text-center`}>
                       {h}
                     </th>
@@ -309,12 +381,93 @@ export default function StatusBoard({
                     <td className={`${TD_Y} px-3 align-top text-center text-on-surface-variant`}>
                       {formatDateTime(r.created_at)}
                     </td>
+                    <td className={`${TD_Y} px-3 align-top`}>
+                      {/* 버튼 영역의 클릭·키는 행(조치 갱신 창)으로 번지지 않게 막는다 — 수정·삭제를 눌렀는데 갱신 창이 뜨면 안 된다 */}
+                      <div
+                        className="flex items-center justify-center gap-3"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <Link
+                          href={`/status/new?edit=${r.id}`}
+                          className="inline-flex items-center gap-1 text-on-surface-variant font-bold hover:underline hover:text-on-surface whitespace-nowrap"
+                        >
+                          <Icon name="edit" className="text-base" />
+                          수정
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => askPassword(r)}
+                          disabled={deletingId === r.id}
+                          className="inline-flex items-center gap-1 text-status-error-text font-bold hover:underline whitespace-nowrap disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+                        >
+                          <Icon name="delete" className="text-base" />
+                          {deletingId === r.id ? "지우는 중…" : "삭제"}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </Card>
+      )}
+
+      {/* ---- 삭제 암호 확인 — 매뉴얼·고장보고서 조회(ArchiveBrowser)와 같은 창 ---- */}
+      {pendingRow && (
+        <Dialog onClose={closeAsk} labelledBy="statusDelDlgTitle" size="sm">
+          <form onSubmit={submitPassword} className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <Icon name="warning" className="text-status-error-text text-2xl shrink-0" />
+              <div className="min-w-0">
+                <h3 id="statusDelDlgTitle" className="text-title-sm text-on-surface">
+                  현황을 삭제할까요?
+                </h3>
+                <p className="text-sm text-on-surface-variant mt-1 break-words">
+                  <strong className="text-on-surface">{pendingRow.equipment_name}</strong>
+                </p>
+                <p className="text-sm text-on-surface-variant mt-1">
+                  첨부 사진과 조치 내용까지 함께 지워지며 되돌릴 수 없습니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="statusDelPw" className="text-xs font-bold text-on-surface-variant">
+                삭제 암호
+              </label>
+              <input
+                id="statusDelPw"
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setPwError(null);
+                }}
+                autoFocus
+                autoComplete="off"
+                className="px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary md:rounded-sm md:bg-surface-container-low md:focus:bg-surface-container-lowest"
+              />
+              {pwError && (
+                <p className="text-sm font-bold text-status-error-text flex items-center gap-1.5">
+                  <Icon name="error" className="text-base" />
+                  {pwError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={closeAsk}>
+                취소
+              </Button>
+              <Button type="submit" variant="danger" disabled={password.length === 0}>
+                <Icon name="delete" className="text-lg" />
+                삭제
+              </Button>
+            </div>
+          </form>
+        </Dialog>
       )}
 
       {selected && (

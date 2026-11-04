@@ -13,6 +13,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Icon } from "./ui";
+import VoiceDictationButton, { type VoiceDictationState } from "./VoiceDictationButton";
 import { getDdasomiReply, type DdasomiReply } from "@/modules/overhaul/lib/ddasomiChat";
 import { askDdasomi } from "@/modules/overhaul/lib/chatbotAI";
 import type { HistoryTurn, TurnMemory } from "@/modules/overhaul/lib/chatbotHistory";
@@ -115,6 +116,8 @@ interface Msg {
   scope?: string;
   /** AI 답변이 실제로 조회한 대상 — 다음 질문 때 history 에 실어 서버로 되돌려 보낸다 */
   memory?: TurnMemory;
+  /** 보관함에 자료가 없어 인터넷 자료로 답했을 때의 출처 — 말풍선 아래 링크로 그린다 */
+  sources?: { title: string; url: string }[];
 }
 
 let msgSeq = 0;
@@ -367,6 +370,9 @@ function emptySnapshot(): ChatbotSnapshot {
 export default function ChatbotDock() {
   const { state, setState } = useChatbotDock();
   const [input, setInput] = useState("");
+  /** 음성 입력 상태·안내 — 녹음 중이면 입력칸 안내 문구가 바뀌고, 실패 안내는 입력줄 위에 한 줄로 보인다 */
+  const [voiceState, setVoiceState] = useState<VoiceDictationState>("idle");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   // "새 대화"를 누를 때마다 올린다 — 그 전에 보낸 질문의 답이 늦게 와도 새 대화에 끼어들지 않게
   const conversationRef = useRef(0);
@@ -452,6 +458,7 @@ export default function ChatbotDock() {
         matches: reply.matches,
         scope: reply.scope,
         memory: reply.memory,
+        sources: reply.sources,
       },
     ]);
   }
@@ -667,6 +674,25 @@ export default function ChatbotDock() {
                       ))}
                     </div>
                   )}
+                  {Array.isArray(m.sources) && m.sources.length > 0 && (
+                    <div className="w-full flex flex-col gap-1 px-1">
+                      <div className="flex items-center gap-1 text-xs font-bold text-on-surface-variant">
+                        <Icon name="public" className="text-sm" />
+                        인터넷 출처 — 우리 설비 기준이 아니니 적용 전 확인하세요
+                      </div>
+                      {m.sources.map((s) => (
+                        <a
+                          key={s.url}
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary font-semibold underline underline-offset-2 truncate hover:opacity-80"
+                        >
+                          {s.title}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   {Array.isArray(m.suggestions) && m.suggestions.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {m.suggestions.map((s) => (
@@ -689,6 +715,12 @@ export default function ChatbotDock() {
         {pending && <DdasomiLoading />}
       </div>
 
+      {voiceError && (
+        <p className="px-3 pt-2 text-xs font-semibold text-status-error-text flex items-center gap-1 shrink-0">
+          <Icon name="error" className="text-sm" />
+          {voiceError}
+        </p>
+      )}
       <div className="p-3 border-t border-border-subtle flex items-center gap-2 shrink-0">
         <input
           value={input}
@@ -696,10 +728,28 @@ export default function ChatbotDock() {
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}
-          placeholder="예: 전체 공정률 / 최근 고장이력 알려줘"
+          placeholder={
+            voiceState === "recording"
+              ? "음성 듣는 중… ■ 누르면 입력"
+              : voiceState === "processing"
+                ? "변환 중…"
+                : "예: 전체 공정률 / 최근 고장이력 알려줘"
+          }
           aria-label="챗봇에게 물어보기"
-          disabled={pending}
+          disabled={pending || voiceState !== "idle"}
           className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-surface-container-high border border-border-subtle text-sm text-on-surface outline-none focus:border-primary disabled:opacity-60"
+        />
+        {/* 음성 입력 — 고장보고서·매뉴얼 작성과 같은 방식(누르고 말하고 ■ 로 멈추면 한 번에 받아쓰기).
+            받아쓴 질문은 바로 보내지 않고 입력칸에 넣는다 — 잘못 들린 곳을 고친 뒤 보내게.
+            다시 녹음하면 이어 붙이지 않고 새로 받아쓴 질문으로 바꾼다 */}
+        <VoiceDictationButton
+          field={{ label: "챗봇 질문", kind: "question" }}
+          label="음성으로 질문하기"
+          disabled={pending}
+          className="w-10 h-10 rounded-xl"
+          onError={setVoiceError}
+          onStateChange={setVoiceState}
+          onResult={setInput}
         />
         <button
           type="button"

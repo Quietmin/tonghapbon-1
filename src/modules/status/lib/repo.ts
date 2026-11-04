@@ -128,6 +128,42 @@ export async function createIssue(input: IssueInput): Promise<{ id: string }> {
 }
 
 /**
+ * 운영 근무자가 작성한 내용(지사·설비명·이슈 내용·담당부서·작성자)을 고친다.
+ * 조치 상태·조치 내용 같은 유지보수 담당자의 갱신 값은 건드리지 않는다. 없는 id 면 false.
+ */
+export async function editIssue(id: string, input: IssueInput): Promise<boolean> {
+  const n = await execute(
+    `update status_issue
+        set branch = $2, equipment_name = $3, content = $4, department = $5, reporter = $6
+      where id = $1`,
+    [
+      id,
+      input.branch,
+      input.equipmentName.trim(),
+      input.content.trim(),
+      input.department.trim(),
+      input.reporter.trim(),
+    ],
+  );
+  return n > 0;
+}
+
+/**
+ * 이슈의 사진을 통째로 바꾼다 — 수정 화면은 남길 사진(기존 + 새로 고른 것)을 모두 보내 온다.
+ * 지운 뒤 다시 넣으므로 사진 id 가 새로 매겨진다(사진 주소가 바뀌어 예전 캐시와 섞이지 않는다).
+ */
+export async function replaceIssuePhotos(issueId: string, dataUrls: string[]): Promise<number> {
+  await execute(`delete from status_issue_photo where issue_id = $1`, [issueId]);
+  return addIssuePhotos(issueId, dataUrls);
+}
+
+/** 이슈 삭제 — 사진은 FK(on delete cascade)로 함께 지워진다. 없는 id 면 false */
+export async function deleteIssue(id: string): Promise<boolean> {
+  const n = await execute(`delete from status_issue where id = $1`, [id]);
+  return n > 0;
+}
+
+/**
  * 이슈에 사진을 붙인다 — 이슈는 이미 저장된 뒤에 부른다. 사진 테이블이 아직 없는 DB(배포 DB 에 마이그레이션 전)에서는
  * 던지므로, 호출하는 쪽이 잡아 "사진만 저장하지 못했다"고 알린다(이슈 자체는 남는다).
  * 반환값은 저장한 사진 수.

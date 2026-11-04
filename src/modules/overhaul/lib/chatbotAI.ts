@@ -10,6 +10,7 @@
 import type { ChatbotSnapshot } from "./chatbotSnapshot";
 import type { Classification } from "./chatbotRules";
 import type { HistoryTurn, TurnMemory } from "./chatbotHistory";
+import type { DocMatch } from "@/modules/docgen/lib/docgenSearch";
 
 /** 보관함 검색 결과 중 GPT 에 근거로 넘길 최소 정보 — 서버가 다시 걸러서(sanitizeDocuments) 프롬프트에 넣는다 */
 export interface AskDoc {
@@ -50,6 +51,10 @@ export type AskFn = (
       usedDocs?: number[] | null;
       /** 이번 답이 실제로 조회한 대상 — 다음 질문 때 history 에 실어 되돌려 보낸다 */
       memory?: TurnMemory;
+      /** 보관함에 자료가 없어 인터넷 자료로 답했을 때의 출처 */
+      sources?: { title: string; url: string }[];
+      /** 서버가 도구로 찾아 답에 쓴 보관함 문서 — 화면이 미리보기 카드로 보여 준다 */
+      docs?: DocMatch[];
     }
   | { ok: false; reason: AskFailReason }
   | null

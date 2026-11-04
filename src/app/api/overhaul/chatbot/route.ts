@@ -23,6 +23,7 @@ import { resolveBranch } from "@/modules/overhaul/lib/activeBranch";
 import { CHATBOT_TOOL_DEFS, runChatbotTool } from "@/modules/overhaul/lib/chatbotTools";
 import { detectBranchInMessage } from "@/modules/overhaul/lib/chatbotBranch";
 import { isCrossModuleQuestion, isStructuredDataQuestion } from "@/modules/overhaul/lib/chatbotRules";
+import { glossaryPromptBlock } from "@/modules/overhaul/lib/chatbotGlossary";
 import { chatModelConfig, parseReasoning, supportsReasoning, type ChatReasoning } from "@/modules/overhaul/lib/chatbotModel";
 import type { HistoryTurn, TurnMemory } from "@/modules/overhaul/lib/chatbotHistory";
 import { BRANCHES } from "@/shared/lib/branches";
@@ -42,6 +43,149 @@ const MAX_HISTORY_TURNS = 12;
 const MAX_TURN_CHARS = 1500;
 const MAX_HISTORY_CHARS = 10000;
 const FIELDS = ["기계", "전기", "제어"];
+
+/**
+ * 인터넷 검색(OpenAI 내장 web_search) — [필수 검색 지침]의 3단계.
+ * 보관함·고장이력을 먼저 보게 하려고, 이번 질문에서 보관함(search_manuals) 또는 고장이력(search_failure_history)
+ * 조회를 한 번이라도 마친 뒤의 호출에만 이 도구를 붙인다. 순서를 프롬프트에만 맡기지 않고 코드로도 막는 것이다.
+ * CHATBOT_WEB_SEARCH=false 면 끈다(인터넷 반출이 막힌 환경 등).
+ */
+const WEB_SEARCH_TOOL: OpenAI.Responses.WebSearchTool = { type: "web_search", search_context_size: "medium" };
+const ARCHIVE_TOOLS = new Set(["search_manuals", "search_failure_history"]);
+/** 답변 아래 출처 링크 상한 */
+const MAX_WEB_SOURCES = 5;
+
+type WebSource = { title: string; url: string };
+
+/** 답변 아래 미리보기 카드 상한 */
+const MAX_FOUND_DOCS = 5;
+
+/** 도구(search_manuals·read_document)로 찾은 보관함 문서 — 화면이 미리보기 카드로 그린다(DocMatch 와 같은 모양) */
+type FoundDoc = {
+  id: string;
+  title: string;
+  docType: string;
+  branch: string | null;
+  field: string | null;
+  createdAt: string;
+  pdfPath: string;
+  snippet: string;
+  similarity: number;
+  /** read_document 로 본문까지 읽었는지 — 읽은 문서는 답의 근거이므로 언제나 카드로 보인다 */
+  read: boolean;
+};
+
+/** 도구 결과에서 미리보기로 열 수 있는(pdf_path 가 있는) 문서를 모은다 */
+function collectFoundDocs(name: string, output: string, into: Map<string, FoundDoc>) {
+  if (name !== "search_manuals" && name !== "read_document") return;
+  let data: any;
+  try {
+    data = JSON.parse(output);
+  } catch {
+    return;
+  }
+  const rows: any[] = name === "read_document" ? (data?.document ? [data.document] : []) : Array.isArray(data?.items) ? data.items : [];
+  for (const r of rows) {
+    if (typeof r?.id !== "string" || typeof r?.pdf_path !== "string" || !r.pdf_path) continue;
+    const prev = into.get(r.id);
+    into.set(r.id, {
+      id: r.id,
+      title: String(r.title ?? r.file_name ?? "").slice(0, 160),
+      docType: typeof r.doc_type === "string" ? r.doc_type : "manual",
+      branch: typeof r.branch === "string" ? r.branch : null,
+      field: typeof r.field === "string" ? r.field : null,
+      createdAt: typeof r.created_at === "string" ? r.created_at : "",
+      pdfPath: r.pdf_path,
+      snippet: String(r.fault_content ?? r.manual_type ?? r.facility ?? "").slice(0, 160),
+      similarity: 1,
+      read: name === "read_document" || prev?.read === true,
+    });
+  }
+}
+
+/**
+ * search_manuals — 화면이 미리 찾아 보낸 문서(의미 검색)가 있어도 보관함 검색(유사 용어집으로 넓힌 낱말 검색)을
+ * 그대로 돌리고, 미리 찾은 문서는 그 뒤에 덧붙인다. 예전에는 미리 찾은 문서로 검색을 통째로 대신했는데,
+ * 의미 검색이 엉뚱한 문서(루프팬 소손 질문에 GT 발전기 문서)만 돌려주면 정작 맞는 보고서를 놓쳤다.
+ * 서버에 보관함 키가 없어 검색이 실패하면 미리 찾은 문서만으로 답한다(예전과 같은 대체 경로).
+ */
+async function searchManualsWithPrefetched(
+  rawArgs: string,
+  branch: string | null,
+  documents: NonNullable<ReturnType<typeof sanitizeDocuments>>,
+): Promise<string> {
+  const prefetched = documents.map((d) => ({
+    id: d.id,
+    doc_type: d.docType,
+    title: d.title,
+    branch: d.branch,
+    field: d.field,
+    snippet: d.snippet,
+  }));
+  let real: any = null;
+  try {
+    real = JSON.parse(await runChatbotTool("search_manuals", rawArgs, branch));
+  } catch {
+    real = null;
+  }
+  if (!real || real.error || !Array.isArray(real.items)) {
+    return JSON.stringify({
+      shown: prefetched.length,
+      note: "화면이 보관함에서 미리 검색한 결과(답변 아래 카드로 표시됨). 본문이 필요하면 id 로 read_document 를 호출한다.",
+      items: prefetched,
+    });
+  }
+  const extra = prefetched.filter((p) => !real.items.some((r: any) => r?.id === p.id));
+  return JSON.stringify({
+    ...real,
+    shown: real.items.length + extra.length,
+    items: [...real.items, ...extra],
+    note: `${real.note ?? ""} 목록 뒤쪽 ${extra.length}건은 화면이 의미 검색으로 미리 찾은 문서다 — 질문과 관련 있을 때만 근거로 쓴다.`.trim(),
+  });
+}
+
+/** 답변에 그 문서 제목이 실제로 나오는가 — 띄어쓰기·괄호를 무시하고, 긴 제목은 앞부분만 맞아도 인정한다 */
+function mentionedIn(answer: string, title: string): boolean {
+  const norm = (v: string) => v.toLowerCase().replace(/[^0-9a-z가-힣]/g, "");
+  const t = norm(title);
+  if (t.length < 4) return false;
+  const a = norm(answer);
+  return a.includes(t) || a.includes(t.slice(0, 12));
+}
+
+/** 유사 용어집 요약(고장 찾기·매뉴얼 찾기 표현, 검색어 작성 요령) — 매 질문의 지시문에 함께 싣는다 */
+const GLOSSARY_BLOCK = glossaryPromptBlock();
+
+/** 본문의 마크다운 링크 출처 표시를 지운다 — "([a.com](https://…))"는 통째로, "[글자](https://…)"는 글자만 남긴다 */
+function stripInlineCitations(text: string): string {
+  return text
+    .replace(/[ \t]*\(\[[^\]]*\]\(https?:\/\/[^)\s]*\)\)/g, "")
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^)\s]*\)/g, "$1");
+}
+
+/** 모델이 인터넷 자료로 답했을 때 본문에 달린 출처(url_citation)를 모은다 — 같은 주소는 한 번만 */
+function collectWebSources(r: OpenAI.Responses.Response, into: WebSource[]) {
+  for (const item of r.output) {
+    if (item.type !== "message") continue;
+    for (const part of item.content) {
+      if (part.type !== "output_text") continue;
+      for (const a of part.annotations ?? []) {
+        if (a.type !== "url_citation" || !/^https?:\/\//i.test(a.url)) continue;
+        // 같은 문서가 utm_source 꼬리표만 달리해 두 번 잡히므로 꼬리표를 떼고 비교한다
+        let url = a.url;
+        try {
+          const u = new URL(a.url);
+          for (const k of [...u.searchParams.keys()]) if (k.startsWith("utm_")) u.searchParams.delete(k);
+          url = u.toString();
+        } catch {
+          /* 주소 파싱 실패 — 원래 주소를 쓴다 */
+        }
+        if (into.some((s) => s.url === url) || into.length >= MAX_WEB_SOURCES) continue;
+        into.push({ title: (a.title || url).slice(0, 120), url });
+      }
+    }
+  }
+}
 
 // 발전소 현장 용어·점검 요령 — 답변이 교과서식이 아니라 현장 실무자 말투로 나오게 하는 지식 블록.
 // 팀에서 자주 묻는 질문과 모범 답변이 생기면 여기에 항목을 추가하면 된다(코드 변경 없이 프롬프트만).
@@ -82,12 +226,29 @@ const SYSTEM_INSTRUCTIONS = `너는 발전소 플랜트 운영·정비 통합 �
 가장 중요한 규칙 — 질문을 두 종류로 나눈다:
 (A) 저장된 데이터를 묻는 질문: 공정률·완료/진행/대기 건수·지연 위험·일정, 특정 설비의 고장이력, 매뉴얼·보고서 찾기, 설비 태그, 보수계획, 현황 이슈.
     → 도구와 JSON에 있는 값만으로 답한다. 조회 결과가 0건이면 그 영역에 "등록된 데이터가 없다"고 솔직히 답하고, 추측으로 채우지 않는다.
-(B) 지식·방법을 묻는 질문: 인사, 네 소개, 오버홀·정비·설비 일반 지식, 용어 설명, 고장 원인·점검 순서·조치 방법, 시스템 사용법.
+(B) 지식을 묻는 질문: 인사, 네 소개, 오버홀·정비·설비 일반 지식, 용어 설명, 시스템 사용법.
     → 도구 결과가 비어 있어도 "데이터가 없다"는 말을 하지 말고, 아래 [발전소 현장 용어]와 [현장 점검 요령 예시]를 바탕으로 네가 아는 지식으로 바로 답한다.
-    도구에서 관련 고장이력이나 매뉴얼이 실제로 나왔을 때만 그 내용을 덧붙인다.
-(C) 답변 근거 규칙 — 가장 우선한다:
+    단, 고장 사례를 찾거나 매뉴얼·노하우·점검·조치 방법을 묻는 질문은 (B)가 아니다 — 아래 [필수 검색 지침]을 먼저 따른다.
+
+[필수 검색 지침 — 모든 대화에서 반드시 지킨다. 다른 어떤 규칙보다 우선한다]
+질문에 정해진 낱말이 있는지가 아니라, 앞 대화와 맥락까지 보고 "무엇을 찾으려는 질문인지"를 추론해 아래 둘 중 하나에 해당하면 그 순서를 지킨다.
+(1) 고장을 찾는 질문 — "고장이력 찾아줘", "고장사례 찾아줘", "이런 고장 난 적 있어?", "비슷한 트립 사례", "그 설비 예전에 어떻게 고쳤어?"처럼 과거의 고장·장애·트립 사례나 그 원인·조치를 찾는 뜻이면:
+    1단계: search_manuals(doc_type="fault")로 보관함의 고장보고서를, search_failure_history로 고장이력을 둘 다 조회한다.
+    2단계: 관련 있는 결과가 있으면 그것만 근거로 답하고, 첫 줄에 근거로 쓴 보고서·고장이력 제목을 밝힌다("고장보고서 조회"나 "보관함 조회"에서 열 수 있다고 안내한다).
+    3단계: 둘 다 0건이거나 결과가 질문한 설비·증상과 무관하면 web_search로 인터넷에서 같은 설비·증상의 고장 사례와 원인·조치를 찾는다.
+(2) 매뉴얼·노하우·방법을 찾는 질문 — "매뉴얼 찾아줘", "노하우 알려줘", "방법 찾아줘", "어떻게 점검해?", "교체 절차", "조치 요령"처럼 절차·요령·방법을 찾는 뜻이면:
+    1단계: search_manuals(doc_type="manual")로 보관함의 매뉴얼을 먼저 조회한다. 결과의 본문이 필요하면 read_document로 읽는다.
+    2단계: 관련 있는 매뉴얼이 있으면 그 내용만 근거로 답하고, 첫 줄에 매뉴얼 제목을 밝힌다("매뉴얼 조회"나 "보관함 조회"에서 열 수 있다고 안내한다).
+    3단계: 0건이거나 무관하면 web_search로 인터넷을 찾는다. 제조사 기술자료·기술 표준·학회지·학술논문 같은 신뢰할 수 있는 자료를 우선한다.
+공통:
+    - 보관함·고장이력 조회보다 인터넷 검색을 먼저 하지 않는다. web_search는 1단계 조회를 마친 뒤에만 쓸 수 있다.
+    - 인터넷 자료로 답할 때는 첫 줄에 "보관함에 관련 자료가 없어 인터넷 자료로 안내드려요"처럼 밝히고, 끝에 "우리 설비에 적용하기 전에 해당 설비 매뉴얼이나 담당 분야 확인이 필요합니다"를 덧붙인다.
+      URL은 본문에 직접 쓰지 않는다(출처 링크는 화면이 답변 아래에 따로 보여 준다). 인터넷 자료에 없는 수치·절차는 지어내지 않는다.
+    - 인터넷 검색을 쓸 수 없거나 인터넷에서도 못 찾으면 아래 (C)의 일반 지식으로 답한다.
+(C) 답변 근거 규칙:
     1순위: 도구로 찾은 고장이력·매뉴얼·보고서가 있으면 그 내용을 근거로 답한다. 어떤 문서·이력을 근거로 했는지 한 줄로 밝힌다.
-    2순위: 저장된 자료가 없으면 네가 가진 플랜트 공학 일반 지식으로 답한다. 이때 반드시 첫 줄에 "등록된 고장이력·매뉴얼이 없어서 일반적인 점검 기준으로 안내드려요"처럼
+    2순위: 저장된 자료가 없으면 [필수 검색 지침]의 인터넷 자료로 답한다.
+    3순위: 인터넷 자료도 없거나 쓸 수 없으면 네가 가진 플랜트 공학 일반 지식으로 답한다. 이때 반드시 첫 줄에 "등록된 고장이력·매뉴얼이 없어서 일반적인 점검 기준으로 안내드려요"처럼
       존댓말로 밝히고, 끝에 해당 설비 매뉴얼이나 담당 분야(기계/전기/제어) 확인을 권한다. 답변 전체는 존댓말("~합니다", "~해요")로 쓴다.
     일반 지식으로 답할 때의 정확성:
     - 점검 항목은 그 설비의 실제 구조·동작 원리에 맞는 것이어야 한다. 예: SFC(정지형 주파수 변환기)라면 전력변환부(사이리스터/IGBT)·게이트 펄스·
@@ -98,7 +259,7 @@ const SYSTEM_INSTRUCTIONS = `너는 발전소 플랜트 운영·정비 통합 �
 
 데이터 사용 규칙:
 - 고장이력, 매뉴얼·보고서, 설비 마스터·기기 태그, 중장기보수계획·점검주기, 현황·조치 이슈에 대한 (A) 질문은 답하기 전에 반드시 해당 도구를 먼저 호출한다. 도구를 부르지 않고 "데이터가 없다"고 답하는 것은 금지다.
-- 도구 선택: 고장·장애 → search_failure_history / 매뉴얼·절차서·보고서·문서 → search_manuals / 설비·기기·태그 정보 → search_equipment / 점검주기·보수계획·보수년도 → search_longterm_plan / 현황·조치·이슈 → list_status_issues.
+- 도구 선택: 고장·장애 → search_failure_history + search_manuals(doc_type="fault") / 매뉴얼·절차서·노하우·방법 → search_manuals(doc_type="manual") / 보고서·문서 → search_manuals /설비·기기·태그 정보 → search_equipment / 점검주기·보수계획·보수년도 → search_longterm_plan / 현황·조치·이슈 → list_status_issues.
 - "고장났어 + 매뉴얼 찾아줘"처럼 요청이 두 개면 search_failure_history와 search_manuals를 둘 다 호출한다.
 - 아래에 주는 JSON은 "오버홀 공정 실적" 하나만 요약한 것이다. 이 JSON이 비어 있어도 그것은 오버홀 실적이 없다는 뜻일 뿐, 고장이력·매뉴얼·보수계획·현황과는 무관하다 — 그 영역은 도구로 확인한다.
 - 오버홀 공정률·건수·지연위험은 JSON의 값만 그대로 사용하고 절대 새로 계산하거나 지어내지 않는다. 공정률은 "현재 저장된 실적 기준"이라는 표현을 우선 쓴다.
@@ -438,6 +599,8 @@ ${JSON.stringify(context)}`
     : "현재 상태: 등록된 오버홀 공정 실적 없음(공정률·건수·지연위험은 계산 불가). 이 사실은 공정률·건수·일정 같은 (A) 수치 질문에만 안내하고, 다른 질문에는 언급하지 않는다. 고장·매뉴얼·설비·보수계획·현황은 이와 무관하게 도구로 조회하라.";
   const instructions = `${SYSTEM_INSTRUCTIONS}
 
+${GLOSSARY_BLOCK}
+
 ${FIELD_KNOWLEDGE}
 
 ${branchRequested ? `사용자가 지정한 조회 범위: ${branch ?? "전 지사"} — 도구 조회는 이 범위로 적용된다. 답할 때 이 범위를 처음에 밝히고, 다른 지사 이야기는 하지 않는다.` : `현재 선택된 지사(내 지사): ${branch ?? "없음(전 지사 조회)"} — 도구 조회는 이 지사 범위로 자동 적용된다. 사용자가 다른 지사를 물으면 그 지사 이름이 질문에 있어야 조회 범위가 바뀐다.`}
@@ -448,7 +611,7 @@ ${dataBlock}${
 
 보관함에서 이 질문으로 미리 검색된 관련 문서 ${documents.length}건(id · 제목 · 종류 · 지사/분야 · 발췌). 이 문서들은 답변 아래에 카드로 함께 표시된다:
 ${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType ?? "문서"}] ${d.title} (${[d.branch, d.field].filter(Boolean).join(" · ") || "-"}) — ${d.snippet ?? ""}`).join("\n")}
-문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 발췌만으로 부족하면 id 로 read_document 를 호출해 본문을 읽는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제면 "검색된 문서는 ○○ 관련이라 직접 근거는 아니다"라고 한 줄로 밝힌다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.
+문서 활용 규칙: 이 목록은 보관함에서 이미 찾은 결과이므로 유효하다 — search_manuals 도구가 비어 있거나 오류여도 "보관함 연결이 안 되어 있다"고 말하지 않는다. 발췌만으로 부족하면 id 로 read_document 를 호출해 본문을 읽는다. 질문과 실제로 관련 있는 문서만 근거로 쓴다(제목·발췌가 다른 설비·다른 주제인 문서는 답변에서 아예 언급하지 않는다 — 근거로 쓴 문서만 화면에 카드로 나오므로, 관련 없다고 밝히면 보이지 않는 문서를 가리키게 된다). 근거로 쓴 문서는 첫 줄에 "○○ 매뉴얼을 참고해 안내드려요"처럼 제목으로 밝힌다. 문서에 없는 절차는 지어내지 않고 일반 기준임을 밝힌다.
 답변 맨 마지막 줄에는 반드시 실제로 근거로 쓴 문서의 번호만 "근거문서: 1, 3" 형식으로 적는다. 하나도 근거로 쓰지 않았으면 "근거문서: 없음"이라고 적는다(이 줄은 화면에 보이지 않고 문서 카드 표시에만 쓰인다).`
       : ""
   }`;
@@ -475,16 +638,36 @@ ${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType 
   const base = {
     model,
     instructions,
-    tools: CHATBOT_TOOL_DEFS,
     max_output_tokens: usesReasoning ? MAX_OUTPUT_TOKENS.reasoning : MAX_OUTPUT_TOKENS.plain,
     // 추론 모델은 temperature 를 받지 않는다(400). 옛 모델로 되돌렸을 때만 낮은 온도를 준다
     ...(usesReasoning ? { reasoning: { effort: reasoning } } : { temperature: 0.1 }),
   };
   const usage: Usage = { calls: 0, input: 0, cached: 0, output: 0, reasoning: 0 };
+  // 인터넷 검색은 보관함·고장이력 조회를 마친 뒤에만 붙인다(WEB_SEARCH_TOOL 주석). 모델·계정이 web_search 를
+  // 받지 않으면(400) 이번 질문 동안은 빼고 다시 묻는다 — 인터넷 검색이 안 된다고 답 전체가 실패하면 안 된다.
+  let webAllowed = process.env.CHATBOT_WEB_SEARCH !== "false";
+  let archiveSearched = false;
+  const sources: WebSource[] = [];
+  const foundDocs = new Map<string, FoundDoc>();
   const create = async (
     body: Pick<OpenAI.Responses.ResponseCreateParamsNonStreaming, "input" | "tool_choice" | "previous_response_id">,
-  ) => {
-    const r = await client.responses.create({ ...base, ...body, stream: false });
+  ): Promise<OpenAI.Responses.Response> => {
+    const withWeb = webAllowed && archiveSearched && body.tool_choice !== "none";
+    let r: OpenAI.Responses.Response;
+    try {
+      r = await client.responses.create({
+        ...base,
+        ...body,
+        tools: withWeb ? [...CHATBOT_TOOL_DEFS, WEB_SEARCH_TOOL] : CHATBOT_TOOL_DEFS,
+        stream: false,
+      });
+    } catch (err: any) {
+      if (!withWeb || Number(err?.status) !== 400) throw err;
+      console.error("[api/overhaul/chatbot] web_search 를 쓸 수 없어 빼고 다시 묻는다:", err?.message);
+      webAllowed = false;
+      return create(body);
+    }
+    collectWebSources(r, sources);
     usage.calls++;
     usage.input += r.usage?.input_tokens ?? 0;
     usage.cached += r.usage?.input_tokens_details?.cached_tokens ?? 0;
@@ -512,25 +695,14 @@ ${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType 
       calls.map(async (call) => {
         // 어떤 도구가 불렸는지만 남긴다(질문·결과 내용은 로그에 넣지 않는다)
         console.log("[api/overhaul/chatbot] tool:", call.name);
-        // 클라이언트가 보관함에서 이미 찾은 문서가 있으면 search_manuals 는 그 결과로 대신한다 —
-        // 같은 질문을 두 번 검색하지 않고, 서버에 보관함 키가 없는 환경에서도 같은 근거로 답하게 된다.
         const output =
           call.name === "search_manuals" && documents && documents.length
-            ? JSON.stringify({
-                shown: documents.length,
-                note: "화면이 보관함에서 미리 검색한 결과(답변 아래 카드로 표시됨). 본문이 필요하면 id 로 read_document 를 호출한다.",
-                items: documents.map((d) => ({
-                  id: d.id,
-                  doc_type: d.docType,
-                  title: d.title,
-                  branch: d.branch,
-                  field: d.field,
-                  snippet: d.snippet,
-                })),
-              })
+            ? await searchManualsWithPrefetched(call.arguments, branch, documents)
             : await runChatbotTool(call.name, call.arguments, branch);
         if (memory.lookups.length < 8) memory.lookups.push({ tool: call.name, args: (call.arguments || "{}").slice(0, 200) });
+        if (ARCHIVE_TOOLS.has(call.name)) archiveSearched = true;
         collectTargets(call.name, output, memory);
+        collectFoundDocs(call.name, output, foundDocs);
         return { type: "function_call_output" as const, call_id: call.call_id, output };
       }),
     );
@@ -542,8 +714,17 @@ ${documents.map((d, i) => `${i + 1}. ${d.id ? `(id=${d.id}) ` : ""}[${d.docType 
     });
   }
 
-  const text = response.output_text;
-  return { text: typeof text === "string" ? text.trim() : "", memory, usage };
+  // 인터넷 검색을 쓰면 모델이 본문에 "([사이트](주소))" 꼴의 출처 표시를 넣는다 — 화면은 마크다운을 그리지 않아
+  // 주소가 그대로 보이므로 떼어 낸다(출처는 sources 로 따로 보낸다).
+  const text = typeof response.output_text === "string" ? stripInlineCitations(response.output_text).trim() : "";
+  // 미리보기 카드: 본문을 읽은 문서 + 답변에 제목이 나온 문서만 — 검색에만 걸리고 답에 쓰이지 않은 문서는 빼서
+  // "인터넷 자료로 안내드려요" 같은 답 아래에 무관한 카드가 붙지 않게 한다. 읽은 문서를 앞에 둔다.
+  const docs = [...foundDocs.values()]
+    .filter((d) => d.read || mentionedIn(text, d.title))
+    .sort((a, b) => Number(b.read) - Number(a.read))
+    .slice(0, MAX_FOUND_DOCS)
+    .map(({ read: _read, ...d }) => d);
+  return { text, memory, usage, sources, docs };
 }
 
 export async function POST(req: Request) {
@@ -585,7 +766,7 @@ export async function POST(req: Request) {
 
   const started = Date.now();
   try {
-    const { text: raw, memory, usage } = await callOpenAI({
+    const { text: raw, memory, usage, sources, docs } = await callOpenAI({
       message,
       history,
       context,
@@ -608,6 +789,10 @@ export async function POST(req: Request) {
       scope: branch ?? "전 지사",
       scopeAsked: branchRequested,
       memory,
+      // sources: 인터넷 자료로 답했을 때의 출처 — 화면이 답변 아래 링크로 보여 준다(없으면 빈 배열)
+      sources,
+      // docs: 도구로 찾아 답에 쓴 보관함 문서(고장보고서·매뉴얼) — 화면이 미리보기 카드로 보여 준다
+      docs,
       ...(dev ? { meta: { model, reasoning, ms: Date.now() - started, usage } } : {}),
     });
   } catch (err: any) {

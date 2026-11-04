@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, Icon, RequiredMark, InlineError } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
-import VoiceSequenceFill, { type VoiceField } from "@/shared/components/VoiceSequenceFill";
+import { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
 import { DEPARTMENTS } from "../lib/constants";
+import type { StatusIssueRow } from "../lib/repo";
 import { PhotoPicker, type PickedPhoto } from "./StatusPhotos";
 
 const SORTED_BRANCHES = [...BRANCHES].sort((a, b) => a.localeCompare(b, "ko"));
@@ -41,25 +42,74 @@ const EMPTY: FormState = {
  * 올라가고, 유지보수 담당자가 거기서 조치 상태를 갱신한다. 폰에서도 쓰므로 한 열로 쌓는다.
  *
  * 지사·담당부서는 내 지사·부서(처음 접속 시 고른 값)로 미리 채운다 — 매번 다시 고르지 않게.
+ *
+ * editing 이 오면(현황 조회의 [수정]) 저장된 내용·사진을 채워 열고, 저장하면 그 현황을 고친다(PUT).
+ * 저장된 사진은 data URL 로 다시 받아 새로 고른 사진과 같이 다룬다 — 빼거나 더한 결과 전부를 보내
+ * 서버가 사진을 통째로 바꾼다.
  */
 export default function StatusRegisterForm({
   initialBranch,
   initialDepartment,
+  editing,
 }: {
   /** 내 지사·부서(처음 접속 시 고른 값) — 지사·담당부서를 미리 채운다 */
   initialBranch: string;
   initialDepartment: string;
+  /** 수정할 현황과 그 사진 id 목록 — 없으면 새로 등록 */
+  editing?: { row: StatusIssueRow; photoIds: number[] };
 }) {
-  const [form, setForm] = useState<FormState>({
-    ...EMPTY,
-    branch: initialBranch,
-    department: initialDepartment,
-  });
+  const editRow = editing?.row;
+  const [form, setForm] = useState<FormState>(
+    editRow
+      ? {
+          branch: editRow.branch ?? "",
+          equipmentName: editRow.equipment_name,
+          content: editRow.content,
+          department: editRow.department,
+          reporter: editRow.reporter,
+        }
+      : { ...EMPTY, branch: initialBranch, department: initialDepartment },
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<FormState | null>(null);
   /** 첨부 사진(선택) — 브라우저에서 줄인 data URL */
   const [photos, setPhotos] = useState<PickedPhoto[]>([]);
+  /** 수정할 때 저장된 사진을 아직 받는 중인지 — 다 받기 전에 저장하면 사진이 빠진 채로 덮어쓴다 */
+  const [loadingPhotos, setLoadingPhotos] = useState(Boolean(editing?.photoIds.length));
+
+  const editPhotoKey = editing?.photoIds.join(",") ?? "";
+  useEffect(() => {
+    const ids = editPhotoKey ? editPhotoKey.split(",").map(Number) : [];
+    if (ids.length === 0) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const loaded = await Promise.all(
+          ids.map(async (id): Promise<PickedPhoto> => {
+            const res = await fetch(`/api/status/photos/one?id=${id}`);
+            if (!res.ok) throw new Error("저장된 사진을 불러오지 못했습니다.");
+            const blob = await res.blob();
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const r = new FileReader();
+              r.onload = () => resolve(String(r.result));
+              r.onerror = () => reject(new Error("저장된 사진을 읽지 못했습니다."));
+              r.readAsDataURL(blob);
+            });
+            return { key: `saved-${id}`, dataUrl, note: "저장된 사진" };
+          }),
+        );
+        if (alive) setPhotos(loaded);
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "저장된 사진을 불러오지 못했습니다.");
+      } finally {
+        if (alive) setLoadingPhotos(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [editPhotoKey]);
   /** 이슈는 저장됐지만 사진만 못 저장했을 때의 안내(예: 배포 DB 에 사진 테이블이 아직 없음) */
   const [photoWarning, setPhotoWarning] = useState<string | null>(null);
   const [donePhotoCount, setDonePhotoCount] = useState(0);
@@ -78,7 +128,7 @@ export default function StatusRegisterForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (saving) return;
+    if (saving || loadingPhotos) return;
 
     // 브라우저 기본 말풍선 대신 직접 검사한다 — 비어 있는 칸을 모두 붉게 보이고 첫 칸으로 이동한다
     const missing = (Object.keys(LABELS) as (keyof FormState)[]).filter(empty);
@@ -92,70 +142,30 @@ export default function StatusRegisterForm({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/status/issues", {
-        method: "POST",
+      const res = await fetch(editRow ? `/api/status/issues/${editRow.id}` : "/api/status/issues", {
+        method: editRow ? "PUT" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...form, photos: photos.map((p) => p.dataUrl) }),
       });
       const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "등록하지 못했습니다.");
+      if (!json.ok) throw new Error(json.error || (editRow ? "수정하지 못했습니다." : "등록하지 못했습니다."));
       setPhotoWarning(typeof json.photoWarning === "string" ? json.photoWarning : null);
       setDonePhotoCount(typeof json.photosSaved === "number" ? json.photosSaved : 0);
       setDone(form);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "등록하지 못했습니다.");
+      setError(err instanceof Error ? err.message : editRow ? "수정하지 못했습니다." : "등록하지 못했습니다.");
     } finally {
       setSaving(false);
     }
   }
 
-  /** 음성으로 한 번에 채울 칸 순서 — 화면에 보이는 순서(지사 → 담당부서 → 설비명 →
-   * 작성자 → 이슈 내용)와 같다(매뉴얼 작성 쪽과 같은 방식·같은 부품을 쓴다). */
-  const voiceFields: VoiceField[] = [
-    {
-      key: "branch",
-      label: "지사",
-      kind: "short",
-      options: SORTED_BRANCHES,
-      setValue: (v) => set("branch", v),
-      getElement: () => document.getElementById("statusBranch"),
-    },
-    {
-      key: "department",
-      label: "담당부서",
-      kind: "short",
-      options: DEPARTMENTS,
-      setValue: (v) => set("department", v),
-      getElement: () => document.getElementById("statusDepartment"),
-    },
-    {
-      key: "equipmentName",
-      label: "설비명",
-      kind: "short",
-      setValue: (v) => set("equipmentName", v),
-      getElement: () => document.getElementById("statusEquipmentName"),
-    },
-    {
-      key: "reporter",
-      label: "작성자",
-      kind: "short",
-      setValue: (v) => set("reporter", v),
-      getElement: () => document.getElementById("statusReporter"),
-    },
-    {
-      key: "content",
-      label: "이슈 내용",
-      kind: "long",
-      setValue: (v) => set("content", v),
-      getElement: () => document.getElementById("statusContent"),
-    },
-  ];
-
   if (done) {
     return (
       <Card lift={false} className="p-8 flex flex-col items-center text-center gap-3">
         <Icon name="check_circle" className="text-4xl text-status-success-text" />
-        <p className="text-title-sm font-bold text-on-surface">현황이 등록되었습니다</p>
+        <p className="text-title-sm font-bold text-on-surface">
+          {editRow ? "현황을 수정했습니다" : "현황이 등록되었습니다"}
+        </p>
         <p className="text-sm text-on-surface-variant">
           {done.branch} · {done.equipmentName} · {done.department}
           {donePhotoCount > 0 && ` · 사진 ${donePhotoCount}장`}
@@ -167,23 +177,27 @@ export default function StatusRegisterForm({
           </p>
         )}
         <p className="text-sm text-on-surface-variant">
-          현황 조회에 &lsquo;미완료&rsquo;로 올라가며, 유지보수 담당자가 조치 상태를 갱신합니다.
+          {editRow
+            ? "고친 내용이 현황 조회에 바로 반영됩니다. 조치 상태는 그대로입니다."
+            : "현황 조회에 ‘미완료’로 올라가며, 유지보수 담당자가 조치 상태를 갱신합니다."}
         </p>
         <div className="flex flex-wrap justify-center gap-2 mt-2">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              // 지사·부서·작성자는 같은 근무자가 이어서 등록하는 경우가 많아 남겨 둔다
-              setForm({ ...EMPTY, branch: done.branch, department: done.department, reporter: done.reporter });
-              setAttempted(false);
-              setTouched({});
-              setPhotos([]);
-              setPhotoWarning(null);
-              setDone(null);
-            }}
-          >
-            <Icon name="add" className="text-base" /> 이어서 등록
-          </Button>
+          {!editRow && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                // 지사·부서·작성자는 같은 근무자가 이어서 등록하는 경우가 많아 남겨 둔다
+                setForm({ ...EMPTY, branch: done.branch, department: done.department, reporter: done.reporter });
+                setAttempted(false);
+                setTouched({});
+                setPhotos([]);
+                setPhotoWarning(null);
+                setDone(null);
+              }}
+            >
+              <Icon name="add" className="text-base" /> 이어서 등록
+            </Button>
+          )}
           <Link
             href="/status"
             className="px-4 py-2.5 rounded-sm font-bold text-sm inline-flex items-center gap-2 bg-primary text-on-primary hover:opacity-90"
@@ -198,9 +212,6 @@ export default function StatusRegisterForm({
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       <Card lift={false} className="p-6 flex flex-col gap-4">
-        <div className="flex justify-end">
-          <VoiceSequenceFill fields={voiceFields} title="음성으로 현황 작성하기" />
-        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-bold text-on-surface-variant">
@@ -244,54 +255,60 @@ export default function StatusRegisterForm({
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="statusEquipmentName" className="text-xs font-bold text-on-surface-variant">
               설비명
               <RequiredMark />
-            </span>
-            <input aria-label="예: 1호기 순환펌프"
-              id="statusEquipmentName"
-              value={form.equipmentName}
-              onChange={(e) => set("equipmentName", e.target.value)}
-              placeholder="예: 1호기 순환펌프"
-              className="input"
-              onBlur={() => touch("equipmentName")}
-              aria-invalid={invalid("equipmentName")}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">
+            </label>
+            <WithVoiceInput field={{ label: "설비명", kind: "short" }} onResult={(v) => set("equipmentName", v)}>
+              <input aria-label="예: 1호기 순환펌프"
+                id="statusEquipmentName"
+                value={form.equipmentName}
+                onChange={(e) => set("equipmentName", e.target.value)}
+                placeholder="예: 1호기 순환펌프"
+                className="input"
+                onBlur={() => touch("equipmentName")}
+                aria-invalid={invalid("equipmentName")}
+              />
+            </WithVoiceInput>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="statusReporter" className="text-xs font-bold text-on-surface-variant">
               작성자
               <RequiredMark />
-            </span>
-            <input aria-label="이름을 입력하세요."
-              id="statusReporter"
-              value={form.reporter}
-              onChange={(e) => set("reporter", e.target.value)}
-              placeholder="이름을 입력하세요."
-              className="input"
-              onBlur={() => touch("reporter")}
-              aria-invalid={invalid("reporter")}
-            />
-          </label>
+            </label>
+            <WithVoiceInput field={{ label: "작성자", kind: "short" }} onResult={(v) => set("reporter", v)}>
+              <input aria-label="이름을 입력하세요."
+                id="statusReporter"
+                value={form.reporter}
+                onChange={(e) => set("reporter", e.target.value)}
+                placeholder="이름을 입력하세요."
+                className="input"
+                onBlur={() => touch("reporter")}
+                aria-invalid={invalid("reporter")}
+              />
+            </WithVoiceInput>
+          </div>
         </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold text-on-surface-variant">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="statusContent" className="text-xs font-bold text-on-surface-variant">
               이슈 내용
               <RequiredMark />
-            </span>
-          <textarea
-            id="statusContent"
-            value={form.content}
-            onChange={(e) => set("content", e.target.value)}
-            rows={5}
-            placeholder="어떤 설비에서 무슨 일이 있었는지 적어 주세요."
-            className="input"
-            onBlur={() => touch("content")}
-            aria-invalid={invalid("content")}
-          />
-        </label>
+            </label>
+          <WithVoiceInput field={{ label: "이슈 내용", kind: "long" }} onResult={(v) => set("content", v)} multiline>
+            <textarea
+              id="statusContent"
+              value={form.content}
+              onChange={(e) => set("content", e.target.value)}
+              rows={5}
+              placeholder="어떤 설비에서 무슨 일이 있었는지 적어 주세요."
+              className="input"
+              onBlur={() => touch("content")}
+              aria-invalid={invalid("content")}
+            />
+          </WithVoiceInput>
+        </div>
 
         <PhotoPicker photos={photos} onChange={setPhotos} onError={setError} />
       </Card>
@@ -300,9 +317,25 @@ export default function StatusRegisterForm({
         <InlineError>{error}</InlineError>
       )}
 
-      <div className="flex justify-end pb-6">
-        <Button type="submit" variant="primary" disabled={saving} className="max-sm:w-full">
-          {saving ? "작성 중…" : "현황 작성"}
+      <div className="flex justify-end gap-2 pb-6">
+        {editRow && (
+          <Link
+            href="/status"
+            className="px-4 py-2.5 rounded-sm font-bold text-sm inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high max-sm:flex-1"
+          >
+            취소
+          </Link>
+        )}
+        <Button type="submit" variant="primary" disabled={saving || loadingPhotos} className="max-sm:flex-1">
+          {loadingPhotos
+            ? "사진 불러오는 중…"
+            : editRow
+              ? saving
+                ? "수정 중…"
+                : "현황 수정"
+              : saving
+                ? "작성 중…"
+                : "현황 작성"}
         </Button>
       </div>
     </form>
