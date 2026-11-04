@@ -86,6 +86,40 @@ function cacheFirst(request) {
   });
 }
 
+/* 웹 푸시 — 서버(src/shared/lib/push.ts)가 보낸 payload 를 기기 알림으로 띄운다.
+ * 앱(브라우저)이 꺼져 있어도 이 워커가 깨어나 알림을 그린다. payload 가 깨져도
+ * 빈 알림이라도 띄운다 — 푸시를 받고 알림을 안 띄우면 브라우저가 구독을 끊을 수 있다. */
+self.addEventListener('push', function (event) {
+  var data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) {}
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'PIMS 알림', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: data.tag || undefined,          // 같은 현황의 알림은 겹치지 않고 갱신
+      data: { url: data.url || '/' }
+    })
+  );
+});
+
+/* 알림을 누르면 해당 현황으로 — 이미 열린 창이 있으면 그 창을 옮기고, 없으면 새로 연다 */
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+  var url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        if ('focus' in c && 'navigate' in c) {
+          return c.navigate(url).then(function (w) { return (w || c).focus(); });
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener('fetch', function (event) {
   var request = event.request;
   if (request.method !== 'GET') return;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, EmptyState, Icon } from "@/shared/components/ui";
 import { getCurrentUser } from "@/shared/lib/currentUser";
 import { AccountButton } from "@/shared/components/ProfileGate";
+import PushOptIn from "@/shared/components/PushOptIn";
 import {
   OPERATIONS_DEPARTMENT,
   isMaintenanceDepartment,
@@ -82,6 +83,8 @@ async function OperationsHome({ branch }: { branch: string | null }) {
         <Icon name="arrow_forward" className="ml-auto text-3xl shrink-0" />
       </Link>
 
+      <PushOptIn description="올린 현황이 조치 완료되면 이 기기로 알림이 옵니다." />
+
       {summary.error ? (
         <StatusError summary={summary} />
       ) : (
@@ -111,6 +114,8 @@ async function MaintenanceHome({
   return (
     <div className="space-y-gutter">
       <Header title={`${branch ?? "전체 지사"} ${department} 현황`} />
+
+      <PushOptIn description={`운영부가 ${department} 담당 현황을 올리면 이 기기로 알림이 옵니다.`} />
 
       {summary.error ? (
         <StatusError summary={summary} />

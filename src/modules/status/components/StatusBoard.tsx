@@ -49,10 +49,13 @@ const SELECT_CLASS =
 export default function StatusBoard({
   initialBranch,
   initialDepartment,
+  initialIssueId,
 }: {
   /** 내 지사·부서(처음 접속 시 고른 값) — 처음에는 이 조건으로 걸러 보여 준다 */
   initialBranch: string;
   initialDepartment: string;
+  /** ?issue=<id> — 푸시 알림·새 현황 팝업에서 눌러 들어오면 그 건의 조치 창을 바로 연다 */
+  initialIssueId?: string;
 }) {
   const [filters, setFilters] = useState<Filters>({
     ...EMPTY_FILTERS,
@@ -123,6 +126,21 @@ export default function StatusBoard({
     const t = setTimeout(() => void load(filters), filters.q ? 250 : 0);
     return () => clearTimeout(t);
   }, [filters, load]);
+
+  // 알림(푸시·팝업)을 눌러 들어온 경우 — 그 건을 필터와 무관하게 따로 불러 조치 창을 연다.
+  // 주소의 ?issue= 는 바로 지운다: 남겨 두면 창을 닫고 새로고침할 때마다 다시 열린다.
+  useEffect(() => {
+    if (!initialIssueId) return;
+    window.history.replaceState(null, "", "/status");
+    void (async () => {
+      try {
+        const json = await (await fetch(`/api/status/issues/${initialIssueId}`)).json();
+        if (json.ok && json.row) setSelected(json.row);
+      } catch {
+        /* 지워진 현황이면 목록만 보인다 */
+      }
+    })();
+  }, [initialIssueId]);
 
   async function remove(row: StatusIssueRow) {
     setDeletingId(row.id);

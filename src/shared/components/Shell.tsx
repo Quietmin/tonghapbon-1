@@ -7,6 +7,7 @@ import MobileNav from "./MobileNav";
 import ChatbotDock from "./ChatbotDock";
 import { ProfileProvider } from "./ProfileGate";
 import { ToastProvider } from "./Toast";
+import StatusAlarm from "./StatusAlarm";
 import { useSidebar } from "./SidebarState";
 
 /**
@@ -47,6 +48,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </main>
       <MobileNav />
       <ChatbotDock />
+      {/* 새 현황 팝업·앱 배지 — 어느 화면에서나 떠야 해서 여기 한 번만 */}
+      <StatusAlarm />
     </div>
     </ToastProvider>
     </ProfileProvider>

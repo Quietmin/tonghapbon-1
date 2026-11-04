@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import {
   addIssuePhotos,
   countByStatus,
   createIssue,
+  getIssue,
   listIssues,
   type IssueFilter,
 } from "@/modules/status/lib/repo";
 import { parseIssueBody } from "@/modules/status/lib/issueInput";
+import { notifyIssueCreated } from "@/shared/lib/push";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,13 @@ export async function POST(req: Request) {
         photoWarning = "현황은 등록됐지만 사진은 저장하지 못했습니다. 관리자에게 알려 주세요.";
       }
     }
+    // 담당부서 기기들로 푸시 — 응답을 먼저 보내고(after) 뒤에서 발송한다.
+    // 발송 실패는 notifyIssueCreated 가 삼키므로 등록 자체에는 영향이 없다.
+    after(async () => {
+      const row = await getIssue(id).catch(() => null);
+      if (row) await notifyIssueCreated(row);
+    });
+
     return NextResponse.json({ ok: true, id, photosSaved, photoWarning }, { status: 201 });
   } catch (e) {
     return fail(e instanceof Error ? e.message : String(e), 500);
