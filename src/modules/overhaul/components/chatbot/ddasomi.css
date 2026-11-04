@@ -68,6 +68,16 @@
   top: -11%;
 }
 
+/* 따소미 이미지는 PC 에서 마우스로 끌면 브라우저가 "이미지 끌어다 놓기"를 시작해 버린다
+   (dragstart → pointercancel). 그러면 플로팅 버튼·헤더를 끌어 옮기던 동작이 중간에 끊긴다 —
+   이미지 자체의 끌기와 선택을 막는다(JSX 의 draggable={false} 와 같은 목적, 이중 안전장치). */
+.ddasomi-face-crop__img,
+.ddasomi-msg-avatar__img {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* 대화창 안 assistant 메시지 아바타 — 돋보기 든 따소미(ddasomi-search.png)를 상반신
    위주로 확대해서 보여준다. 수치는 이미지의 실제 내용 영역(캔버스 픽셀 스캔으로 측정,
    얼굴·헬멧·돋보기·상반신이 전부 들어오고 귀·돋보기가 잘리지 않는 지점)을 기준으로 잡았다 —

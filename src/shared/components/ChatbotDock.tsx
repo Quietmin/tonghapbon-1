@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -196,6 +197,7 @@ const DRAG_CLICK_THRESHOLD = 6;
  */
 function useDraggablePosition() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [posLoaded, setPosLoaded] = useState(false);
   const elRef = useRef<HTMLDivElement | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
@@ -218,6 +220,8 @@ function useDraggablePosition() {
       if (typeof parsed.x === "number" && typeof parsed.y === "number") setPos({ x: parsed.x, y: parsed.y });
     } catch {
       /* 저장된 위치를 못 읽어도 기본 자리(0,0)로 그냥 동작한다 */
+    } finally {
+      setPosLoaded(true);
     }
   }, []);
 
@@ -298,13 +302,16 @@ function useDraggablePosition() {
         // justDraggedRef 는 도크 전체(열기 버튼·최소화·닫기)가 같이 쓴다. 막아야 하는
         // 건 딱 하나 — 드래그를 끝낸 바로 그 pointerup 이 만드는 "유령 클릭"뿐이다
         // (마우스를 떼면 브라우저가 같은 동작 안에서 바로 click 을 하나 더 쏜다).
-        // 그 유령 클릭은 pointerup 과 같은 동기 작업 안에서 일어나므로, microtask 로
-        // 미뤄 끄면 그 클릭이 지나간 *바로 다음*에 풀린다 — 시간을 정해 두면(예:
-        // 300ms) 그 안에 사용자가 다른 버튼(예: 헤더를 끌고 바로 닫기)을 눌러도 같이
-        // 막혀 버리는데, microtask 는 그 문제가 없다.
-        queueMicrotask(() => {
+        // 그 유령 클릭은 pointerup·mouseup 과 같은 작업(task) 안에서 이어서 일어난다.
+        // microtask 로 풀면 안 된다 — microtask 는 이벤트 리스너 하나가 끝날 때마다
+        // 바로 돌아서, PC 마우스에서는 click 이 오기 *전*에 풀려 버려 끌고 나면 창이
+        // 열렸다(실제 재현함; 폰 터치는 끌면 click 자체가 안 와서 드러나지 않았다).
+        // setTimeout(0) 은 다음 작업에서 돌므로 유령 클릭이 지나간 바로 뒤에 풀린다 —
+        // 시간을 길게(예: 300ms) 잡으면 그 사이 다른 버튼(헤더를 끌고 바로 닫기 등)
+        // 누르기까지 막히는데, 0ms 는 그 문제가 없다.
+        setTimeout(() => {
           justDraggedRef.current = false;
-        });
+        }, 0);
         try {
           localStorage.setItem(DOCK_POS_KEY, JSON.stringify(lastPosRef.current));
         } catch {
@@ -318,6 +325,14 @@ function useDraggablePosition() {
     },
     [clamp],
   );
+
+  const reclamp = useCallback(() => {
+    const p = posRef.current;
+    const next = clamp(p.x, p.y);
+    if (next.x === p.x && next.y === p.y) return;
+    lastPosRef.current = next;
+    setPos(next);
+  }, [clamp]);
 
   /** 버튼 onClick 맨 앞에서 부른다 — true 면 방금 드래그였다는 뜻이니 열기 동작을 건너뛴다 */
   const consumeDraggedFlag = useCallback(() => {
@@ -343,6 +358,9 @@ function useDraggablePosition() {
     // move/up/cancel 을 요소에 따로 걸 필요가 없다.
     dragHandlers: { onPointerDown },
     consumeDraggedFlag,
+    /** 지금 자리를 화면 안으로 다시 당긴다 — 작은 버튼 ↔ 큰 패널로 바뀌어 크기가 달라진 직후에 부른다 */
+    reclamp,
+    posLoaded,
   };
 }
 
@@ -383,6 +401,17 @@ export default function ChatbotDock() {
   const [preview, setPreview] = useState<{ title: string; previewUrl: string; downloadUrl: string } | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const drag = useDraggablePosition();
+  // 버튼과 패널은 같은 끌기 좌표를 쓴다. 작은 버튼을 화면 위쪽으로 옮겨 둔 채 열면 훨씬 큰
+  // 패널이 그 좌표만큼 밀려 머리(헤더·닫기)가 화면 밖으로 나가 버린다 — 모양이 바뀐 직후
+  // (그리기 전에) 화면 안으로 다시 당긴다.
+  // 폰 폭의 시트는 끌기 좌표를 아예 적용하지 않으므로(ddasomi.css) 당길 것도 없다 — 거기서
+  // clamp 를 돌리면 옮겨지지 않은 시트를 기준으로 계산해 좌표만 망가진다.
+  // posLoaded: 저장해 둔 자리를 읽어 온 뒤에도 한 번 당긴다(열린 채로 새로 고친 경우).
+  const { reclamp, posLoaded } = drag;
+  useLayoutEffect(() => {
+    if (state === "open" && window.innerWidth < 768) return;
+    reclamp();
+  }, [state, reclamp, posLoaded]);
 
   /** 검색 결과 카드를 탭했을 때 — 보관함 조회 화면(ArchiveBrowser)과 같은 방식으로 서명 URL 둘을 받아 모달로 연다 */
   async function openMatch(m: DocMatch) {
@@ -475,8 +504,11 @@ export default function ChatbotDock() {
       <div
         ref={drag.elRef}
         style={drag.style}
-        className="print:hidden fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[200] flex flex-col items-end gap-3 touch-none"
+        className="print:hidden fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[200] flex flex-col items-end gap-3 touch-none select-none"
         {...drag.dragHandlers}
+        // PC 마우스로 끌 때 브라우저의 기본 "끌어다 놓기"(이미지·글자)가 시작되면 pointercancel 이
+        // 와서 옮기기가 끊긴다 — 안쪽 무엇이든 기본 끌기는 시작하지 않게 막는다.
+        onDragStart={(e) => e.preventDefault()}
       >
         {/* 말풍선 — 버튼과 같이 눌리도록 클릭 영역을 공유한다. 폰에서는 버튼을 작게(56px) 하고 말풍선은
             감춘다 — 큰 버튼과 말풍선이 현황 목록 같은 본문을 가리는 데 대한 조정(PC 는 그대로 2배 크기) */}
@@ -504,7 +536,7 @@ export default function ChatbotDock() {
           className="w-14 h-14 md:w-28 md:h-28 rounded-full bg-primary shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
         >
           <span className="ddasomi-face-crop w-full h-full">
-            <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img ddasomi-idle-anim" />
+            <img src="/ddasomi-default.png" alt="" draggable={false} className="ddasomi-face-crop__img ddasomi-idle-anim" />
           </span>
         </button>
       </div>
@@ -531,7 +563,8 @@ export default function ChatbotDock() {
       ].join(" ")}
     >
       <header
-        className="flex items-center gap-2 px-4 h-12 border-b border-border-subtle shrink-0 md:cursor-grab md:active:cursor-grabbing"
+        className="flex items-center gap-2 px-4 h-12 border-b border-border-subtle shrink-0 select-none md:cursor-grab md:active:cursor-grabbing"
+        onDragStart={(e) => e.preventDefault()}
         onPointerDown={(e) => {
           // 폰 폭에서는 시트 자체를 끌지 않는다 — pointerType 이 아니라 화면 폭으로
           // 가른다(마우스를 쓰는 좁은 창도 있을 수 있어서).
@@ -540,7 +573,7 @@ export default function ChatbotDock() {
         }}
       >
         <span className="ddasomi-face-crop w-7 h-7 shrink-0">
-          <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img" />
+          <img src="/ddasomi-default.png" alt="" draggable={false} className="ddasomi-face-crop__img" />
         </span>
         <span className="text-title-sm text-on-surface flex-1 truncate">정비 챗봇 (따소미)</span>
 
@@ -590,7 +623,7 @@ export default function ChatbotDock() {
         {msgs.length === 0 ? (
           <div className="m-auto text-center px-2">
             <span className="ddasomi-face-crop w-16 h-16 mx-auto block">
-              <img src="/ddasomi-default.png" alt="" className="ddasomi-face-crop__img" />
+              <img src="/ddasomi-default.png" alt="" draggable={false} className="ddasomi-face-crop__img" />
             </span>
             <p className="text-sm font-bold text-on-surface mt-2">안녕하세요! 따소미예요 👋</p>
             <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
@@ -631,7 +664,7 @@ export default function ChatbotDock() {
             return (
               <div key={m.id} className="max-w-[92%] self-start flex items-start gap-2">
                 <span className={`ddasomi-msg-avatar w-11 h-11 shrink-0 mt-0.5 ${isLatestBot ? "ddasomi-lookaround-anim" : ""}`}>
-                  <img src="/ddasomi-search.png" alt="" className="ddasomi-msg-avatar__img" />
+                  <img src="/ddasomi-search.png" alt="" draggable={false} className="ddasomi-msg-avatar__img" />
                 </span>
                 <div className="flex flex-col gap-1.5 min-w-0">
                   {/* 어느 지사 범위로 조회한 답인지 — 내 지사와 질문 속 지사가 다를 수 있어 늘 밝힌다 */}
