@@ -15,6 +15,7 @@ import {
 } from "@/shared/lib/tableStyle";
 import { useToast } from "@/shared/components/Toast";
 import { DELETE_PASSWORD } from "@/shared/lib/deletePassword";
+import { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
 import { DEPARTMENTS, STATUS_LABELS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { formatDate, formatDateTime } from "./badges";
@@ -575,16 +576,23 @@ export function UpdateDialog({
           })}
         </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold text-on-surface-variant">조치 내용</span>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={3}
-            placeholder="어떤 조치를 했는지, 또는 앞으로 할 계획을 적어 주세요."
-            className="input"
-          />
-        </label>
+        {/* 음성 입력 — 현황 작성 칸들과 같은 방식(다시 녹음하면 새로 받아쓴 글로 바뀐다).
+            버튼이 칸 앞에 오므로 <label> 로 감싸지 않는다(감싸면 제목을 누를 때 녹음이 켜진다) */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="statusActionNote" className="text-xs font-bold text-on-surface-variant">
+            조치 내용
+          </label>
+          <WithVoiceInput field={{ label: "조치 내용", kind: "long" }} onResult={setNote} multiline>
+            <textarea
+              id="statusActionNote"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="어떤 조치를 했는지, 또는 앞으로 할 계획을 적어 주세요."
+              className="input"
+            />
+          </WithVoiceInput>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
@@ -593,15 +601,20 @@ export function UpdateDialog({
             </span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
           </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold text-on-surface-variant">조치자</span>
-            <input aria-label="이름을 입력하세요."
-              value={by}
-              onChange={(e) => setBy(e.target.value)}
-              placeholder="이름을 입력하세요."
-              className="input"
-            />
-          </label>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="statusHandledBy" className="text-xs font-bold text-on-surface-variant">
+              조치자
+            </label>
+            <WithVoiceInput field={{ label: "조치자", kind: "short" }} onResult={setBy}>
+              <input aria-label="이름을 입력하세요."
+                id="statusHandledBy"
+                value={by}
+                onChange={(e) => setBy(e.target.value)}
+                placeholder="이름을 입력하세요."
+                className="input"
+              />
+            </WithVoiceInput>
+          </div>
         </div>
       </div>
 
