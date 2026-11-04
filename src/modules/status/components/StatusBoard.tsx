@@ -15,7 +15,7 @@ import {
 } from "@/shared/lib/tableStyle";
 import { useToast } from "@/shared/components/Toast";
 import { DELETE_PASSWORD } from "@/shared/lib/deletePassword";
-import { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
+import { VoiceScope, WithVoiceInput } from "@/shared/components/VoiceDictationButton";
 import { DEPARTMENTS, STATUS_LABELS, STATUS_OPTIONS, type IssueStatus } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { formatDate, formatDateTime } from "./badges";
@@ -538,6 +538,8 @@ export function UpdateDialog({
   // 팝업 틀(포털·Esc·스크롤 잠금·포커스)은 공통 Dialog 가 맡는다
   return (
     <Dialog onClose={onClose} labelledBy="statusDlgTitle">
+      {/* 조치 내용·조치자 음성 입력이 이 이슈의 설비명·내용과 현황 관리의 이전 기록 용어를 기준으로 받아쓰게 한다 */}
+      <VoiceScope menu="status" extraContext={`설비명: ${row.equipment_name}\n이슈 내용: ${row.content}`}>
       <DialogHeader
         id="statusDlgTitle"
         above={<StatusChip status={row.status} label={STATUS_LABELS[row.status]} />}
@@ -657,6 +659,7 @@ export function UpdateDialog({
           {saving ? "저장 중…" : "저장"}
         </Button>
       </div>
+      </VoiceScope>
     </Dialog>
   );
 }

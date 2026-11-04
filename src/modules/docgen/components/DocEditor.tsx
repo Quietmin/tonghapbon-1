@@ -33,7 +33,7 @@ import { A4Page, FaultA4Page, chunkFaultPages, chunkPages } from "./A4Preview";
 import { PageBanner } from "./Letterhead";
 import PhotoEditorModal, { type PhotoEditorResult } from "./PhotoEditorModal";
 import AutoTextarea from "./AutoTextarea";
-import VoiceDictationButton, { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
+import VoiceDictationButton, { VoiceScope, WithVoiceInput } from "@/shared/components/VoiceDictationButton";
 
 /**
  * 3개 모드(사진대장·매뉴얼·고장 보고서)가 공유하는 편집기.
@@ -1089,7 +1089,7 @@ export default function DocEditor({
   const effectiveScale = busy ? 1 : baseScale;
 
   return (
-    <>
+    <VoiceScope menu={mode}>
       <ScreenHeader
         icon="edit_note"
         title={`${MODE_TITLES[mode]} 작성`}
@@ -1341,7 +1341,7 @@ export default function DocEditor({
                     </div>
 
                     {"kind" in item ? (
-                      <div className="flex items-start gap-1.5 px-1 pt-1">
+                      <div className="flex items-start gap-1.5 px-1 pt-1" data-voice-row>
                         {/* 다시 녹음하면 이어 붙이지 않고 새로 받아쓴 글로 바꾼다 */}
                         <VoiceDictationButton
                           label="텍스트 칸 음성 입력"
@@ -1370,7 +1370,7 @@ export default function DocEditor({
                             }}
                           />
                         </div>
-                        <div className="flex items-start gap-1.5 px-1 pt-1">
+                        <div className="flex items-start gap-1.5 px-1 pt-1" data-voice-row>
                           {/* 다시 녹음하면 이어 붙이지 않고 새로 받아쓴 글로 바꾼다 */}
                           <VoiceDictationButton
                             label="사진 설명 음성 입력"
@@ -1621,6 +1621,6 @@ export default function DocEditor({
           </div>
         </Dialog>
       )}
-    </>
+    </VoiceScope>
   );
 }

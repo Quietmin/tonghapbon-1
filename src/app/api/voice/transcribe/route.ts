@@ -12,6 +12,13 @@
 // 정리 단계의 모델은 챗봇(OPENAI_MODEL)과 별도로 OPENAI_VOICE_CLEANUP_MODEL 로 고른다
 // — 음성 입력 쪽 모델을 바꿔도 챗봇 답변 품질에 영향이 없게 분리했다.
 import { NextResponse } from "next/server";
+import {
+  getMenuVocabulary,
+  parseVoiceMenu,
+  VOICE_MENU_LABELS,
+  type MenuVocabulary,
+  type VoiceMenu,
+} from "./menuVocabulary";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -28,6 +35,10 @@ const MAX_FIELD_LABEL_LEN = 60;
 const MAX_OPTIONS = 30;
 /** 호출부가 보낸 maxChars 가 너무 크거나 이상해도 이 선을 넘지 않게 묶어 둔다 */
 const MAX_CHARS_CAP = 300;
+/** 호출부가 보내는 "양식에 이미 적힌 글" 상한 — 프롬프트가 지나치게 길어지지 않게 */
+const MAX_FORM_CONTEXT = 1500;
+/** STT keywords 20개 중 메뉴 이전 기록 용어에 내주는 자리 — 나머지는 보기·플랜트 용어 */
+const MENU_KEYWORD_SLOTS = 10;
 
 function fail(status: number, reason: string) {
   return NextResponse.json({ ok: false, reason }, { status });
@@ -110,7 +121,38 @@ const PLANT_KEYWORDS = [
 ];
 const MAX_KEYWORDS = 20;
 
-function buildCleanupPrompt(fieldLabel: string, kind: "short" | "long", raw: string, maxChars?: number): string {
+/** 메뉴·이전 기록·작성 중인 양식 — 정리 단계가 표기를 고를 때 기준으로 삼는 맥락 */
+interface VoiceContext {
+  menu: VoiceMenu | null;
+  vocab: MenuVocabulary;
+  formContext: string;
+}
+
+/**
+ * [지침] 메뉴별 이전 기록 우선 — 현황 작성·고장보고서 작성·매뉴얼 작성에서 받아쓴 말은 그 메뉴에서
+ * 예전에 작성·출력된 글에 실제로 쓰인 용어와, 지금 작성 중인 양식에 이미 적힌 글을 기준으로 추론하고
+ * 맥락을 판단해 표기를 정한다(menuVocabulary.ts 머리말 참고). 같은 설비·기기는 기록과 같은 이름으로 써야
+ * 나중에 조회·검색(챗봇 보관함 검색 포함)에서 한데 묶인다.
+ */
+function buildContextBlock(ctx: VoiceContext | null): { block: string; rule: string } {
+  if (!ctx?.menu) return { block: "", rule: "" };
+  const lines: string[] = [`\n지금 쓰는 메뉴: ${VOICE_MENU_LABELS[ctx.menu]}`];
+  if (ctx.vocab.phrases.length) lines.push(`이 메뉴의 이전 기록에 쓰인 설비·기기·문서 이름(자주 쓰인 순): ${ctx.vocab.phrases.join(", ")}`);
+  if (ctx.vocab.terms.length) lines.push(`이 메뉴의 이전 기록에 자주 쓰인 용어: ${ctx.vocab.terms.join(", ")}`);
+  if (ctx.formContext) lines.push(`지금 작성 중인 양식에 이미 적힌 글(다른 칸들):\n"""\n${ctx.formContext}\n"""`);
+  const rule = `
+   메뉴·이전 기록 우선 — 위 "지금 쓰는 메뉴"의 이전 기록 용어와 "이미 적힌 글"을 이 받아쓰기의 1순위 기준으로 삼는다. 받아쓴 낱말이 그 목록의 이름·용어와 발음이 비슷하고 맥락에 맞으면 목록의 표기 그대로 맞춘다(띄어쓰기·영문 대소문자·하이픈까지 같게). 양식에 이미 적힌 설비·기기를 다시 가리키는 말이면 같은 이름으로 쓴다. 목록에 없는 말이면 일반 플랜트 용어로 추론한다. 단, 목록에 있다고 해서 원문에 없는 설비·내용을 보태지는 않는다.`;
+  return { block: lines.join("\n"), rule };
+}
+
+function buildCleanupPrompt(
+  fieldLabel: string,
+  kind: "short" | "long",
+  raw: string,
+  maxChars?: number,
+  ctx: VoiceContext | null = null,
+): string {
+  const { block: contextBlock, rule: contextRule } = buildContextBlock(ctx);
   const kindLine =
     kind === "long"
       ? `이 칸은 완성된 문장이 아니라 개조식으로 적는 칸이다. "-습니다/-했습니다" 같은 문장체 종결어미는 쓰지 말고, 명사형이나 "-함/-됨/-확인/-완료"처럼 핵심만 간결하게 끝맺어라. 여러 사실은 쉼표로 나열한다.`
@@ -122,7 +164,7 @@ function buildCleanupPrompt(fieldLabel: string, kind: "short" | "long", raw: str
   return `너는 한국어 음성 받아쓰기 결과를 양식 입력칸에 바로 넣을 수 있게 정리하는 도우미다. 입력을 그대로 돌려주는 것은 "정리"가 아니다 — 아래 규칙대로 반드시 다듬어서 JSON으로 출력해라.
 
 지금 채우려는 칸: "${fieldLabel}"
-${kindLine}${lengthLine}
+${kindLine}${lengthLine}${contextBlock}
 
 예시(다른 칸 기준 — 방식만 참고):
 칸: "작성자" / 원문: "어 작성자는 음 홍길동입니다" → text: "홍길동"
@@ -140,7 +182,7 @@ ${kindLine}${lengthLine}
 1. 사용자가 "${fieldLabel}는/은/이/가 ~~"처럼 칸 이름을 같이 말했으면, 그 이름을 말한 부분은 반드시 빼고 실제 내용만 남긴다.
 2. "음", "어", "그러니까" 같은 군더더기 말과 더듬거나 같은 말 반복은 반드시 지운다.
 3. 단어나 구절이 뜻이 안 통하거나 이 칸(${fieldLabel})의 맥락과 안 맞으면, 발음이 비슷해 잘못 받아적혔을 가능성을 추론해서 가장 말이 되는 표현으로 바로잡는다 — 이건 지어내는 게 아니라 교정이다.
-   ${PLANT_TERM_RULE}
+   ${PLANT_TERM_RULE}${contextRule}
 4. 다만 원문에 아예 등장하지 않은 새로운 사실·수치·이름·단위·날짜·부정(아니다/없다 등) 표현을 보태거나 뒤집지는 않는다(교정은 "있던 말을 더 말이 되게" 고치는 것까지만, 없던 정보를 만들어 내거나 뜻을 바꾸는 게 아니다).
 5. 결과는 JSON의 text 필드에 넣는다.${maxChars ? ` 글자 수 제한(${maxChars}자)을 꼭 지켜라.` : ""} 원문에 쓸 만한 내용이 전혀 없으면 text를 빈 문자열로 한다.`;
 }
@@ -190,11 +232,19 @@ const QUESTION_KEYWORDS = ["따소미", ...PLANT_KEYWORDS].slice(0, MAX_KEYWORDS
 /** STT 힌트 공통 문장 — 일상어보다 플랜트 용어로 받아적게 한다 */
 const PLANT_HINT = "의료·일상 낱말보다 설비 용어로 받아적는다(예: 단자번호·단자대·절연저항·계전기·차단기·접점·지락·트립·누유).";
 
-function buildTranscribeHint(fieldLabel: string, options: string[] | null, question = false): string {
+function buildTranscribeHint(
+  fieldLabel: string,
+  options: string[] | null,
+  question = false,
+  ctx: VoiceContext | null = null,
+): string {
   if (question) {
     return `발전소·지역난방 설비 정비 담당자가 챗봇에게 묻는 질문을 받아쓰는 중이다. 고장 사례·매뉴얼·현황을 찾는 말이 많고, SFC·GT·BFP·DCS 같은 영문 약어와 설비명·지사명이 섞인 구어체 한국어다. ${PLANT_HINT}`;
   }
-  const base = `설비 점검·정비 현장에서 "${fieldLabel}" 칸에 들어갈 말을 받아쓰는 중이다. 설비명·지사명·전문 용어가 섞인 구어체 한국어 문장일 수 있다. ${PLANT_HINT}`;
+  const menuLine = ctx?.menu
+    ? ` 메뉴는 ${VOICE_MENU_LABELS[ctx.menu]}이고${ctx.vocab.phrases.length ? `, 이전 기록에 나온 이름: ${ctx.vocab.phrases.slice(0, 12).join(", ")}` : ""}.`
+    : "";
+  const base = `설비 점검·정비 현장에서 "${fieldLabel}" 칸에 들어갈 말을 받아쓰는 중이다. 설비명·지사명·전문 용어가 섞인 구어체 한국어 문장일 수 있다. ${PLANT_HINT}${menuLine}`;
   if (options && options.length) {
     return `${base} 다음 중 하나를 고르는 말일 때가 많다: ${options.slice(0, 20).join(", ")}.`;
   }
@@ -205,9 +255,19 @@ function buildTranscribeHint(fieldLabel: string, options: string[] | null, quest
  *  있는 낱말을 있는 그대로 나열해 인식 정확도를 높인다. 보기 목록(select 류 칸의 후보)이 있으면
  *  그것을 먼저 넣고, 남는 자리는 자주 잘못 들리는 플랜트 용어(PLANT_KEYWORDS)로 채운다 —
  *  자유 서술 칸도 "단자번호"가 "환자번호"로 들리지 않게 용어 후보를 받는다. */
-function buildKeywords(options: string[] | null): string[] {
-  const opts = (options ?? []).slice(0, MAX_KEYWORDS);
-  return [...opts, ...PLANT_KEYWORDS.filter((k) => !opts.includes(k))].slice(0, MAX_KEYWORDS);
+function buildKeywords(options: string[] | null, vocab: MenuVocabulary | null = null): string[] {
+  const out: string[] = [];
+  const add = (k: string) => {
+    if (out.length < MAX_KEYWORDS && !out.includes(k)) out.push(k);
+  };
+  (options ?? []).slice(0, MAX_KEYWORDS).forEach(add);
+  // 메뉴 이전 기록 용어 — 이름(설비·기기) 먼저, 그다음 자주 쓰인 낱말. 너무 긴 이름은 힌트로 부적합해 뺀다
+  if (vocab) {
+    const menuWords = [...vocab.phrases, ...vocab.terms].filter((w) => w.length <= 15).slice(0, MENU_KEYWORD_SLOTS);
+    menuWords.forEach(add);
+  }
+  PLANT_KEYWORDS.forEach(add);
+  return out;
 }
 
 async function transcribeWithOpenAI(
@@ -216,6 +276,7 @@ async function transcribeWithOpenAI(
   fieldLabel: string,
   options: string[] | null,
   question = false,
+  ctx: VoiceContext | null = null,
 ): Promise<string | null> {
   const form = new FormData();
   form.append("file", audio, `recording.${extensionForMime(audio.type)}`);
@@ -223,8 +284,8 @@ async function transcribeWithOpenAI(
   // gpt-transcribe 는 복수형 languages 를 쓴다(language 단수 필드와는 별개 — 같이
   // 보내지 않는다. 공식 가이드: "these models use languages instead of language").
   form.append("languages[]", "ko");
-  if (fieldLabel || question) form.append("prompt", buildTranscribeHint(fieldLabel, options, question));
-  for (const kw of question ? QUESTION_KEYWORDS : buildKeywords(options)) form.append("keywords[]", kw);
+  if (fieldLabel || question) form.append("prompt", buildTranscribeHint(fieldLabel, options, question, ctx));
+  for (const kw of question ? QUESTION_KEYWORDS : buildKeywords(options, ctx?.vocab ?? null)) form.append("keywords[]", kw);
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -380,8 +441,14 @@ export async function POST(req: Request) {
   const maxCharsNum = typeof maxCharsRaw === "string" ? parseInt(maxCharsRaw, 10) : NaN;
   const maxChars = Number.isFinite(maxCharsNum) && maxCharsNum > 0 ? Math.min(maxCharsNum, MAX_CHARS_CAP) : undefined;
 
+  // 어느 메뉴에서 말했는지 + 양식에 이미 적힌 글 — 메뉴 이전 기록 용어를 기준으로 표기를 맞춘다(buildContextBlock)
+  const menu = fieldKind === "question" ? null : parseVoiceMenu(form.get("menu"));
+  const formContextRaw = form.get("formContext");
+  const formContext =
+    typeof formContextRaw === "string" ? formContextRaw.replace(/"""/g, "\"").trim().slice(0, MAX_FORM_CONTEXT) : "";
+  const ctx: VoiceContext | null = menu ? { menu, vocab: await getMenuVocabulary(menu), formContext } : null;
   try {
-    const raw = await transcribeWithOpenAI(audio, apiKey, fieldLabel, options, fieldKind === "question");
+    const raw = await transcribeWithOpenAI(audio, apiKey, fieldLabel, options, fieldKind === "question", ctx);
     if (!raw) return NextResponse.json({ ok: true, raw: "", text: "" });
 
     if (fieldKind === "question") {
@@ -403,7 +470,7 @@ export async function POST(req: Request) {
 
     // 자유 서술·짧은 값 칸 — 정리 단계가 실패해도(네트워크 오류 등) 받아쓴 원문은
     // 살려서 돌려준다. 빈 손으로 돌아가는 것보다 원문이라도 칸에 들어가는 편이 낫다.
-    const prompt = buildCleanupPrompt(fieldLabel, fieldKind, raw, maxChars);
+    const prompt = buildCleanupPrompt(fieldLabel, fieldKind, raw, maxChars, ctx);
     let cleaned = await cleanWithOpenAI(prompt, apiKey).catch(() => null);
     // 드물게 망가진 응답(멀티바이트 글자가 중간에 끊겨 U+FFFD로 치환된 경우)이
     // 들어올 때가 있다(실제로 관찰됨 — 네트워크/레이트리밋 경계에서 발생하는 듯).

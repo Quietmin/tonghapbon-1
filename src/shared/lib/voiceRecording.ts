@@ -106,15 +106,27 @@ export interface TranscribeResult {
 
 /** 녹음한 오디오를 서버(api/voice/transcribe)로 보내 텍스트로 받는다. 실패하면 null
  *  — 호출부가 "다시 말씀해 주세요" 같은 안내로 대체한다. */
+/** 어느 메뉴의 작성 화면에서 말했는지 — 서버가 그 메뉴의 이전 기록 용어를 받아쓰기 기준으로 쓴다 */
+export type VoiceMenu = "status" | "fault" | "manual" | "report";
+
+export interface TranscribeScope {
+  menu: VoiceMenu;
+  /** 지금 작성 중인 양식의 다른 칸들에 이미 적힌 글 — 같은 설비·용어 표기를 맞추는 데 쓴다 */
+  formContext?: string;
+}
+
 export async function transcribeAudio(
   blob: Blob,
   field: TranscribeFieldContext,
+  scope?: TranscribeScope | null,
 ): Promise<TranscribeResult | null> {
   try {
     const form = new FormData();
     form.append("audio", blob, "recording.webm");
     form.append("fieldLabel", field.label);
     form.append("fieldKind", field.kind);
+    if (scope?.menu) form.append("menu", scope.menu);
+    if (scope?.formContext) form.append("formContext", scope.formContext.slice(0, 1500));
     if (field.options?.length) form.append("options", JSON.stringify(field.options));
     if (field.maxChars) form.append("maxChars", String(field.maxChars));
     const res = await fetch("/api/voice/transcribe", { method: "POST", body: form });

@@ -16,14 +16,86 @@
  *
  * 마이크·녹음 API(MediaRecorder)를 지원하지 않으면 아무것도 그리지 않는다.
  */
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./ui";
 import {
   isVoiceRecordingSupported,
   useAudioRecorder,
   transcribeAudio,
   type TranscribeFieldContext,
+  type VoiceMenu,
 } from "@/shared/lib/voiceRecording";
+
+/*
+ * 음성 입력 범위(메뉴) — 현황 작성·조치 갱신(status), 고장보고서(fault), 매뉴얼(manual), 사진대장(report)
+ * 화면을 VoiceScope 로 감싸 두면, 그 안의 모든 음성 버튼이 받아쓸 때
+ *   ① 어느 메뉴인지(서버가 그 메뉴의 이전 기록 용어를 1순위 기준으로 쓴다)
+ *   ② 같은 양식의 다른 칸에 이미 적힌 글(같은 설비·용어 표기를 맞춘다)
+ * 를 함께 보낸다. 칸마다 따로 값을 넘기지 않고 화면(DOM)에서 바로 읽으므로, 칸이 늘어도 고칠 곳이 없다.
+ * 범위 밖(따소미 대화창 등)의 버튼은 예전처럼 칸 정보만 보낸다.
+ */
+interface VoiceScopeValue {
+  menu: VoiceMenu;
+  scopeRef: React.RefObject<HTMLDivElement | null>;
+  extraContext?: string;
+}
+const VoiceScopeContext = createContext<VoiceScopeValue | null>(null);
+
+export function VoiceScope({
+  menu,
+  extraContext,
+  children,
+}: {
+  menu: VoiceMenu;
+  /** 입력칸이 아니라 글로만 보이는 맥락(예: 조치 갱신 창의 설비명·이슈 내용) — 양식 글 앞에 붙인다 */
+  extraContext?: string;
+  children: ReactNode;
+}) {
+  const scopeRef = useRef<HTMLDivElement | null>(null);
+  return (
+    <VoiceScopeContext.Provider value={{ menu, scopeRef, extraContext }}>
+      {/* display:contents — 감싸도 레이아웃(부모의 flex·grid)에 끼어들지 않는다 */}
+      <div ref={scopeRef} className="contents">
+        {children}
+      </div>
+    </VoiceScopeContext.Provider>
+  );
+}
+
+const MAX_FORM_CONTEXT = 1500;
+
+/** 칸 이름만 — label 이 고르는 칸을 감싸고 있으면 보기 글자까지 섞이므로 안쪽 입력 요소는 빼고, "*(필수)" 표시도 지운다 */
+function labelText(label: HTMLLabelElement | undefined): string {
+  if (!label) return "";
+  const clone = label.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll("select, input, textarea, button").forEach((n) => n.remove());
+  return (clone.textContent ?? "").replace(/\*|\(필수\)|\(선택\)/g, "").trim();
+}
+
+/** 범위 안 입력칸들의 현재 글을 "칸 이름: 값" 줄로 모은다 — 지금 채우는 칸(exclude 안)은 뺀다 */
+function collectFormContext(scope: HTMLElement | null, exclude: Element | null): string {
+  if (!scope) return "";
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  const fields = scope.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+    'input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]):not([type=password]):not([type=date]):not([type=datetime-local]):not([type=time]), textarea, select',
+  );
+  for (const el of fields) {
+    if (exclude?.contains(el)) continue;
+    const value =
+      el instanceof HTMLSelectElement ? (el.selectedOptions[0]?.textContent ?? "").trim() : el.value.trim();
+    if (!value || (el instanceof HTMLSelectElement && !el.value)) continue;
+    const name = (labelText(el.labels?.[0]) || el.getAttribute("aria-label") || el.getAttribute("placeholder") || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 30);
+    const line = `${name ? `${name}: ` : ""}${value.replace(/\s+/g, " ").slice(0, 300)}`;
+    if (seen.has(line)) continue;
+    seen.add(line);
+    lines.push(line);
+  }
+  return lines.join("\n").slice(0, MAX_FORM_CONTEXT);
+}
 
 export type VoiceDictationState = "idle" | "recording" | "processing";
 
@@ -62,6 +134,8 @@ export default function VoiceDictationButton({
   const [processing, setProcessing] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
   const recorder = useAudioRecorder();
+  const scope = useContext(VoiceScopeContext);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const setError = (msg: string | null) => {
     setErrorState(msg);
@@ -84,7 +158,20 @@ export default function VoiceDictationButton({
       const blob = await recorder.stop();
       if (!blob) return;
       setProcessing(true);
-      const result = await transcribeAudio(blob, field);
+      // 지금 채우는 칸(같은 음성 줄 안의 입력칸)은 맥락에서 뺀다 — 다시 녹음하면 그 칸은 새 글로 바뀌기 때문
+      const row = buttonRef.current?.closest("[data-voice-row]") ?? null;
+      const result = await transcribeAudio(
+        blob,
+        field,
+        scope
+          ? {
+              menu: scope.menu,
+              formContext: [scope.extraContext?.trim(), collectFormContext(scope.scopeRef.current, row)]
+                .filter(Boolean)
+                .join("\n"),
+            }
+          : null,
+      );
       setProcessing(false);
       if (!result) {
         setError("음성을 텍스트로 바꾸지 못했어요. 다시 시도해 주세요.");
@@ -105,6 +192,7 @@ export default function VoiceDictationButton({
   return (
     <span className="inline-flex items-center gap-1.5">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => void toggle()}
         disabled={processing || (disabled && !recorder.isRecording)}
@@ -146,7 +234,7 @@ export function WithVoiceInput({
 }) {
   const [error, setError] = useState<string | null>(null);
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1" data-voice-row>
       <div className={`flex gap-1.5 ${multiline ? "items-start" : "items-center"}`}>
         <VoiceDictationButton
           field={field}

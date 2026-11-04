@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button, Card, Icon, RequiredMark, InlineError } from "@/shared/components/ui";
 import { BRANCHES } from "@/shared/lib/branches";
-import { WithVoiceInput } from "@/shared/components/VoiceDictationButton";
+import { VoiceScope, WithVoiceInput } from "@/shared/components/VoiceDictationButton";
 import { DEPARTMENTS } from "../lib/constants";
 import type { StatusIssueRow } from "../lib/repo";
 import { PhotoPicker, type PickedPhoto } from "./StatusPhotos";
@@ -210,6 +210,7 @@ export default function StatusRegisterForm({
   }
 
   return (
+    <VoiceScope menu="status">
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       <Card lift={false} className="p-6 flex flex-col gap-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -339,5 +340,6 @@ export default function StatusRegisterForm({
         </Button>
       </div>
     </form>
+    </VoiceScope>
   );
 }
