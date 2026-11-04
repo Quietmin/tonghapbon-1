@@ -352,6 +352,12 @@ export interface TaskFilter {
   equipmentType?: string;
   q?: string;
   needsReview?: boolean;
+  /**
+   * 이 id 들만 본다. 지연 위험처럼 SQL 로 못 거르는 조건(schedule.ts 가 계획일정을
+   * 계산해 판정한다)을 쓸 때, 부른 쪽이 id 를 추려 넘긴다. 빈 배열이면 결과도 비는데,
+   * 그게 맞다 — "지연 위험만 보기"를 켰는데 위험 작업이 없으면 빈 목록이어야 한다.
+   */
+  ids?: string[];
   limit?: number;
   offset?: number;
 }
@@ -370,6 +376,17 @@ export async function listTasks(
   if (f.field) add("field = ?", f.field);
   if (f.equipmentType) add("equipment_type = ?", f.equipmentType);
   if (f.needsReview) where.push("needs_review = true");
+  if (f.ids) {
+    // 빈 목록이면 아무것도 안 나와야 한다 (in () 는 문법 오류라 false 로 적는다)
+    if (f.ids.length === 0) where.push("false");
+    else {
+      const ph = f.ids.map((id) => {
+        params.push(id);
+        return `$${params.length}`;
+      });
+      where.push(`id in (${ph.join(", ")})`);
+    }
+  }
   if (f.q) {
     // 한국어는 조사·어미가 붙어 문장 전체 유사도가 안 먹는다.
     // 어절로 쪼개 모두 포함하는 행을 찾는다 (db/schema.sql 상단의 검색 전략 주석 참고).
