@@ -94,8 +94,19 @@ async function sendTo(subs: SubscriptionRow[], payload: PushPayload): Promise<vo
   );
 }
 
-async function subscriptionsFor(branch: string | null, department: string): Promise<SubscriptionRow[]> {
+/**
+ * 보낼 대상 고르기. department 를 주면 그 부서만, 주지 않으면 그 지사의 모든 부서다.
+ * 현황 등록은 지사 전체로 보낸다 — 담당부서가 잘못 지정될 수도 있고, 어느 부서 일인지
+ * 서로 알고 있어야 한다는 요구다(등록한 운영부 본인도 포함).
+ */
+async function subscriptionsFor(branch: string | null, department?: string): Promise<SubscriptionRow[]> {
   if (!branch) return [];
+  if (!department) {
+    return query<SubscriptionRow>(
+      `select endpoint, p256dh, auth from push_subscription where branch = $1`,
+      [branch],
+    );
+  }
   return query<SubscriptionRow>(
     `select endpoint, p256dh, auth from push_subscription where branch = $1 and department = $2`,
     [branch, department],
@@ -109,13 +120,14 @@ function clip(text: string, max = 90): string {
 }
 
 /**
- * 운영부가 현황을 등록했다 → 그 지사의 담당부서(계전부·기계부·공무부) 기기들로.
+ * 운영부가 현황을 등록했다 → 그 지사의 모든 부서(운영부·계전부·기계부·공무부) 기기들로.
+ * 담당부서만이 아니라 지사 전체가 받는다 — 누가 조치할 일인지는 알림 제목에 적어 구분한다.
  * 구독 테이블이 아직 없는 DB(마이그레이션 전)에서도 등록이 깨지지 않도록 전체를 삼킨다.
  */
 export async function notifyIssueCreated(row: StatusIssueRow): Promise<void> {
   try {
     if (!ensureVapid()) return;
-    const subs = await subscriptionsFor(row.branch, row.department);
+    const subs = await subscriptionsFor(row.branch);
     await sendTo(subs, {
       title: `[${row.branch}] 현황 등록 — ${row.department} 조치 필요`,
       body: `${row.equipment_name} · ${clip(row.content)} (작성 ${row.reporter})`,

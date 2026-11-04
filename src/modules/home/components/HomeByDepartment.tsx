@@ -83,7 +83,9 @@ async function OperationsHome({ branch }: { branch: string | null }) {
         <Icon name="arrow_forward" className="ml-auto text-3xl shrink-0" />
       </Link>
 
-      <PushOptIn description="올린 현황이 조치 완료되면 이 기기로 알림이 옵니다." />
+      <PushOptIn
+        description={`${branch ?? "내 지사"}에 현황이 등록되거나 조치 완료되면 이 기기로 알림이 옵니다.`}
+      />
 
       {summary.error ? (
         <StatusError summary={summary} />
@@ -115,7 +117,9 @@ async function MaintenanceHome({
     <div className="space-y-gutter">
       <Header title={`${branch ?? "전체 지사"} ${department} 현황`} />
 
-      <PushOptIn description={`운영부가 ${department} 담당 현황을 올리면 이 기기로 알림이 옵니다.`} />
+      <PushOptIn
+        description={`${branch ?? "내 지사"}에 현황이 등록되면 담당부서와 상관없이 이 기기로 알림이 옵니다.`}
+      />
 
       {summary.error ? (
         <StatusError summary={summary} />
