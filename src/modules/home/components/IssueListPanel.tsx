@@ -145,6 +145,14 @@ export default function IssueListPanel({
 
   const hasScheduleColumn = columns.includes("scheduled");
   const compact = columns.length <= 3;
+  /*
+   * 표와 카드 목록 중 무엇을 보일지는 화면 폭이 아니라 이 카드의 실제 폭(컨테이너 쿼리)으로 정한다.
+   * 노트북(폭 1024~1279px)에서는 사이드바 옆에 카드가 두 단으로 서서 한 카드가 300px 남짓인데, 표는 칸 폭 합이
+   * 400px(3열)·760px(6열)이라 카드 안에서 좌우로 밀어야만 이슈 내용이 보였다. 표가 다 들어가는 폭(3열 26rem,
+   * 6열 48rem)부터 표를, 그보다 좁으면 폰과 같은 카드 목록을 보인다. (클래스 이름은 Tailwind 가 찾도록 통째로 적는다)
+   */
+  const listOnlyWhenNarrow = compact ? "@min-[26rem]:hidden" : "@min-[48rem]:hidden";
+  const tableOnlyWhenWide = compact ? "@max-[26rem]:hidden" : "@max-[48rem]:hidden";
   const widthOf = (c: IssueColumn) => (compact ? COMPACT_WIDTH[c] : undefined) ?? COLUMN_META[c].width;
 
   // 페이지 나누기 — 저장 뒤 목록이 줄어 현재 페이지가 사라져도 마지막 페이지로 붙는다
@@ -198,9 +206,9 @@ export default function IssueListPanel({
       {rows.length === 0 ? (
         <EmptyState compact icon="inbox" title={emptyText} />
       ) : (
-        <>
-        {/* 폰(md 미만) — 표는 칸이 좁아 이슈 내용이 잘리므로 카드 목록으로 보인다. 누르기·키보드는 표와 같다 */}
-        <ul className="md:hidden flex flex-col divide-y divide-border-subtle">
+        <div className="@container">
+        {/* 카드가 좁을 때(폰, 노트북 두 단) — 표는 칸이 좁아 이슈 내용이 잘리므로 카드 목록으로 보인다. 누르기·키보드는 표와 같다 */}
+        <ul className={`${listOnlyWhenNarrow} flex flex-col divide-y divide-border-subtle`}>
           {visibleRows.map((r) => {
             const open = () => (editable ? setSelected(r) : setDetail(r));
             const meta = columns
@@ -247,7 +255,7 @@ export default function IssueListPanel({
           })}
         </ul>
 
-        <div className="max-md:hidden overflow-x-auto -mx-1">
+        <div className={`${tableOnlyWhenWide} overflow-x-auto -mx-1`}>
           <table
             className={`${TABLE} table-fixed`}
             // 폭이 정해진 칸의 합에 폭 없는 칸(이슈 내용)이 쓸 160px 을 더한다 — 좁으면 가로로 밀어 보게 하고 칸이 0px 로 사라지지 않게
@@ -289,7 +297,7 @@ export default function IssueListPanel({
             </tbody>
           </table>
         </div>
-        </>
+        </div>
       )}
 
       {pageCount > 1 && (
