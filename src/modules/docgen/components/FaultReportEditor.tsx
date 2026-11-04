@@ -13,7 +13,7 @@ import SortedSelect, {
   UnitField,
 } from "./SortedSelect";
 import { BRANCHES, FAULT_FIELDS } from "../lib/constants";
-import { ButtonLink, Icon } from "@/shared/components/ui";
+import { Icon } from "@/shared/components/ui";
 import {
   formatDateTime,
   minutesText,
@@ -273,18 +273,7 @@ export default function FaultReportEditor({ initial }: { initial?: FaultReportIn
       mode="fault"
       accent="primary"
       faultSummary={faultSummary}
-      // 작성 ↔ 조회를 제목 줄에서 바로 오간다. 반대쪽(조회 화면)의 작성 버튼과
-      // 같은 색으로 둬서, 두 화면을 오갈 때 같은 자리의 같은 버튼으로 읽히게 한다.
-      // 폰처럼 폭이 좁으면 flex-wrap 으로 버튼을 아래 줄로 내린다 — wrap 이 없으면
-      // flex 가 두 버튼을 억지로 한 줄에 욱여넣으면서 한글이 글자 하나씩 세로로
-      // 쪼개져 보이는 문제가 있었다(실제로 겪음).
-      // (예전 "음성으로 고장보고서 입력하기" 버튼은 칸마다 음성 버튼이 붙으면서 뺐다)
-      headingAction={
-        <ButtonLink href="/failure" variant="primary" className="whitespace-nowrap">
-          <Icon name="inventory_2" className="text-lg" />
-          고장보고서 조회
-        </ButtonLink>
-      }
+      // 제목 줄의 "고장보고서 조회" 버튼은 뺐다 — 화면 위쪽 챕터 메뉴(조회·작성)와 겹쳐서.
       initialFiles={issuePhotos}
       saveMeta={{
         branch,
